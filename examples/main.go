@@ -26,38 +26,36 @@ sets the request and response modifier of the proxy; modifiers adhere to the
 following top-level JSON structure:
 
 	{
-		"name": "modified name (e.g., header.Modifier)",
-		"type": 3, // 1 (REQUEST), 2 (RESPONSE), 3 (REQUEST & RESPONSE)
-		"modifier": { ... }
+		"package.Modifier": {
+			"scope": ["request", "response"],
+			"attribute 1": "value",
+			"attribute 2": "value"
+		}
 	}
 
 modifiers may be "stacked" to provide support for additional behaviors; for
 example, to add a "Martian-Test" header with the value "true" for requests
 with the domain "www.example.com" the JSON message would be:
 
- 	{
- 		"name": "url.Filter",
- 		"type": 1,
- 		"modifier": {
- 			"host": "www.example.com",
- 			"modifier": {
- 				"name": "header.Modifier",
- 				"type": 1,
- 				"modifier": {
- 					"name": "Martian-Test",
- 					"value": "true"
- 				}
- 			}
- 		}
- 	}
+	{
+		"url.Filter": {
+			"scope": ["request"],
+			"host": "www.example.com",
+			"modifier": {
+				"header.Modifier": {
+					"name": "Martian-Test",
+					"value": "true"
+				}
+			}
+		}
+	}
 
-url.Filter parses the JSON object in the outermost message's "modifier"
-attribute; the "host" key tells the url.Filter to filter requests if the
-host explicitly matches "www.example.com"
+url.Filter parses the JSON object in the value of the "url.Filter" attribute;
+the "host" key tells the url.Filter to filter requests if the host explicitly
+matches "www.example.com"
 
-the "modifier" key contained within the outmost message's "modifier"
-attribute contains another modifier message of the header.Modifier to run
-iff the filter passes
+the "modifier" key within the "url.Filter" JSON object contains another
+modifier message of the type header.Modifier to run iff the filter passes
 
 	GET host:port/martian/verify
 
@@ -80,14 +78,12 @@ modifier configuration request; for example, to verify that all requests to
 configuration endpoint:
 
 	{
-		"name": "url.Filter",
-		"type": 1,
-		"modifier": {
+		"url.Filter": {
+			"scope": ["request"],
 			"host": "www.example.com",
 			"modifier": {
-				"name": "url.Verifier",
-				"type": 1,
-				"modifier": {
+				"url.Verifier": {
+					"scope": ["request"],
 					"scheme": "https"
 				}
 			}
