@@ -19,17 +19,17 @@ anywhere that Go can target.
 ### Start the Proxy
 Running an instance of Martian is as simple as
 
-    go run main.go
+    go run examples/main.go
 
 If you want to see system logs as Martian is running, pass in the verbosity
 flag:
 
-    go run main.go -- -v=0
+    go run examples/main.go -- -v=0
 
 By default, Martian will be running on port 8080. The port can be specified via
 a flag:
 
-    go run main.go -- --port=9999
+    go run examples/main.go -- --port=9999
 
 ### Configure
 Once Martian is running, you need to configure its behavior. Without
