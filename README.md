@@ -59,7 +59,7 @@ Let's break down the parts of this message.
   refer to the [modifier reference](modifiers.md).
 
 * `[package.Type].scope`: Indicates whether to apply to the modifier to
-  requests, responses or both. This can be a array containing "request",
+  requests, responses or both. This can be an array containing "request",
   "response", or both.
 
 * `[package.Type].[key]: Modifier specific data. In the case of the header
