@@ -1,4 +1,4 @@
-# Martian Proxy
+# Martian Proxy [![Build Status](https://travis-ci.org/google/martian.svg?branch=master)](https://travis-ci.org/google/martian)
 
 Martian Proxy is a programmable HTTP proxy designed to be used for testing.
 
