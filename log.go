@@ -16,9 +16,10 @@ package martian
 
 import (
 	"fmt"
-	log "github.com/golang/glog"
 	"runtime"
 	"strings"
+
+	log "github.com/golang/glog"
 )
 
 // Infof logs an info message with caller information.
