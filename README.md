@@ -53,9 +53,9 @@ The above configuration tells Martian to inject a header with the name
 
 Let's break down the parts of this message.
 
-* `[package.Type]`: The package.Type of the [modifier](#modifiers) that you
-  want to use. In this case, it's "header.Modifier", which is the name of the
-  modifier that sets headers (to learn more about the `header.Modifier`, please
+* `[package.Type]`: The package.Type of the modifier that you want to use. In
+  this case, it's "header.Modifier", which is the name of the modifier that
+  sets headers (to learn more about the `header.Modifier`, please
   refer to the [modifier reference](https://github.com/google/martian/wiki/Modifier-Reference).
 
 * `[package.Type].scope`: Indicates whether to apply to the modifier to
@@ -129,7 +129,7 @@ Verification errors are held in memory until they are explicitly cleared by
 ## Martian as a Library
 Martian can also be included into any Go program and used as a library.
 
-## Modifiers All The Way Down(#modifiers)
+## Modifiers All The Way Down
 Martian's request and response modification system is designed to be general
 and extensible. The design objective is to provide individual modifier
 behaviors that can arranged to build out nearly any desired modification.
