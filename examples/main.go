@@ -141,6 +141,7 @@ import (
 	"github.com/google/martian"
 	"github.com/google/martian/cors"
 	"github.com/google/martian/fifo"
+	"github.com/google/martian/header"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/verify"
 )
@@ -190,11 +191,19 @@ func main() {
 
 	p := martian.NewProxy(mitm)
 
-	m := martianhttp.NewModifier()
 	fg := fifo.NewGroup()
 
+	hbhmod := header.NewHopByHopModifier()
+	fg.AddRequestModifier(hbhmod)
+	fg.AddRequestModifier(header.NewForwardedModifier())
+	fg.AddRequestModifier(header.NewBadFramingModifier())
+	fg.AddRequestModifier(header.NewViaModifier("martian 1.1"))
+
+	m := martianhttp.NewModifier()
 	fg.AddRequestModifier(m)
 	fg.AddResponseModifier(m)
+
+	fg.AddResponseModifier(hbhmod)
 
 	p.SetRequestModifier(fg)
 	p.SetResponseModifier(fg)

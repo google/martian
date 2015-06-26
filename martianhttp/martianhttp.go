@@ -37,6 +37,22 @@ func NewModifier() *Modifier {
 	return &Modifier{}
 }
 
+// SetRequestModifier sets the request modifier.
+func (m *Modifier) SetRequestModifier(reqmod martian.RequestModifier) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.reqmod = reqmod
+}
+
+// SetResponseModifier sets the response modifier.
+func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.resmod = resmod
+}
+
 // ModifyRequest runs reqmod.
 func (m *Modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
 	m.mu.RLock()
@@ -96,7 +112,7 @@ func (m *Modifier) ResetRequestVerifications() {
 	}
 }
 
-// ResetResponseVerifications resets verifications on resdmo, iff resmod is a
+// ResetResponseVerifications resets verifications on resmod, iff resmod is a
 // ResponseVerifier.
 func (m *Modifier) ResetResponseVerifications() {
 	m.mu.RLock()

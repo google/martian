@@ -35,17 +35,17 @@ var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 // MITM is the configuration for using the Proxy as a MITM.
 type MITM struct {
 	// Authority is the CA certificate used to sign MITM certificates.
-	Authority	*x509.Certificate
+	Authority *x509.Certificate
 	// PublicKey used to create MITM certificates.
-	PublicKey	interface{}
+	PublicKey interface{}
 	// PrivateKey of the CA used to sign MITM certificates.
-	PrivateKey	interface{}
+	PrivateKey interface{}
 	// Validity is the window of time around time.Now() that the
 	// certificate will be valid.
-	Validity	time.Duration
+	Validity time.Duration
 	// Organization that is displayed as the owner of the
 	// certificate.
-	Organization	string
+	Organization string
 }
 
 // Hijack takes a net.Conn and the host name to create the SSL
@@ -54,8 +54,9 @@ type MITM struct {
 func (mitm *MITM) Hijack(conn net.Conn, host string) (*tls.Conn, *bufio.ReadWriter, error) {
 	// Ensure the certificate we create is valid within a window of time to allow
 	// for clock skew.
-	start := time.Now().Add(-mitm.Validity)
-	end := time.Now().Add(mitm.Validity)
+	now := time.Now().UTC()
+	start := now.Add(-mitm.Validity)
+	end := now.Add(mitm.Validity)
 
 	tpl, err := NewTemplate(mitm.Organization, host, start, end, mitm.PublicKey)
 	if err != nil {
@@ -70,8 +71,8 @@ func (mitm *MITM) Hijack(conn net.Conn, host string) (*tls.Conn, *bufio.ReadWrit
 	config := &tls.Config{
 		Certificates: []tls.Certificate{
 			{
-				PrivateKey:	mitm.PrivateKey,
-				Certificate:	[][]byte{cb},
+				PrivateKey:  mitm.PrivateKey,
+				Certificate: [][]byte{cb},
 			},
 		},
 	}
@@ -100,17 +101,17 @@ func NewTemplate(org, host string, start, end time.Time, pub interface{}) (*x509
 	}
 
 	return &x509.Certificate{
-		SerialNumber:	serial,
+		SerialNumber: serial,
 		Subject: pkix.Name{
-			CommonName:	host,
-			Organization:	[]string{org},
+			CommonName:   host,
+			Organization: []string{org},
 		},
-		SubjectKeyId:		keyID,
-		KeyUsage:		x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:		[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid:	true,
-		DNSNames:		[]string{host},
-		NotBefore:		start,
-		NotAfter:		end,
+		SubjectKeyId:          keyID,
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{host},
+		NotBefore:             start,
+		NotAfter:              end,
 	}, nil
 }

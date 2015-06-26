@@ -320,26 +320,16 @@ func (p *Proxy) handleNonMITMConnect(ctx *Context, conn net.Conn, host string) {
 
 // handleRequest runs the request and response modifiers and performs the roundtrip to the destination server.
 func (p *Proxy) handleRequest(ctx *Context, rw *bufio.ReadWriter, req *http.Request) (closing bool) {
-	if err := proxyutil.FixBadFraming(req.Header); err != nil {
-		Errorf("proxyutil.FixBadFraming(): %v", err)
-		proxyutil.NewErrorResponse(400, err, req).Write(rw)
+	if shouldCloseAfterReply(req.Header) {
+		Debugf("closing after reply")
+		closing = true
 	}
-
-	proxyutil.SetForwardedHeaders(req)
-	proxyutil.SetViaHeader(req.Header, "1.1 martian")
 
 	if err := p.ModifyRequest(ctx, req); err != nil {
 		Errorf("martian.ModifyRequest(): %v", err)
 		proxyutil.NewErrorResponse(400, err, req).Write(rw)
 		return
 	}
-
-	if shouldCloseAfterReply(req.Header) {
-		Debugf("closing after reply")
-		closing = true
-	}
-
-	proxyutil.RemoveHopByHopHeaders(req.Header)
 
 	var res *http.Response
 	var err error
@@ -356,8 +346,6 @@ func (p *Proxy) handleRequest(ctx *Context, rw *bufio.ReadWriter, req *http.Requ
 		Debugf("skipped round trip for %s", req.URL)
 		res = proxyutil.NewResponse(200, nil, req)
 	}
-
-	proxyutil.RemoveHopByHopHeaders(res.Header)
 
 	if err := p.ModifyResponse(ctx, res); err != nil {
 		Errorf("martian.ModifyResponse(): %v", err)
