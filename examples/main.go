@@ -57,6 +57,35 @@ matches "www.example.com"
 the "modifier" key within the "url.Filter" JSON object contains another
 modifier message of the type header.Modifier to run iff the filter passes
 
+groups may also be used to run multiple modifiers sequentially; for example to
+log requests and responses after adding the "Martian-Test" header to the
+request, but only when the host matches www.example.com:
+
+  {
+    "url.Filter": {
+      "host": "www.example.com",
+      "modifier": {
+        "fifo.Group": {
+          "modifiers": [
+            {
+              "header.Modifier": {
+                "scope": ["request"],
+                "name": "Martian-Test",
+                "value": "true"
+              }
+            },
+            {
+              "log.Logger": { }
+            }
+          ]
+        }
+      }
+    }
+  }
+
+modifiers are designed to be composed together in ways that allow the user to
+write a single JSON structure to accomplish a variety of functionality
+
 	GET host:port/martian/verify
 
 retrieves the verifications errors as JSON with the following structure:

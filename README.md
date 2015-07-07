@@ -26,6 +26,8 @@ flag:
 
     go run examples/main.go -- -v=0
 
+For logging of requests and responses a [logging modifier](https://github.com/google/martian/wiki/Modifier-Reference#logging) is available
+
 By default, Martian will be running on port 8080. The port can be specified via
 a flag:
 
