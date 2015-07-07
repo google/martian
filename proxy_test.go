@@ -34,20 +34,20 @@ import (
 )
 
 type hijackResponseRecorder struct {
-	Code		int
-	Flushed		bool
-	HeaderMap	http.Header
-	Body		*bytes.Buffer
+	Code      int
+	Flushed   bool
+	HeaderMap http.Header
+	Body      *bytes.Buffer
 
-	conn			net.Conn
-	wroteHeader, hijacked	bool
+	conn                  net.Conn
+	wroteHeader, hijacked bool
 }
 
 func newHijackRecorder(conn net.Conn) *hijackResponseRecorder {
 	return &hijackResponseRecorder{
-		conn:		conn,
-		Body:		new(bytes.Buffer),
-		HeaderMap:	http.Header{},
+		conn:      conn,
+		Body:      new(bytes.Buffer),
+		HeaderMap: http.Header{},
 	}
 }
 
@@ -106,8 +106,8 @@ func (rw *hijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) 
 
 type timeoutPipe struct {
 	net.Conn
-	readTimeout	time.Time
-	writeTimeout	time.Time
+	readTimeout  time.Time
+	writeTimeout time.Time
 }
 
 type pipeNetError struct {
@@ -130,15 +130,15 @@ func pipeWithTimeout() (*timeoutPipe, *timeoutPipe) {
 	rc, wc := net.Pipe()
 
 	trc := &timeoutPipe{
-		Conn:		rc,
-		readTimeout:	time.Now().Add(3 * time.Minute),
-		writeTimeout:	time.Now().Add(3 * time.Minute),
+		Conn:         rc,
+		readTimeout:  time.Now().Add(3 * time.Minute),
+		writeTimeout: time.Now().Add(3 * time.Minute),
 	}
 
 	twc := &timeoutPipe{
-		Conn:		wc,
-		readTimeout:	time.Now().Add(3 * time.Minute),
-		writeTimeout:	time.Now().Add(3 * time.Minute),
+		Conn:         wc,
+		readTimeout:  time.Now().Add(3 * time.Minute),
+		writeTimeout: time.Now().Add(3 * time.Minute),
 	}
 	return trc, twc
 }
@@ -212,8 +212,8 @@ func tlsClient(conn net.Conn, ca *x509.Certificate, server string) net.Conn {
 	pool.AddCert(ca)
 
 	return tls.Client(conn, &tls.Config{
-		ServerName:	server,
-		RootCAs:	pool,
+		ServerName: server,
+		RootCAs:    pool,
 	})
 }
 
@@ -883,8 +883,8 @@ func TestServeHTTPChunkedBody(t *testing.T) {
 
 func TestShouldCloseAfterReply(t *testing.T) {
 	tt := []struct {
-		values	[]string
-		want	bool
+		values []string
+		want   bool
 	}{
 		{[]string{""}, false},
 		{[]string{"X-Hop-By-Hop", "Close"}, true},
@@ -898,130 +898,6 @@ func TestShouldCloseAfterReply(t *testing.T) {
 		if got := shouldCloseAfterReply(header); got != tc.want {
 			t.Errorf("shouldCloseAfterReply(%v): got %t, want %t", header, got, tc.want)
 		}
-	}
-}
-
-func TestServeHTTPRemovesHopByHopHeaders(t *testing.T) {
-	p := NewProxy(nil)
-	p.RoundTripper = RoundTripFunc(func(req *http.Request) (*http.Response, error) {
-		res := proxyutil.NewResponse(201, nil, req)
-		res.Header.Set("Hop-By-Hop", "true")
-		res.Header.Set("End-To-End", "true")
-		res.Header.Set("Connection", "Hop-By-Hop, close")
-
-		return res, nil
-	})
-
-	rc, wc := pipeWithTimeout()
-	defer rc.Close()
-	defer wc.Close()
-
-	rw := newHijackRecorder(wc)
-	req, err := http.NewRequest("GET", "http://www.example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-
-	go p.ServeHTTP(rw, req)
-
-	res, err := http.ReadResponse(bufio.NewReader(rc), req)
-	if err != nil {
-		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
-	}
-	res.Body.Close()
-
-	if got, want := res.Header.Get("End-To-End"), "true"; got != want {
-		t.Errorf("res.Header.Get(%q): got %q, want %q", "End-To-End", got, want)
-	}
-	if got, want := res.Header.Get("Hop-By-Hop"), ""; got != want {
-		t.Errorf("res.Header.Get(%q): got %q, want %q", "Hop-By-Hop", got, want)
-	}
-}
-
-func TestServeHTTPAddsForwardedHeaders(t *testing.T) {
-	p := NewProxy(nil)
-	p.RoundTripper = RoundTripFunc(func(req *http.Request) (*http.Response, error) {
-		if got, want := req.Header.Get("X-Forwarded-For"), "10.0.0.1"; got != want {
-			t.Fatalf("req.Header.Get(%q): got %q, want %q", "X-Forwarded-For", got, want)
-		}
-
-		return proxyutil.NewResponse(200, nil, req), nil
-	})
-
-	rc, wc := pipeWithTimeout()
-	defer rc.Close()
-	defer wc.Close()
-
-	rw := newHijackRecorder(wc)
-	req, err := http.NewRequest("GET", "http://www.example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-	req.RemoteAddr = "10.0.0.1"
-
-	go p.ServeHTTP(rw, req)
-
-	res, err := http.ReadResponse(bufio.NewReader(rc), req)
-	if err != nil {
-		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
-	}
-	res.Body.Close()
-}
-
-func TestServeHTTPAddsViaHeader(t *testing.T) {
-	p := NewProxy(nil)
-	p.RoundTripper = RoundTripFunc(func(req *http.Request) (*http.Response, error) {
-		if got, want := req.Header.Get("Via"), "1.1 martian"; got != want {
-			t.Fatalf("req.Header.Get(%q): got %q, want %q", "Via", got, want)
-		}
-
-		return proxyutil.NewResponse(200, nil, req), nil
-	})
-
-	rc, wc := pipeWithTimeout()
-	defer rc.Close()
-	defer wc.Close()
-
-	rw := newHijackRecorder(wc)
-	req, err := http.NewRequest("GET", "http://www.example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-
-	go p.ServeHTTP(rw, req)
-
-	res, err := http.ReadResponse(bufio.NewReader(rc), req)
-	if err != nil {
-		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
-	}
-	res.Body.Close()
-}
-
-func TestServeHTTPBadRequestOnBadFramingError(t *testing.T) {
-	p := NewProxy(nil)
-
-	rc, wc := pipeWithTimeout()
-	defer rc.Close()
-	defer wc.Close()
-
-	rw := newHijackRecorder(wc)
-	req, err := http.NewRequest("GET", "http://www.example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-	// Mismatched Content-Lengths.
-	req.Header.Set("Content-Length", "34, 42")
-
-	go p.ServeHTTP(rw, req)
-
-	res, err := http.ReadResponse(bufio.NewReader(rc), req)
-	if err != nil {
-		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
-	}
-	res.Body.Close()
-
-	if got, want := res.StatusCode, 400; got != want {
-		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
 }
 

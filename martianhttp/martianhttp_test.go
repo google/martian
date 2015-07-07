@@ -45,11 +45,11 @@ func TestModifyRequest(t *testing.T) {
 	m := NewModifier()
 
 	var modRun bool
-	m.reqmod = martian.RequestModifierFunc(
+	m.SetRequestModifier(martian.RequestModifierFunc(
 		func(*martian.Context, *http.Request) error {
 			modRun = true
 			return nil
-		})
+		}))
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -68,11 +68,11 @@ func TestModifyResponse(t *testing.T) {
 	m := NewModifier()
 
 	var modRun bool
-	m.resmod = martian.ResponseModifierFunc(
+	m.SetResponseModifier(martian.ResponseModifierFunc(
 		func(*martian.Context, *http.Response) error {
 			modRun = true
 			return nil
-		})
+		}))
 
 	res := proxyutil.NewResponse(200, nil, nil)
 	if err := m.ModifyResponse(martian.NewContext(), res); err != nil {
@@ -104,9 +104,9 @@ func TestVerifyRequests(t *testing.T) {
 	m := NewModifier()
 	verr := fmt.Errorf("request verification failure")
 
-	m.reqmod = &verify.TestVerifier{
+	m.SetRequestModifier(&verify.TestVerifier{
 		RequestError: verr,
-	}
+	})
 
 	if err := m.VerifyRequests(); err != verr {
 		t.Errorf("VerifyRequests(): got %v, want %v", err, verr)
@@ -125,9 +125,9 @@ func TestVerifyResponses(t *testing.T) {
 	m := NewModifier()
 	verr := fmt.Errorf("response verification failure")
 
-	m.resmod = &verify.TestVerifier{
+	m.SetResponseModifier(&verify.TestVerifier{
 		ResponseError: verr,
-	}
+	})
 
 	if err := m.VerifyResponses(); err != verr {
 		t.Errorf("VerifyResponses(): got %v, want %v", err, verr)
