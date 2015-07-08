@@ -118,7 +118,7 @@ func TestVerifyRequests(t *testing.T) {
 
 func TestVerifierFromJSON(t *testing.T) {
 	msg := []byte(`{
-    "martianurl.Verifier": {
+    "url.Verifier": {
       "scope": ["request"],
       "scheme": "https",
       "host": "www.martian.proxy",

@@ -32,7 +32,7 @@ const (
 )
 
 func init() {
-	parse.Register("martianurl.Verifier", verifierFromJSON)
+	parse.Register("url.Verifier", verifierFromJSON)
 }
 
 // Verifier verifies the structure of URLs.

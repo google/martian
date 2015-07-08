@@ -116,7 +116,7 @@ func TestIntegration(t *testing.T) {
 
 func TestModifierFromJSON(t *testing.T) {
 	msg := []byte(`{
-    "martianurl.Modifier": {
+    "url.Modifier": {
       "scope": ["request"],
       "scheme": "https",
       "host": "www.martian.proxy",
