@@ -66,7 +66,7 @@ func TestModifyRequestWithHostHeader(t *testing.T) {
 func TestModifierFromJSON(t *testing.T) {
 	msg := []byte(`{
 	  "header.Modifier": {
-		  "type": ["request", "response"],
+		  "scope": ["request", "response"],
 			"name": "X-Martian",
 			"value": "true"
     }
