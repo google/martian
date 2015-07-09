@@ -159,12 +159,20 @@ func (p *timeoutPipe) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
-func (p *timeoutPipe) Read(b []byte) (n int, err error) {
-	rc := make(chan bool, 1)
+func (p *timeoutPipe) Read(b []byte) (int, error) {
+	type connRead struct {
+		n   int
+		err error
+	}
+
+	rc := make(chan connRead, 1)
 
 	go func() {
-		n, err = p.Conn.Read(b)
-		rc <- true
+		n, err := p.Conn.Read(b)
+		rc <- connRead{
+			n:   n,
+			err: err,
+		}
 	}()
 
 	d := p.readTimeout.Sub(time.Now())
@@ -173,19 +181,26 @@ func (p *timeoutPipe) Read(b []byte) (n int, err error) {
 	}
 
 	select {
-	case <-rc:
-		return n, err
+	case cr := <-rc:
+		return cr.n, cr.err
 	case <-time.After(d):
 		return 0, &pipeNetError{true, false}
 	}
 }
 
 func (p *timeoutPipe) Write(b []byte) (n int, err error) {
-	wc := make(chan bool, 1)
+	type connWrite struct {
+		n   int
+		err error
+	}
+	wc := make(chan connWrite, 1)
 
 	go func() {
-		n, err = p.Conn.Write(b)
-		wc <- true
+		n, err := p.Conn.Write(b)
+		wc <- connWrite{
+			n:   n,
+			err: err,
+		}
 	}()
 
 	d := p.writeTimeout.Sub(time.Now())
@@ -194,8 +209,8 @@ func (p *timeoutPipe) Write(b []byte) (n int, err error) {
 	}
 
 	select {
-	case <-wc:
-		return n, err
+	case cw := <-wc:
+		return cw.n, cw.err
 	case <-time.After(d):
 		return 0, &pipeNetError{true, false}
 	}
