@@ -1,3 +1,17 @@
+// Copyright 2015 Google Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package martianmobile is a small subset of the Martian API intended to be
 // built with gomobile for Android and iOS support.
 package martianmobile
@@ -10,8 +24,10 @@ import (
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
 	_ "github.com/google/martian/header"
+	_ "github.com/google/martian/log"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"
+	_ "github.com/google/martian/priority"
 	_ "github.com/google/martian/querystring"
 	_ "github.com/google/martian/status"
 
@@ -23,7 +39,7 @@ import (
 
 // Proxy is a wrapper for the initialized Martian proxy.
 type Proxy struct {
-        proxy    *martian.Proxy
+	proxy    *martian.Proxy
 	listener net.Listener
 }
 
@@ -63,19 +79,19 @@ func Start(addr string) (*Proxy, error) {
 	rh.SetResponseVerifier(m)
 	http.Handle("/martian/verify/reset", rh)
 
-        http.Handle("/", p)
+	http.Handle("/", p)
 
-        log.Printf("Martian proxy starting\n")
-        go http.Serve(l, nil)
+	log.Printf("Martian proxy starting\n")
+	go http.Serve(l, nil)
 
-        return &Proxy{
-            proxy: p,
-            listener: l,
-        }, nil
+	return &Proxy{
+		proxy:    p,
+		listener: l,
+	}, nil
 }
 
 // Shutdown closes the martian.Proxy.
 func (p *Proxy) Shutdown() {
 	p.listener.Close()
-        log.Printf("Martian proxy shut down\n")
+	log.Printf("Martian proxy shut down\n")
 }
