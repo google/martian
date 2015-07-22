@@ -109,9 +109,9 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 // ModifyRequest applies the contained request modifier if the filter name and values
 // match the request query parameters. In the case of a nil valueMatcher, the modifier is
 // only applied when the nameMatcher matches.
-func (f *Filter) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (f *Filter) ModifyRequest(req *http.Request) error {
 	if f.matches(req) && f.reqmod != nil {
-		return f.reqmod.ModifyRequest(ctx, req)
+		return f.reqmod.ModifyRequest(req)
 	}
 
 	return nil
@@ -119,9 +119,9 @@ func (f *Filter) ModifyRequest(ctx *martian.Context, req *http.Request) error {
 
 // ModifyResponse applies the contained response modifier if the filter name and values match the
 // request query parameters.
-func (f *Filter) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (f *Filter) ModifyResponse(res *http.Response) error {
 	if f.matches(res.Request) && f.resmod != nil {
-		return f.resmod.ModifyResponse(ctx, res)
+		return f.resmod.ModifyResponse(res)
 	}
 
 	return nil

@@ -36,7 +36,7 @@ type blacklistModifierJSON struct {
 }
 
 // ModifyRequest deletes all request headers based on the header name.
-func (m *blacklistModifier) ModifyRequest(_ *martian.Context, req *http.Request) error {
+func (m *blacklistModifier) ModifyRequest(req *http.Request) error {
 	for _, name := range m.names {
 		req.Header.Del(name)
 	}
@@ -45,7 +45,7 @@ func (m *blacklistModifier) ModifyRequest(_ *martian.Context, req *http.Request)
 }
 
 // ModifyResponse deletes all response headers based on the header name.
-func (m *blacklistModifier) ModifyResponse(_ *martian.Context, res *http.Response) error {
+func (m *blacklistModifier) ModifyResponse(res *http.Response) error {
 	for _, name := range m.names {
 		res.Header.Del(name)
 	}

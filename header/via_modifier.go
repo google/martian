@@ -27,7 +27,7 @@ import (
 // http://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-9.9
 func NewViaModifier(via string) martian.RequestModifier {
 	return martian.RequestModifierFunc(
-		func(ctx *martian.Context, req *http.Request) error {
+		func(req *http.Request) error {
 			if v := req.Header.Get("Via"); v != "" {
 				via = v + ", " + via
 			}

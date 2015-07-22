@@ -20,6 +20,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -78,5 +79,33 @@ func TestNewErrorResponse(t *testing.T) {
 	}
 	if want := []byte("response error"); !bytes.Equal(got, want) {
 		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+}
+
+func TestWarning(t *testing.T) {
+	hdr := http.Header{}
+	err := fmt.Errorf("modifier error")
+
+	Warning(hdr, err)
+
+	if got, want := len(hdr["Warning"]), 1; got != want {
+		t.Fatalf("len(hdr[%q]): got %d, want %d", "Warning", got, want)
+	}
+
+	want := `199 "martian" "modifier error"`
+	if got := hdr["Warning"][0]; !strings.HasPrefix(got, want) {
+		t.Errorf("hdr[%q][0]: got %q, want to have prefix %q", "Warning", got, want)
+	}
+
+	hdr.Set("Date", "Mon, 02 Jan 2006 15:04:05 GMT")
+	Warning(hdr, err)
+
+	if got, want := len(hdr["Warning"]), 2; got != want {
+		t.Fatalf("len(hdr[%q]): got %d, want %d", "Warning", got, want)
+	}
+
+	want = `199 "martian" "modifier error" "Mon, 02 Jan 2006 15:04:05 GMT"`
+	if got := hdr["Warning"][1]; got != want {
+		t.Errorf("hdr[%q][1]: got %q, want %q", got, want)
 	}
 }

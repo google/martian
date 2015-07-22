@@ -18,8 +18,6 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
-
-	"github.com/google/martian"
 )
 
 func TestBadFramingMultipleContentLengths(t *testing.T) {
@@ -30,7 +28,7 @@ func TestBadFramingMultipleContentLengths(t *testing.T) {
 	}
 	req.Header["Content-Length"] = []string{"42", "42, 42"}
 
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Header["Content-Length"], []string{"42"}; !reflect.DeepEqual(got, want) {
@@ -38,7 +36,7 @@ func TestBadFramingMultipleContentLengths(t *testing.T) {
 	}
 
 	req.Header["Content-Length"] = []string{"42", "32, 42"}
-	if err := m.ModifyRequest(martian.NewContext(), req); err == nil {
+	if err := m.ModifyRequest(req); err == nil {
 		t.Error("ModifyRequest(): got nil, want error")
 	}
 }
@@ -52,7 +50,7 @@ func TestBadFramingTransferEncodingAndContentLength(t *testing.T) {
 	req.Header["Transfer-Encoding"] = []string{"gzip, chunked"}
 	req.Header["Content-Length"] = []string{"42"}
 
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
 	if _, ok := req.Header["Content-Length"]; ok {
@@ -61,7 +59,7 @@ func TestBadFramingTransferEncodingAndContentLength(t *testing.T) {
 
 	req.Header.Set("Transfer-Encoding", "gzip, identity")
 	req.Header.Del("Content-Length")
-	if err := m.ModifyRequest(martian.NewContext(), req); err == nil {
+	if err := m.ModifyRequest(req); err == nil {
 		t.Error("ModifyRequest(): got nil, want error")
 	}
 }

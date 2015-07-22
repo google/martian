@@ -38,7 +38,7 @@ type modifierJSON struct {
 }
 
 // ModifyRequest modifies the query string of the request with the given key and value.
-func (m *modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (m *modifier) ModifyRequest(req *http.Request) error {
 	query := req.URL.Query()
 	query.Set(m.key, m.value)
 	req.URL.RawQuery = query.Encode()

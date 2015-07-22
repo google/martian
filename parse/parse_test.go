@@ -20,113 +20,157 @@ import (
 	"testing"
 
 	"github.com/google/martian"
+	"github.com/google/martian/martiantest"
 )
 
 func TestFromJSON(t *testing.T) {
-	wasRun := false
+	msg := []byte(`{
+		"first.Modifier": { },
+		"second.Modifier": { }
+	}`)
 
-	Register("parse.Key", func(b []byte) (*Result, error) {
-		m := martian.RequestModifierFunc(
-			func(*martian.Context, *http.Request) error {
-				wasRun = true
-				return nil
-			})
+	if _, err := FromJSON(msg); err == nil {
+		t.Error("FromJson(): got nil, want more than one key error")
+	}
 
-		msg := &struct {
+	Register("martiantest.Modifier", func(b []byte) (*Result, error) {
+		type testJSON struct {
 			Scope []ModifierType `json:"scope"`
-		}{}
+		}
 
+		msg := &testJSON{}
 		if err := json.Unmarshal(b, msg); err != nil {
 			return nil, err
 		}
 
-		return NewResult(m, msg.Scope)
+		tm := martiantest.NewModifier()
+		return NewResult(tm, msg.Scope)
 	})
 
-	rawMsg := []byte(`{
-	  "parse.Key": {
-      "scope":["request"]
-    }
+	msg = []byte(`{
+		"martiantest.Modifier": { }
 	}`)
 
-	r, err := FromJSON(rawMsg)
+	r, err := FromJSON(msg)
 	if err != nil {
 		t.Fatalf("FromJSON(): got %v, want no error", err)
 	}
 
-	reqmod := r.RequestModifier()
-	if reqmod == nil {
-		t.Fatal("FromJSON(): got nil, want not nil")
+	if _, ok := r.RequestModifier().(*martiantest.Modifier); !ok {
+		t.Fatal("r.RequestModifier().(*martiantest.Modifier): got !ok, want ok")
+	}
+
+	if _, ok := r.ResponseModifier().(*martiantest.Modifier); !ok {
+		t.Fatal("r.ResponseModifier().(*martiantest.Modifier): got !ok, want ok")
+	}
+
+	msg = []byte(`{
+	  "martiantest.Modifier": {
+      "scope": ["request"]
+    }
+	}`)
+
+	r, err = FromJSON(msg)
+	if err != nil {
+		t.Fatalf("FromJSON(): got %v, want no error", err)
+	}
+
+	if _, ok := r.RequestModifier().(*martiantest.Modifier); !ok {
+		t.Fatal("r.RequestModifier().(*martiantest.Modifier): got !ok, want ok")
 	}
 
 	resmod := r.ResponseModifier()
 	if resmod != nil {
-		t.Fatal("FromJSON(): got nil, want not nil")
+		t.Error("r.ResponseModifier(): got not nil, want nil")
 	}
 
-	err = reqmod.ModifyRequest(nil, nil)
+	msg = []byte(`{
+	  "martiantest.Modifier": {
+      "scope": ["response"]
+    }
+	}`)
+
+	r, err = FromJSON(msg)
 	if err != nil {
-		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
-	}
-	if !wasRun {
-		t.Error("FromJSON(): got false, want true")
+		t.Fatalf("FromJSON(): got %v, want no error", err)
 	}
 
+	if _, ok := r.ResponseModifier().(*martiantest.Modifier); !ok {
+		t.Fatal("r.ResponseModifier().(*martiantest.Modifier): got !ok, want ok")
+	}
+
+	reqmod := r.RequestModifier()
+	if reqmod != nil {
+		t.Error("r.RequestModifier(): got not nil, want nil")
+	}
 }
 
-func TestResultRequestResponseModifierCorrectScope(t *testing.T) {
-	mod := struct {
-		martian.RequestModifier
-		martian.ResponseModifier
-	}{
-		RequestModifier: martian.RequestModifierFunc(
-			func(*martian.Context, *http.Request) error {
-				return nil
-			}),
-		ResponseModifier: martian.ResponseModifierFunc(
-			func(*martian.Context, *http.Response) error {
-				return nil
-			}),
+func TestNewResultMismatchedScopes(t *testing.T) {
+	reqmod := martian.RequestModifierFunc(
+		func(*http.Request) error {
+			return nil
+		})
+	resmod := martian.ResponseModifierFunc(
+		func(*http.Response) error {
+			return nil
+		})
+
+	if _, err := NewResult(reqmod, []ModifierType{Response}); err == nil {
+		t.Error("NewResult(reqmod, RESPONSE): got nil, want error")
 	}
-	result := &Result{
-		reqmod: mod,
+
+	if _, err := NewResult(resmod, []ModifierType{Request}); err == nil {
+		t.Error("NewResult(resmod, REQUEST): got nil, want error")
+	}
+
+	if _, err := NewResult(reqmod, []ModifierType{ModifierType("unknown")}); err == nil {
+		t.Error("NewResult(resmod, REQUEST): got nil, want error")
+	}
+}
+
+func TestResultModifierAccessors(t *testing.T) {
+	tm := martiantest.NewModifier()
+
+	r := &Result{
+		reqmod: tm,
 		resmod: nil,
 	}
-	reqmod := result.RequestModifier()
-	if reqmod == nil {
-		t.Error("result.RequestModifier: got nil, want not nil")
+	if reqmod := r.RequestModifier(); reqmod == nil {
+		t.Error("r.RequestModifier: got nil, want reqmod")
 	}
 
-	resmod := result.ResponseModifier()
-	if resmod != nil {
-		t.Errorf("result.ResponseModifier: got %v, want nil", resmod)
+	if resmod := r.ResponseModifier(); resmod != nil {
+		t.Error("r.ResponseModifier: got resmod, want nil")
 	}
 
-	result = &Result{
+	r = &Result{
 		reqmod: nil,
-		resmod: mod,
+		resmod: tm,
 	}
-	reqmod = result.RequestModifier()
-	if reqmod != nil {
-		t.Errorf("result.RequestModifier: got %v, want nil", reqmod)
+	if reqmod := r.RequestModifier(); reqmod != nil {
+		t.Errorf("r.RequestModifier: got reqmod, want nil")
 	}
 
-	resmod = result.ResponseModifier()
-	if resmod == nil {
-		t.Error("result.ResponseModifier: got nil, want not nil")
+	if resmod := r.ResponseModifier(); resmod == nil {
+		t.Error("r.ResponseModifier: got nil, want resmod")
 	}
 }
 
 func TestParseUnknownModifierReturnsError(t *testing.T) {
-	rawMsg := `
-	{
+	msg := []byte(`{
 	  "unknown.Key": {
       "scope": ["request", "response"]
 		}
-	}`
+	}`)
 
-	_, err := FromJSON([]byte(rawMsg))
-	if _, ok := err.(ErrUnknownModifier); !ok {
+	_, err := FromJSON(msg)
+
+	umerr, ok := err.(ErrUnknownModifier)
+	if !ok {
 		t.Fatalf("FromJSON(): got %v, want ErrUnknownModifier", err)
+	}
+
+	if got, want := umerr.Error(), "parse: unknown modifier: unknown.Key"; got != want {
+		t.Errorf("Error(): got %q, want %q", got, want)
 	}
 }

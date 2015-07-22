@@ -17,8 +17,6 @@ package header
 import (
 	"net/http"
 	"testing"
-
-	"github.com/google/martian"
 )
 
 func TestViaModifier(t *testing.T) {
@@ -28,7 +26,7 @@ func TestViaModifier(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Header.Get("Via"), "1.1 martian"; got != want {
@@ -36,7 +34,7 @@ func TestViaModifier(t *testing.T) {
 	}
 
 	req.Header.Set("Via", "1.0 alpha")
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Header.Get("Via"), "1.0 alpha, 1.1 martian"; got != want {

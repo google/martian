@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -31,7 +30,7 @@ func TestNewHeaderModifier(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Header.Get("testing"), "true"; got != want {
@@ -39,7 +38,7 @@ func TestNewHeaderModifier(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := mod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 	if got, want := req.Header.Get("testing"), "true"; got != want {
@@ -55,7 +54,7 @@ func TestModifyRequestWithHostHeader(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Host, "www.google.com"; got != want {
@@ -88,8 +87,7 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("reqmod: got nil, want not nil")
 	}
 
-	ctx := martian.NewContext()
-	if err := reqmod.ModifyRequest(ctx, req); err != nil {
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -104,7 +102,7 @@ func TestModifierFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := resmod.ModifyResponse(ctx, res); err != nil {
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 

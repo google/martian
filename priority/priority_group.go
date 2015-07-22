@@ -164,12 +164,12 @@ func (pg *Group) RemoveResponseModifier(resmod martian.ResponseModifier) error {
 // ModifyRequest modifies the request. Modifiers are run in descending order of
 // their priority. If an error is returned by a RequestModifier the error is
 // returned and no further modifiers are run.
-func (pg *Group) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (pg *Group) ModifyRequest(req *http.Request) error {
 	pg.reqmu.RLock()
 	defer pg.reqmu.RUnlock()
 
 	for _, m := range pg.reqmods {
-		if err := m.reqmod.ModifyRequest(ctx, req); err != nil {
+		if err := m.reqmod.ModifyRequest(req); err != nil {
 			return err
 		}
 	}
@@ -180,12 +180,12 @@ func (pg *Group) ModifyRequest(ctx *martian.Context, req *http.Request) error {
 // ModifyResponse modifies the response. Modifiers are run in descending order
 // of their priority. If an error is returned by a ResponseModifier the error
 // is returned and no further modifiers are run.
-func (pg *Group) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (pg *Group) ModifyResponse(res *http.Response) error {
 	pg.resmu.RLock()
 	defer pg.resmu.RUnlock()
 
 	for _, m := range pg.resmods {
-		if err := m.resmod.ModifyResponse(ctx, res); err != nil {
+		if err := m.resmod.ModifyResponse(res); err != nil {
 			return err
 		}
 	}

@@ -30,7 +30,7 @@ import (
 // see: http://tools.ietf.org/html/rfc7239
 func NewForwardedModifier() martian.RequestModifier {
 	return martian.RequestModifierFunc(
-		func(ctx *martian.Context, req *http.Request) error {
+		func(req *http.Request) error {
 			req.Header.Set("X-Forwarded-Proto", req.URL.Scheme)
 
 			xff, _, err := net.SplitHostPort(req.RemoteAddr)

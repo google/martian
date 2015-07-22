@@ -63,18 +63,18 @@ func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
 }
 
 // ModifyRequest runs the modifier if the URL matches all provided matchers.
-func (f *Filter) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (f *Filter) ModifyRequest(req *http.Request) error {
 	if f.reqmod != nil && f.matches(req.URL) {
-		return f.reqmod.ModifyRequest(ctx, req)
+		return f.reqmod.ModifyRequest(req)
 	}
 
 	return nil
 }
 
 // ModifyResponse runs the modifier if the request URL matches urlMatcher.
-func (f *Filter) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (f *Filter) ModifyResponse(res *http.Response) error {
 	if f.resmod != nil && f.matches(res.Request.URL) {
-		return f.resmod.ModifyResponse(ctx, res)
+		return f.resmod.ModifyResponse(res)
 	}
 
 	return nil

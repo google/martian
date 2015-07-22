@@ -16,35 +16,20 @@
 // request and response modifiers.
 package martian
 
-import (
-	"errors"
-	"net/http"
-)
-
-// ErrAuthRequired is the error returned by modifiers when
-// ctx.Auth.ID is required, but empty.
-var ErrAuthRequired = errors.New("authentication is required")
+import "net/http"
 
 // RequestModifier is an interface that defines a request modifier that can be
 // used by a proxy.
 type RequestModifier interface {
 	// ModifyRequest modifies the request.
-	//
-	// Modifying the request body is possible, though the req.Body must be
-	// replaced with a new io.ReadCloser since rewinding the body is
-	// unsupported.
-	ModifyRequest(ctx *Context, req *http.Request) error
+	ModifyRequest(req *http.Request) error
 }
 
 // ResponseModifier is an interface that defines a response modifier that can
 // be used by a proxy.
 type ResponseModifier interface {
 	// ModifyResponse modifies the response.
-	//
-	// Modifying the response body is possible, though the res.Body must be
-	// replaced with a new io.ReadCloser since rewinding the body is
-	// unsupported.
-	ModifyResponse(ctx *Context, res *http.Response) error
+	ModifyResponse(res *http.Response) error
 }
 
 // RequestResponseModifier is an interface that is both a ResponseModifier and
@@ -56,27 +41,18 @@ type RequestResponseModifier interface {
 
 // RequestModifierFunc is an adapter for using a function with the given
 // signature as a RequestModifier.
-type RequestModifierFunc func(ctx *Context, req *http.Request) error
+type RequestModifierFunc func(req *http.Request) error
 
 // ResponseModifierFunc is an adapter for using a function with the given
 // signature as a ResponseModifier.
-type ResponseModifierFunc func(ctx *Context, res *http.Response) error
+type ResponseModifierFunc func(res *http.Response) error
 
 // ModifyRequest modifies the request using the given function.
-func (f RequestModifierFunc) ModifyRequest(ctx *Context, req *http.Request) error {
-	return f(ctx, req)
+func (f RequestModifierFunc) ModifyRequest(req *http.Request) error {
+	return f(req)
 }
 
 // ModifyResponse modifies the response using the given function.
-func (f ResponseModifierFunc) ModifyResponse(ctx *Context, res *http.Response) error {
-	return f(ctx, res)
-}
-
-// RoundTripFunc is an adapter for using a function with the given signature as
-// an http.RoundTripper.
-type RoundTripFunc func(*http.Request) (*http.Response, error)
-
-// RoundTrip delegates to the provided RoundTrip function.
-func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
+func (f ResponseModifierFunc) ModifyResponse(res *http.Response) error {
+	return f(res)
 }

@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/proxyutil"
 )
 
@@ -54,7 +53,7 @@ func TestRemoveHopByHopHeaders(t *testing.T) {
 	}
 
 	req.Header = hs
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -67,7 +66,7 @@ func TestRemoveHopByHopHeaders(t *testing.T) {
 
 	res := proxyutil.NewResponse(200, nil, req)
 	res.Header = hs
-	if err := m.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 

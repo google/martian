@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -53,7 +52,7 @@ func NewVerifier(method string) (verify.RequestVerifier, error) {
 // ModifyRequest verifies that the request's method matches the given method
 // in all modified requests. An error will be added to the contained *MultiError
 // if a method is unmatched.
-func (v *verifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (v *verifier) ModifyRequest(req *http.Request) error {
 	m := req.Method
 
 	if v.method != "" && v.method != m {

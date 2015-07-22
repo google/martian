@@ -54,12 +54,12 @@ type TestVerifier struct {
 }
 
 // ModifyRequest is a no-op.
-func (tv *TestVerifier) ModifyRequest(*martian.Context, *http.Request) error {
+func (tv *TestVerifier) ModifyRequest(*http.Request) error {
 	return nil
 }
 
 // ModifyResponse is a no-op.
-func (tv *TestVerifier) ModifyResponse(*martian.Context, *http.Response) error {
+func (tv *TestVerifier) ModifyResponse(*http.Response) error {
 	return nil
 }
 

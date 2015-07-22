@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 )
 
@@ -30,7 +29,7 @@ func TestNewQueryStringModifier(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.URL.Query().Get("testing"), "true"; got != want {
@@ -46,7 +45,7 @@ func TestQueryStringModifierQueryExists(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.URL.Query().Get("testing"), "true"; got != want {
@@ -62,7 +61,7 @@ func TestQueryStringModifierQueryExistsMultipleKeys(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.URL.Query().Get("testing"), "true"; got != want {
@@ -99,8 +98,7 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("reqmod: got nil, want not nil")
 	}
 
-	ctx := martian.NewContext()
-	if err := reqmod.ModifyRequest(ctx, req); err != nil {
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
 	}
 

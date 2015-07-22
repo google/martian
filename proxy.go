@@ -16,351 +16,407 @@ package martian
 
 import (
 	"bufio"
+	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"net/http"
-	"strings"
+	"net/url"
+	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/google/martian/mitm"
 	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/session"
 )
 
-// Proxy implements an HTTP proxy with CONNECT and TLS MITM support.
-type Proxy struct {
-	// RoundTripper used to make the request from the proxy to the target server.
-	RoundTripper http.RoundTripper
-	// Timeout is the length of time the connection will be kept open while idle.
-	Timeout time.Duration
+var (
+	closeConn = errors.New("closing connection")
 
-	mitm    *MITM
-	creqmod RequestModifier
-	cresmod ResponseModifier
-	reqmod  RequestModifier
-	resmod  ResponseModifier
+	ctxmu sync.RWMutex
+	ctxs  = make(map[*http.Request]*session.Context)
+)
+
+// SetContext associates the context with request.
+func SetContext(req *http.Request, ctx *session.Context) {
+	ctxmu.Lock()
+	defer ctxmu.Unlock()
+
+	ctxs[req] = ctx
 }
 
-// NewProxy returns an HTTP proxy.
-func NewProxy(mitm *MITM) *Proxy {
-	return &Proxy{
-		RoundTripper: http.DefaultTransport,
-		Timeout:      5 * time.Minute,
-		mitm:         mitm,
-	}
+// RemoveContext removes the context for a given request.
+func RemoveContext(req *http.Request) {
+	ctxmu.Lock()
+	defer ctxmu.Unlock()
+
+	delete(ctxs, req)
 }
 
-// SetConnectRequestModifier sets the request modifier for the CONNECT request.
-func (p *Proxy) SetConnectRequestModifier(creqmod RequestModifier) {
-	Debugf("set CONNECT request modifier")
-	p.creqmod = creqmod
+// Context returns the associated context for the request.
+func Context(req *http.Request) *session.Context {
+	ctxmu.RLock()
+	defer ctxmu.RUnlock()
+
+	return ctxs[req]
 }
 
-// SetConnectResponseModifier sets the response modifier for the CONNECT response.
-func (p *Proxy) SetConnectResponseModifier(cresmod ResponseModifier) {
-	Debugf("set CONNECT response modifier")
-	p.cresmod = cresmod
-}
-
-// SetRequestModifier sets the request modifier for the decrypted request.
-func (p *Proxy) SetRequestModifier(reqmod RequestModifier) {
-	Debugf("set request modifier")
-	p.reqmod = reqmod
-}
-
-// SetResponseModifier sets the response modifier for the decrypted response.
-func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
-	Debugf("set response modifier")
-	p.resmod = resmod
-}
-
-// ModifyRequest modifies the request.
-func (p *Proxy) ModifyRequest(ctx *Context, req *http.Request) error {
-	if p.reqmod == nil {
-		Debugf("no modifier set, skip modifying request %s", req.URL)
-		return nil
+func isCloseableError(err error) bool {
+	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
+		return true
 	}
 
-	Debugf("modifying request %s", req.URL)
-
-	return p.reqmod.ModifyRequest(ctx, req)
-}
-
-// ModifyResponse modifies the response.
-func (p *Proxy) ModifyResponse(ctx *Context, res *http.Response) error {
-	if p.resmod == nil {
-		Debugf("no modifier set, skip modifying response for %s", res.Request.URL)
-		return nil
-	}
-
-	Debugf("modifying response %s", res.Request.URL)
-
-	return p.resmod.ModifyResponse(ctx, res)
-}
-
-// ServeHTTP handles requests from a connection and writes responses.
-//
-// If a MITM config was provided and a CONNECT request is received, the proxy
-// will generate a fake TLS certificate using the given authority certificate
-// and perform the TLS handshake. The request will then be decrypted and
-// modifiers will be run, followed by the request being re-encrypted and sent
-// to the destination server.
-//
-// If no MITM config was provided and a CONNECT request is received, the proxy
-// will open a connection to the destination server and copy the encrypted bytes
-// directly, as per normal CONNECT semantics.
-func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := NewContext()
-
-	hj, ok := w.(http.Hijacker)
-	if !ok {
-		Errorf("w.(http.Hijacker): !ok")
-		http.Error(w, "error unsupported http.Hijacker", 500)
-		return
-	}
-
-	// Take over the connection immediately. We technically don't need to do this
-	// in a non-CONNECT request, but it's easier to have all cases share the same
-	// logic for request handling.
-	conn, rw, err := hj.Hijack()
-	if err != nil {
-		Errorf("hj.Hijack(): %v", err)
-		return
-	}
-	defer conn.Close()
-
-	var closing bool
-	switch r.Method {
-	case "CONNECT":
-		if r.URL.Host == "" {
-			r.URL.Host = r.Host
-		}
-
-		// Run the CONNECT modifiers and handle errors.
-		res, err := p.connectResponse(ctx, r)
-		if err != nil {
-			Errorf("connectResponse(%s): %v", r.URL, err)
-			res.Write(rw)
-			break
-		}
-
-		var tlsconn net.Conn
-		var tlsrw *bufio.ReadWriter
-		if p.mitm != nil {
-			// Drop the port when building the MITM certificate.
-			host, _, err := net.SplitHostPort(r.Host)
-			if err != nil {
-				Errorf("net.SplitHostPort(%s): %v", r.Host, err)
-				proxyutil.NewErrorResponse(400, err, r).Write(rw)
-				break
-			}
-
-			// Build MITM certificate and wrap connection.
-			tlsconn, tlsrw, err = p.mitm.Hijack(conn, host)
-			if err != nil {
-				Errorf("mitm.Hijack(conn, %s): %v", host, err)
-				proxyutil.NewErrorResponse(400, err, r).Write(rw)
-				break
-			}
-			defer tlsconn.Close()
-
-			Debugf("Hijacked TLS connection for %s", host)
-		}
-
-		res.Write(rw)
-		rw.Flush()
-
-		if tlsconn != nil && tlsrw != nil {
-			conn = tlsconn
-			rw = tlsrw
-		}
-
-		// Proxy is not configured for man-in-the-middle and we have received a
-		// CONNECT request. Proxy the request as normal CONNECT.
-		if p.mitm == nil {
-			p.handleNonMITMConnect(ctx, conn, r.Host)
-			return
-		}
-	default:
-		Debugf("received non-CONNECT request %s", r.URL)
-		// Run the request and response modifiers.
-		closing = p.handleRequest(ctx, rw, r)
-	}
-
-	Debugf("rw.Flush(): flushing response: %s", r.URL)
-	if err := rw.Flush(); err != nil {
-		Errorf("rw.Flush(): %v", err)
-	}
-
-	if closing {
-		Debugf("closing connection")
-		return
-	}
-
-	// We continue looping until the connection has been closed by the client.
-	for {
-		// Each request has its own timeout of p.Timeout. Reset after each request.
-		deadline := time.Now().Add(p.Timeout)
-
-		if err := conn.SetDeadline(deadline); err != nil {
-			Errorf("conn.SetDeadline(%s): %v", deadline.Format(time.RFC3339), err)
-			return
-		}
-
-		Debugf("Waiting for request...")
-		req, err := http.ReadRequest(rw.Reader)
-		if err != nil {
-			// We have encountered a timeout error, do not attempt to send an error
-			// response, just close the connection.
-			neterr, ok := err.(net.Error)
-			switch {
-			case ok && neterr.Timeout():
-			case err == io.EOF:
-			case err == io.ErrClosedPipe:
-			default:
-				Errorf("http.ReadRequest(): %v", err)
-				return
-			}
-
-			Debugf("http.ReadRequest(): timeout error %v", err)
-			return
-		}
-		// Scheme will be empty in the case of a CONNECT request,
-		// default to HTTPS if we don't have an original scheme.
-		req.URL.Scheme = r.URL.Scheme
-		if req.URL.Scheme == "" {
-			req.URL.Scheme = "https"
-		}
-
-		// For requests received during MITM the URL.Host will not be set as it
-		// does not appear in the Request-URI line. The http package will fill the
-		// Host field with either the value from URL.Host or the Host header.
-		req.URL.Host = req.Host
-
-		req.RemoteAddr = conn.RemoteAddr().String()
-
-		// Run the request and response modifiers.
-		closing = p.handleRequest(ctx, rw, req)
-
-		if err := rw.Flush(); err != nil {
-			Errorf("rw.Flush(): %v", err)
-		}
-
-		if closing {
-			Debugf("closing connection")
-			return
-		}
-	}
-}
-
-// shouldCloseAfterReply returns whether the connection should be closed after
-// the response has been sent.
-func shouldCloseAfterReply(header http.Header) bool {
-	for _, vs := range header["Connection"] {
-		for _, v := range strings.Split(vs, ",") {
-			if strings.ToLower(strings.TrimSpace(v)) == "close" {
-				return true
-			}
-		}
+	switch err {
+	case io.EOF, io.ErrClosedPipe, closeConn:
+		return true
 	}
 
 	return false
 }
 
-// connectResponse builds the CONNECT response and runs the CONNECT request and
-// response modifiers.
-func (p *Proxy) connectResponse(ctx *Context, req *http.Request) (*http.Response, error) {
-	res := proxyutil.NewResponse(200, nil, req)
+// Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
+type Proxy struct {
+	roundTripper http.RoundTripper
+	timeout      time.Duration
+	mitm         *mitm.Config
+	proxyURL     *url.URL
+	conns        *sync.WaitGroup
+	closing      int32 // atomic
 
-	if p.creqmod != nil {
-		if err := p.creqmod.ModifyRequest(ctx, req); err != nil {
-			Errorf("ModifyConnectRequest(%s): %v", req.URL, err)
-			return proxyutil.NewErrorResponse(400, err, req), err
-		}
-	}
-
-	if p.cresmod != nil {
-		if err := p.cresmod.ModifyResponse(ctx, res); err != nil {
-			Errorf("ModifyConnectResponse(%s): %v", res.Request.URL, err)
-			return proxyutil.NewErrorResponse(400, err, req), err
-		}
-	}
-
-	return res, nil
+	reqmod RequestModifier
+	resmod ResponseModifier
 }
 
-// handleNonMITMConnect dials the destination server and passes through the
-// encrypted data from the client.
-func (p *Proxy) handleNonMITMConnect(ctx *Context, conn net.Conn, host string) {
-	Debugf("no MITM config found, fallback to normal CONNECT flow for %s", host)
+// Option is a configurable proxy setting.
+type Option func(p *Proxy)
 
-	dc, err := net.Dial("tcp", host)
-	if err != nil {
-		Errorf("net.Dial(%q, %s, nil): %v", "tcp", host, err)
-		return
+// NewProxy returns a new HTTP proxy.
+func NewProxy() *Proxy {
+	nm := Noop("martian")
+
+	return &Proxy{
+		roundTripper: http.DefaultTransport,
+		timeout:      5 * time.Minute,
+		conns:        &sync.WaitGroup{},
+		reqmod:       nm,
+		resmod:       nm,
 	}
-	defer dc.Close()
-
-	Debugf("begin copy for %s", host)
-
-	donec := make(chan bool, 1)
-
-	go func() {
-		io.Copy(dc, conn)
-		donec <- true
-	}()
-
-	go func() {
-		io.Copy(conn, dc)
-		donec <- true
-	}()
-
-	<-donec
-
-	Debugf("end copy for %s", host)
 }
 
-// handleRequest runs the request and response modifiers and performs the roundtrip to the destination server.
-func (p *Proxy) handleRequest(ctx *Context, rw *bufio.ReadWriter, req *http.Request) (closing bool) {
-	if shouldCloseAfterReply(req.Header) {
-		Debugf("closing after reply")
-		closing = true
+// Option sets the given options for the proxy.
+func (p *Proxy) Option(opts ...Option) {
+	for _, opt := range opts {
+		opt(p)
 	}
+}
 
-	if err := p.ModifyRequest(ctx, req); err != nil {
-		Errorf("martian.ModifyRequest(): %v", err)
-		proxyutil.NewErrorResponse(400, err, req).Write(rw)
-		return
+// RoundTripper sets the http.RoundTripper of the proxy.
+func RoundTripper(rt http.RoundTripper) Option {
+	return func(p *Proxy) {
+		p.roundTripper = rt
 	}
+}
 
-	var res *http.Response
-	var err error
-	if !ctx.SkipRoundTrip {
-		Debugf("proceed to round trip for %s", req.URL)
+// Timeout sets the request timeout of the proxy.
+func Timeout(timeout time.Duration) Option {
+	return func(p *Proxy) {
+		p.timeout = timeout
+	}
+}
 
-		res, err = p.RoundTripper.RoundTrip(req)
+// MITM sets the config to use for MITMing of CONNECT requests.
+func MITM(config *mitm.Config) Option {
+	return func(p *Proxy) {
+		p.mitm = config
+	}
+}
+
+// DownstreamProxy sets the proxy that receives requests from the upstream
+// proxy.
+func DownstreamProxy(proxyURL *url.URL) Option {
+	return func(p *Proxy) {
+		p.proxyURL = proxyURL
+	}
+}
+
+// Close sets the proxying to the closing state and waits for all connections
+// to resolve.
+func (p *Proxy) Close() {
+	atomic.StoreInt32(&p.closing, 1)
+	p.conns.Wait()
+}
+
+// Closing returns whether the proxy is in the closing state.
+func (p *Proxy) Closing() bool {
+	return atomic.LoadInt32(&p.closing) == 1
+}
+
+// SetRequestModifier sets the request modifier.
+func (p *Proxy) SetRequestModifier(reqmod RequestModifier) {
+	p.reqmod = reqmod
+}
+
+// SetResponseModifier sets the response modifier.
+func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
+	p.resmod = resmod
+}
+
+// Serve accepts connections from the listener and handles the requests.
+func (p *Proxy) Serve(l net.Listener) error {
+	defer l.Close()
+
+	var delay time.Duration
+	for {
+		if p.Closing() {
+			return nil
+		}
+
+		conn, err := l.Accept()
 		if err != nil {
-			Errorf("RoundTripper.RoundTrip(%s): %v", req.URL, err)
-			proxyutil.NewErrorResponse(502, err, req).Write(rw)
+			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+				if delay == 0 {
+					delay = 5 * time.Millisecond
+				} else {
+					delay *= 2
+				}
+				if max := time.Second; delay > max {
+					delay = max
+				}
+
+				Debugf("martian: temporary error on accept: %v", err)
+				time.Sleep(delay)
+				continue
+			}
+
+			Errorf("martian: failed to accept: %v", err)
+			return err
+		}
+		delay = 0
+		Debugf("martian: accepted connection from %s", conn.RemoteAddr())
+
+		if tconn, ok := conn.(*net.TCPConn); ok {
+			tconn.SetKeepAlive(true)
+			tconn.SetKeepAlivePeriod(3 * time.Minute)
+		}
+
+		go p.handleLoop(conn)
+	}
+}
+
+func (p *Proxy) handleLoop(conn net.Conn) {
+	p.conns.Add(1)
+	defer p.conns.Done()
+	defer conn.Close()
+
+	ctx := session.NewContext()
+	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+
+	for {
+		deadline := time.Now().Add(p.timeout)
+		if err := conn.SetDeadline(deadline); err != nil {
+			Errorf("martian: failed to set connection deadline: %v", err)
 			return
 		}
-	} else {
-		Debugf("skipped round trip for %s", req.URL)
-		res = proxyutil.NewResponse(200, nil, req)
+
+		if err := p.handle(ctx, conn, brw); isCloseableError(err) {
+			Infof("martian: closing connection: %v", conn.RemoteAddr())
+			return
+		}
+	}
+}
+
+func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWriter) error {
+	Debugf("martian: waiting for request: %v", conn.RemoteAddr())
+
+	req, err := http.ReadRequest(brw.Reader)
+	if err != nil {
+		if !isCloseableError(err) {
+			Errorf("martian: failed to read request: %v", err)
+		}
+
+		// Failed to read request, close the connection.
+		return closeConn
 	}
 
-	if err := p.ModifyResponse(ctx, res); err != nil {
-		Errorf("martian.ModifyResponse(): %v", err)
-		proxyutil.NewErrorResponse(400, err, req).Write(rw)
-		return
+	req.URL.Scheme = "http"
+	if ctx.IsSecure() {
+		Debugf("martian: forcing HTTPS inside secure session")
+		req.URL.Scheme = "https"
 	}
 
-	if closing {
-		res.Header.Set("Connection", "close")
-		res.Close = true
+	req.RemoteAddr = conn.RemoteAddr().String()
+	if req.URL.Host == "" {
+		req.URL.Host = req.Host
+	}
+	if tlsconn, ok := conn.(*tls.Conn); ok {
+		cs := tlsconn.ConnectionState()
+		req.TLS = &cs
 	}
 
-	if err := res.Write(rw); err != nil {
-		Errorf("res.Write(): %v", err)
+	Debugf("martian: received request: %s", req.URL)
+
+	ctx, err = session.FromContext(ctx)
+	if err != nil {
+		Errorf("martian: failed to derive context: %v", err)
+		return err
 	}
 
-	return
+	SetContext(req, ctx)
+	defer RemoveContext(req)
+
+	if req.Method == "CONNECT" {
+		if err := p.reqmod.ModifyRequest(req); err != nil {
+			Errorf("martian: error modifying CONNECT request: %v", err)
+			proxyutil.Warning(req.Header, err)
+		}
+
+		if p.mitm != nil {
+			Debugf("martian: attempting MITM for connection: %s", req.Host)
+			res := proxyutil.NewResponse(200, nil, req)
+
+			if err := p.resmod.ModifyResponse(res); err != nil {
+				Errorf("martian: error modifying CONNECT response: %v", err)
+				proxyutil.Warning(res.Header, err)
+			}
+
+			if err := res.Write(brw); err != nil {
+				Errorf("martian: failed to write CONNECT response: %v", err)
+				return err
+			}
+			brw.Flush()
+
+			Debugf("martian: completed MITM for connection: %s", req.Host)
+			ctx.MarkSecure()
+
+			tlsconn := tls.Server(conn, p.mitm.TLSForHost(req.Host))
+			brw.Writer.Reset(tlsconn)
+			brw.Reader.Reset(tlsconn)
+
+			return p.handle(ctx, tlsconn, brw)
+		}
+
+		Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
+		res, dconn, cerr := p.connect(req)
+		if cerr != nil {
+			Errorf("martian: failed to CONNECT: %v", err)
+			res = proxyutil.NewResponse(502, nil, req)
+			proxyutil.Warning(res.Header, cerr)
+		}
+
+		if err := p.resmod.ModifyResponse(res); err != nil {
+			Errorf("martian: error modifying CONNECT response: %v", err)
+			proxyutil.Warning(res.Header, err)
+		}
+
+		if err := res.Write(brw); err != nil {
+			Errorf("martian: failed to write CONNECT response: %v", err)
+			return err
+		}
+		brw.Flush()
+
+		if cerr != nil {
+			return cerr
+		}
+
+		defer dconn.Close()
+
+		dbw := bufio.NewWriter(dconn)
+		dbr := bufio.NewReader(dconn)
+		defer dbw.Flush()
+
+		copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
+			io.Copy(w, r)
+			donec <- true
+		}
+
+		donec := make(chan bool, 2)
+		go copySync(dbw, brw, donec)
+		go copySync(brw, dbr, donec)
+
+		Debugf("martian: established CONNECT tunnel, proxying traffic")
+		<-donec
+		<-donec
+		Debugf("martian: closed CONNECT tunnel")
+
+		return closeConn
+	}
+
+	if err := p.reqmod.ModifyRequest(req); err != nil {
+		Errorf("martian: error modifying request: %v", err)
+		proxyutil.Warning(req.Header, err)
+	}
+
+	res, err := p.roundTrip(ctx, req)
+	if err != nil {
+		Errorf("martian: failed to round trip: %v", err)
+		res = proxyutil.NewResponse(502, nil, req)
+		proxyutil.Warning(res.Header, err)
+	}
+
+	if err := p.resmod.ModifyResponse(res); err != nil {
+		Errorf("martian: error modifying response: %v", err)
+		proxyutil.Warning(res.Header, err)
+	}
+
+	var closing error
+	if req.Close || p.Closing() {
+		Debugf("martian: received close request: %v", req.RemoteAddr)
+		res.Header.Add("Connection", "close")
+		closing = closeConn
+	}
+
+	Debugf("martian: sent response: %v", req.URL)
+	if err := res.Write(brw); err != nil {
+		Errorf("martian: failed to write response: %v", err)
+		return err
+	}
+	brw.Flush()
+
+	return closing
+}
+
+func (p *Proxy) roundTrip(ctx *session.Context, req *http.Request) (*http.Response, error) {
+	if ctx.SkippingRoundTrip() {
+		Debugf("martian: skipping round trip")
+		return proxyutil.NewResponse(200, nil, req), nil
+	}
+
+	if tr, ok := p.roundTripper.(*http.Transport); ok {
+		tr.Proxy = http.ProxyURL(p.proxyURL)
+	}
+
+	return p.roundTripper.RoundTrip(req)
+}
+
+func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
+	if p.proxyURL != nil {
+		Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
+
+		conn, err := net.Dial("tcp", p.proxyURL.Host)
+		if err != nil {
+			return nil, nil, err
+		}
+		pbw := bufio.NewWriter(conn)
+		pbr := bufio.NewReader(conn)
+
+		if err := req.Write(pbw); err != nil {
+			return nil, nil, err
+		}
+		pbw.Flush()
+
+		res, err := http.ReadResponse(pbr, req)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return res, conn, nil
+	}
+
+	conn, err := net.Dial("tcp", req.URL.Host)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return proxyutil.NewResponse(200, nil, req), conn, nil
 }

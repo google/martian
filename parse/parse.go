@@ -18,7 +18,6 @@ package parse
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/google/martian"
@@ -58,18 +57,18 @@ func NewResult(mod interface{}, scope []ModifierType) (*Result, error) {
 		switch s {
 		case Request:
 			if !reqOk {
-				return nil, fmt.Errorf("invalid scope 'request' for modifier")
+				return nil, fmt.Errorf("parse: invalid scope %q for modifier", "request")
 			}
 
 			result.reqmod = reqmod
 		case Response:
 			if !resOk {
-				return nil, fmt.Errorf("invalid scope 'response' for modifier")
+				return nil, fmt.Errorf("parse: invalid scope %q for modifier", "response")
 			}
 
 			result.resmod = resmod
 		default:
-			return nil, fmt.Errorf("invalid scope: %s not in [%q, %q]", s, "request", "response")
+			return nil, fmt.Errorf("parse: invalid scope: %s not in [%q, %q]", s, "request", "response")
 		}
 	}
 
@@ -103,7 +102,7 @@ type ErrUnknownModifier struct {
 
 // Error returns a formatted error message for an ErrUnknownModifier.
 func (e ErrUnknownModifier) Error() string {
-	return fmt.Sprintf("parse: unknown modifier %v", e.name)
+	return fmt.Sprintf("parse: unknown modifier: %s", e.name)
 }
 
 // Register registers a parsing function for name that will be used to unmarshal
@@ -126,12 +125,12 @@ func FromJSON(b []byte) (*Result, error) {
 	}
 
 	if len(msg) != 1 {
-		ks := []string{}
+		ks := ""
 		for k := range msg {
-			ks = append(ks, k)
+			ks += ", " + k
 		}
 
-		return nil, fmt.Errorf("message must contain exactly one modifier, but received %d: %s", len(msg), strings.Join(ks, ", "))
+		return nil, fmt.Errorf("parse: expected one modifier, received %d: %s", len(msg), ks)
 	}
 
 	parseMu.RLock()
@@ -143,5 +142,6 @@ func FromJSON(b []byte) (*Result, error) {
 		}
 		return parseFunc(m)
 	}
-	return nil, fmt.Errorf("parse: message contained no modifiers, but passed length check: %v", msg)
+
+	return nil, fmt.Errorf("parse: no modifiers found: %v", msg)
 }

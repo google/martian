@@ -43,9 +43,13 @@ func init() {
 
 // NewFilter builds a new header filter.
 func NewFilter(name, value string) *Filter {
+	nm := martian.Noop("header.Filter")
+
 	return &Filter{
-		name:  http.CanonicalHeaderKey(name),
-		value: value,
+		name:   http.CanonicalHeaderKey(name),
+		value:  value,
+		reqmod: nm,
+		resmod: nm,
 	}
 }
 
@@ -60,10 +64,10 @@ func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
 }
 
 // ModifyRequest runs reqmod iff req has a header with name matching value.
-func (f *Filter) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (f *Filter) ModifyRequest(req *http.Request) error {
 	for _, v := range req.Header[f.name] {
 		if v == f.value {
-			return f.reqmod.ModifyRequest(ctx, req)
+			return f.reqmod.ModifyRequest(req)
 		}
 	}
 
@@ -71,10 +75,10 @@ func (f *Filter) ModifyRequest(ctx *martian.Context, req *http.Request) error {
 }
 
 // ModifyResponse runs resmod iff res has a header with name matching value.
-func (f *Filter) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (f *Filter) ModifyResponse(res *http.Response) error {
 	for _, v := range res.Header[f.name] {
 		if v == f.value {
-			return f.resmod.ModifyResponse(ctx, res)
+			return f.resmod.ModifyResponse(res)
 		}
 	}
 

@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 )
 
@@ -78,15 +77,23 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 	return parse.NewResult(mod, msg.Scope)
 }
 
-// ModifyRequest signals to the proxy to skip the roundtrip.
-func (m *Modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
-	ctx.SkipRoundTrip = true
+// ModifyRequest sets the Content-Type header and overrides the request body.
+func (m *Modifier) ModifyRequest(req *http.Request) error {
+	req.Body.Close()
+
+	req.Header.Set("Content-Type", m.contentType)
+
+	// Reset the Content-Encoding since we know that the new body isn't encoded.
+	req.Header.Del("Content-Encoding")
+
+	req.ContentLength = int64(len(m.body))
+	req.Body = ioutil.NopCloser(bytes.NewReader(m.body))
 
 	return nil
 }
 
 // ModifyResponse sets the Content-Type header and overrides the response body.
-func (m *Modifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (m *Modifier) ModifyResponse(res *http.Response) error {
 	// Replace the existing body, close it first.
 	res.Body.Close()
 

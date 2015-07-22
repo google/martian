@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/martian"
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
@@ -103,20 +103,16 @@ func TestFilterModifyRequest(t *testing.T) {
 			t.Fatalf("%d. NewRequest(): got %v, want no error", i, err)
 		}
 
-		var modRun bool
 		mod := NewFilter(tc.url)
-		mod.SetRequestModifier(martian.RequestModifierFunc(
-			func(*martian.Context, *http.Request) error {
-				modRun = true
-				return nil
-			}))
+		tm := martiantest.NewModifier()
+		mod.SetRequestModifier(tm)
 
-		if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+		if err := mod.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %q, want no error", i, err)
 		}
 
-		if modRun != tc.want {
-			t.Errorf("modRun: got %t, want %t", modRun, tc.want)
+		if tm.RequestModified() != tc.want {
+			t.Errorf("tm.RequestModified(): got %t, want %t", tm.RequestModified(), tc.want)
 		}
 	}
 }
@@ -197,27 +193,22 @@ func TestFilterModifyResponse(t *testing.T) {
 		}
 		res := proxyutil.NewResponse(200, nil, req)
 
-		var modRun bool
 		mod := NewFilter(tc.url)
-		mod.SetResponseModifier(martian.ResponseModifierFunc(
-			func(*martian.Context, *http.Response) error {
-				modRun = true
-				return nil
-			}))
+		tm := martiantest.NewModifier()
+		mod.SetResponseModifier(tm)
 
-		if err := mod.ModifyResponse(martian.NewContext(), res); err != nil {
+		if err := mod.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. ModifyResponse(): got %q, want no error", i, err)
 		}
 
-		if modRun != tc.want {
-			t.Errorf("modRun: got %t, want %t", modRun, tc.want)
+		if tm.ResponseModified() != tc.want {
+			t.Errorf("tm.ResponseModified(): got %t, want %t", tm.ResponseModified(), tc.want)
 		}
 	}
 }
 
 func TestFilterFromJSON(t *testing.T) {
-	rawMsg := `
-	{
+	msg := []byte(`{
 		"url.Filter": {
       "scope": ["request", "response"],
       "scheme": "https",
@@ -229,9 +220,9 @@ func TestFilterFromJSON(t *testing.T) {
         }
       }
     }
-	}`
+	}`)
 
-	r, err := parse.FromJSON([]byte(rawMsg))
+	r, err := parse.FromJSON(msg)
 	if err != nil {
 		t.Fatalf("FilterFromJSON(): got %v, want no error", err)
 	}
@@ -246,8 +237,7 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx := martian.NewContext()
-	if err := reqmod.ModifyRequest(ctx, req); err != nil {
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -261,7 +251,7 @@ func TestFilterFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := resmod.ModifyResponse(ctx, res); err != nil {
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 

@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // NewResponse builds new HTTP responses.
@@ -58,4 +59,15 @@ func NewErrorResponse(code int, err error, req *http.Request) *http.Response {
 	res.ContentLength = int64(len(err.Error()))
 
 	return res
+}
+
+func Warning(header http.Header, err error) {
+	date := header.Get("Date")
+	if date == "" {
+		date = time.Now().Format(http.TimeFormat)
+	}
+
+	w := fmt.Sprintf(`199 "martian" %q %q`, err.Error(), date)
+
+	header.Add("Warning", w)
 }

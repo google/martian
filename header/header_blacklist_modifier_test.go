@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -34,7 +33,7 @@ func TestBlacklistModifierOnRequest(t *testing.T) {
 	req.Header.Set("X-Testing", "value")
 	req.Header.Set("Y-Testing", "value")
 
-	if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -55,7 +54,7 @@ func TestBlacklistModifierOnResponse(t *testing.T) {
 	res.Header.Set("X-Testing", "value")
 	res.Header.Set("Y-Testing", "value")
 
-	if err := mod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
@@ -123,7 +122,7 @@ func TestBlacklistModifierFromJSON(t *testing.T) {
 	}
 
 	for i, tc := range tt {
-		if err := reqmod.ModifyRequest(martian.NewContext(), req); err != nil {
+		if err := reqmod.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. reqmod.ModifyRequest(): got %v, want no error", i, err)
 		}
 
@@ -131,7 +130,7 @@ func TestBlacklistModifierFromJSON(t *testing.T) {
 			t.Errorf("%d. req.Header.Get(%q): got %q, want %q", i, tc.header, got, want)
 		}
 
-		if err := resmod.ModifyResponse(martian.NewContext(), res); err != nil {
+		if err := resmod.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. resmod.ModifyResponse(): got %v, want no error", i, err)
 		}
 

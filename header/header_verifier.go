@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -62,7 +61,7 @@ func NewVerifier(name, value string) verify.RequestResponseVerifier {
 // requests. If value is non-empty the value must be present in at least one
 // header for name. An error will be added to the contained *MultiError for
 // every unmatched request.
-func (v *verifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (v *verifier) ModifyRequest(req *http.Request) error {
 	vs := req.Header[v.name]
 
 	for _, value := range vs {
@@ -86,7 +85,7 @@ func (v *verifier) ModifyRequest(ctx *martian.Context, req *http.Request) error 
 // responses. If value is non-empty the value must be present in at least one
 // header for name. An error will be added to the contained *MultiError for
 // every unmatched response.
-func (v *verifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (v *verifier) ModifyResponse(res *http.Response) error {
 	vs := res.Header[v.name]
 
 	for _, value := range vs {

@@ -20,7 +20,7 @@ proxy specific paths using JSON.
 
 Supported configuration endpoints:
 
-	POST host:port/martian/modifiers
+	POST http://martian.proxy/modifiers
 
 sets the request and response modifier of the proxy; modifiers adhere to the
 following top-level JSON structure:
@@ -86,7 +86,7 @@ request, but only when the host matches www.example.com:
 modifiers are designed to be composed together in ways that allow the user to
 write a single JSON structure to accomplish a variety of functionality
 
-	GET host:port/martian/verify
+	GET http://martian.proxy/verify
 
 retrieves the verifications errors as JSON with the following structure:
 
@@ -119,13 +119,17 @@ configuration endpoint:
 		}
 	}
 
-sending a request to "host:port/martian/verify" will then return errors from the url.Verifier
+sending a request to "http://martian.proxy/verify" will then return errors from the url.Verifier
 
-	POST host:port/martian/verify/reset
+	POST http://martian.proxy/verify/reset
 
 resets the verifiers to their initial state; note some verifiers may start in
 a failure state (e.g., pingback.Verifier is failed if no requests have been
 seen by the proxy)
+
+	GET http://martian.proxy/authority.cer
+
+prompts the user to install the CA certificate used by the proxy if MITM is enabled
 
 passing the -cors flag will enable CORS support for the endpoints so that they
 may be called via AJAX
@@ -133,12 +137,21 @@ may be called via AJAX
 The flags are:
 	-addr=":8080"
 		host:port of the proxy
+	-api-addr=":0"
+		host:port of the configuration API
+	-api-hostname="martian.proxy"
+		hostname that can be used to reference the configuration API when
+		configuring through the proxy
 	-cert=""
-		PEM encoded X509 CA certificate; if set, it will be set as the
+		PEM encoded X.509 CA certificate; if set, it will be set as the
 		issuer for dynamically-generated certificates during man-in-the-middle
 	-key=""
 		PEM encoded private key of cert (RSA or ECDSA); if set, the key will be used
 		to sign dynamically-generated certificates during man-in-the-middle
+	-generate-cert=false
+		generates a CA certificate and private key to use for man-in-the-middle;
+		the certificate is only valid while the proxy is running and will be
+		discarded on shutdown
 	-organization="Martian Proxy"
 		organization name set on the dynamically-generated certificates during
 		man-in-the-middle
@@ -153,14 +166,13 @@ The flags are:
 package main
 
 import (
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/google/martian"
@@ -168,11 +180,25 @@ import (
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/header"
 	"github.com/google/martian/martianhttp"
+	"github.com/google/martian/martianurl"
+	"github.com/google/martian/mitm"
 	"github.com/google/martian/verify"
+
+	_ "github.com/google/martian/body"
+	_ "github.com/google/martian/cookie"
+	_ "github.com/google/martian/log"
+	_ "github.com/google/martian/method"
+	_ "github.com/google/martian/pingback"
+	_ "github.com/google/martian/priority"
+	_ "github.com/google/martian/querystring"
+	_ "github.com/google/martian/status"
 )
 
 var (
 	addr         = flag.String("addr", ":8080", "host:port of the proxy")
+	apiAddr      = flag.String("api-addr", ":0", "host:port of the configuration API")
+	apiHostname  = flag.String("api-hostname", "martian.proxy", "hostname forwarded to apiAddr")
+	generateCert = flag.Bool("generate-cert", false, "generate certificate and private key for MITM")
 	cert         = flag.String("cert", "", "CA certificate used to sign MITM certificates")
 	key          = flag.String("key", "", "private key of the CA used to sign MITM certificates")
 	organization = flag.String("organization", "Martian Proxy", "organization name for MITM certificates")
@@ -183,38 +209,45 @@ var (
 func main() {
 	flag.Parse()
 
-	var mitm *martian.MITM
-	if *cert != "" && *key != "" {
+	p := martian.NewProxy()
+
+	var x509c *x509.Certificate
+	var priv interface{}
+
+	if *generateCert {
+		var err error
+		x509c, priv, err = mitm.NewAuthority("martian.proxy", "Martian Authority", 30*24*time.Hour)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else if *cert != "" && *key != "" {
 		tlsc, err := tls.LoadX509KeyPair(*cert, *key)
 		if err != nil {
 			log.Fatal(err)
 		}
+		priv = tlsc.PrivateKey
 
-		x509c, err := x509.ParseCertificate(tlsc.Certificate[0])
+		x509c, err = x509.ParseCertificate(tlsc.Certificate[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if x509c != nil && priv != nil {
+		mc, err := mitm.NewConfig(x509c, priv)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		var pub crypto.PublicKey
-		switch priv := tlsc.PrivateKey.(type) {
-		case *rsa.PrivateKey:
-			pub = &priv.PublicKey
-		case *ecdsa.PrivateKey:
-			pub = &priv.PublicKey
-		default:
-			log.Fatal("Public key is not of supported type: rsa, ecdsa.")
-		}
+		mc.SetValidity(*validity)
+		mc.SetOrganization(*organization)
 
-		mitm = &martian.MITM{
-			Authority:    x509c,
-			PublicKey:    pub,
-			PrivateKey:   tlsc.PrivateKey,
-			Validity:     *validity,
-			Organization: *organization,
-		}
+		p.Option(martian.MITM(mc))
+
+		// Expose certificate authority.
+		ah := martianhttp.NewAuthorityHandler(x509c)
+		http.Handle("/authority.cer", ah)
 	}
-
-	p := martian.NewProxy(mitm)
 
 	fg := fifo.NewGroup()
 
@@ -238,25 +271,48 @@ func main() {
 	// intercepted.
 
 	// Update modifiers.
-	configure("martian/modifiers", m)
+	configure("/modifiers", m)
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
-	configure("martian/verify", vh)
+	configure("/verify", vh)
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	configure("martian/verify/reset", rh)
+	configure("/verify/reset", rh)
 
-	// Forward all other requests to the proxy.
-	http.Handle("/", p)
+	cl, err := net.Listen("tcp", *apiAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	log.Printf("Martian started at %s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	// Redirect *apiHostname to the API server host:port.
+	apif := martianurl.NewFilter(&url.URL{
+		Host: *apiHostname,
+	})
+	apim := martianurl.NewModifier(&url.URL{
+		Host: cl.Addr().String(),
+	})
+	apif.SetRequestModifier(apim)
+
+	fg.AddRequestModifier(apif)
+
+	go http.Serve(cl, nil)
+
+	log.Printf("martian: API started at %s\n", cl.Addr())
+
+	pl, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("martian: proxy started at %s\n", pl.Addr())
+
+	log.Fatal(p.Serve(pl))
 }
 
 // configure installs a configuration handler at path.
