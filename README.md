@@ -24,7 +24,7 @@ Running an instance of Martian is as simple as
 If you want to see system logs as Martian is running, pass in the verbosity
 flag:
 
-    go run examples/main.go -- -v=0
+    go run examples/main.go -- -v
 
 For logging of requests and responses a [logging modifier](https://github.com/google/martian/wiki/Modifier-Reference#logging) is available
 
@@ -70,7 +70,7 @@ Let's break down the parts of this message.
 This is a simple configuration, for more complex configurations, modifiers are
 combined with groups and filters to compose the desired behavior. 
 
-To configure Martian, `POST` the JSON to `host:port/martian/modifiers`. You'll
+To configure Martian, `POST` the JSON to `http://martian.proxy/modifiers`. You'll
 want to use whatever mechanism your language of choice provides you to make
 HTTP requests, but for demo purposes, curl works (assuming your configuration
 is in a file called `modifier.json`).
@@ -79,7 +79,43 @@ is in a file called `modifier.json`).
              -X POST \
              -H "Content-Type: application/json" \
              -d @modifier.json \
-                "http://localhost:8080/martian/modifiers"
+                "http://martian.proxy/configure"
+
+### Intercepting HTTPS Requests and Responses
+Martian supports modifying HTTPS requests and responses if configured to do so.
+
+In order for Martian to intercept HTTPS traffic a custom CA certificate must be
+installed in the browser so that connection warnings are not shown.
+
+The easiest way to install the CA certificate is to start the proxy with the
+necessary flags to use a custom CA certificate and private key using the `-cert`
+and `-key` flags, or to have the proxy generate one using the `-generate-ca-cert`
+flag.
+
+After the proxy has started, visit http://martian.proxy/authority.cer in the
+browser configured to use the proxy and a prompt will be displayed to install
+the certificate.
+
+Several flags are available in `examples/main.go` to help configure MITM
+functionality:
+
+    -key=""
+      PEM encoded private key file of the CA certificate provided in -cert; used
+      to sign certificates that are generated on-the-fly
+    -cert=""
+      PEM encoded CA certificate file used to generate certificates
+    -generate-ca-cert=false
+      generates a CA certificate and private key to use for man-in-the-middle;
+      most users choosing this option will immediately visit
+      http://martian.proxy/authority.cer in the browser whose traffic is to be
+      intercepted to install the newly generated CA certificate
+    -organization="Martian Proxy"
+      organization name set on the dynamically-generated certificates during
+      man-in-the-middle
+    -validity="1h"
+      window of time around the time of request that the dynamically-generated
+      certificate is valid for; the duration is set such that the total valid
+      timeframe is double the value of validity (1h before & 1h after)
 
 ### Check Verifiers
 Let's assume that you've configured Martian to verify the presence a specific
@@ -107,7 +143,7 @@ got back `200 OK` responses.
 
 To check verifications, perform
 
-    GET host:port/martian/verify
+    GET http://martian.proxy/verify
 
 Failed expectations are tracked as errors, and the list of errors are retrieved
 by making a `GET` request to `host:port/martian/verify`, which will return
@@ -126,7 +162,7 @@ a list of errors:
 
 Verification errors are held in memory until they are explicitly cleared by
 
-    POST host:port/martian/verify/reset
+    POST http://martian.proxy/verify/reset
 
 ## Martian as a Library
 Martian can also be included into any Go program and used as a library.
@@ -149,9 +185,9 @@ Modifiers, filters and groups all implement `RequestModifer`,
 `ResponseModifier` or `RequestResponseModifier` (defined in
 [`martian.go`](https://github.com/google/martian/martian.go)).
 
-    ModifyRequest(ctx *martian.Context, req *http.Request) error
+    ModifyRequest(req *http.Request) error
 
-    ModifyResponse(ctx *martian.Context, res *http.Response) error
+    ModifyResponse(res *http.Response) error
 
 Throughout the code (and this documentation) you'll see the word "modifier"
 used as a term that encompasses modifiers, groups and filters. Even though a
