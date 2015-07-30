@@ -148,7 +148,7 @@ The flags are:
 	-key=""
 		PEM encoded private key of cert (RSA or ECDSA); if set, the key will be used
 		to sign dynamically-generated certificates during man-in-the-middle
-	-generate-cert=false
+	-generate-ca-cert=false
 		generates a CA certificate and private key to use for man-in-the-middle;
 		the certificate is only valid while the proxy is running and will be
 		discarded on shutdown
@@ -198,7 +198,7 @@ var (
 	addr         = flag.String("addr", ":8080", "host:port of the proxy")
 	apiAddr      = flag.String("api-addr", ":0", "host:port of the configuration API")
 	apiHostname  = flag.String("api-hostname", "martian.proxy", "hostname forwarded to apiAddr")
-	generateCert = flag.Bool("generate-cert", false, "generate certificate and private key for MITM")
+	generateCA   = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
 	cert         = flag.String("cert", "", "CA certificate used to sign MITM certificates")
 	key          = flag.String("key", "", "private key of the CA used to sign MITM certificates")
 	organization = flag.String("organization", "Martian Proxy", "organization name for MITM certificates")
@@ -214,7 +214,7 @@ func main() {
 	var x509c *x509.Certificate
 	var priv interface{}
 
-	if *generateCert {
+	if *generateCA {
 		var err error
 		x509c, priv, err = mitm.NewAuthority("martian.proxy", "Martian Authority", 30*24*time.Hour)
 		if err != nil {
