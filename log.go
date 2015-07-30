@@ -16,41 +16,35 @@ package martian
 
 import (
 	"fmt"
-
-	stdlog "log"
+	"log"
 )
 
 // Infof logs an info message with caller information.
 func Infof(format string, args ...interface{}) {
-	msg := format
+	msg := fmt.Sprintf("INFO: %s", format)
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
 
-	//log.InfoDepth(1, msg)
-	stdlog.Println(msg)
+	log.Println(msg)
 }
 
 // Debugf logs a debug message with caller information.
 func Debugf(format string, args ...interface{}) {
-	msg := format
+	msg := fmt.Sprintf("DEBUG: %s", format)
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
 
-	//if log.V(2) {
-	//log.InfoDepth(1, msg)
-	stdlog.Println(msg)
-	//}
+	log.Println(msg)
 }
 
 // Errorf logs an error message with caller information.
 func Errorf(format string, args ...interface{}) {
-	msg := format
+	msg := fmt.Sprintf("ERROR: %s", format)
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
 
-	//log.ErrorDepth(1, msg)
-	stdlog.Println(msg)
+	log.Println(msg)
 }
