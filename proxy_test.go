@@ -92,8 +92,8 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
-	p.Option(RoundTripper(tr))
-	p.Option(Timeout(100 * time.Millisecond))
+	p.SetRoundTripper(tr)
+	p.SetTimeout(100 * time.Millisecond)
 
 	// Start the proxy with a listener that will return a temporary error on
 	// Accept() three times.
@@ -138,7 +138,7 @@ func TestIntegrationHTTP(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
-	p.Option(RoundTripper(tr))
+	p.SetRoundTripper(tr)
 
 	tm := martiantest.NewModifier()
 
@@ -202,8 +202,8 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 
 	dtr := martiantest.NewTransport()
 	dtr.Respond(299)
-	downstream.Option(RoundTripper(dtr))
-	downstream.Option(Timeout(50 * time.Millisecond))
+	downstream.SetRoundTripper(dtr)
+	downstream.SetTimeout(50 * time.Millisecond)
 
 	go downstream.Serve(dl)
 
@@ -217,10 +217,10 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	defer upstream.Close()
 
 	// Set upstream proxy's downstream proxy to the host:port of the first proxy.
-	upstream.Option(DownstreamProxy(&url.URL{
+	upstream.SetDownstreamProxy(&url.URL{
 		Host: dl.Addr().String(),
-	}))
-	upstream.Option(Timeout(50 * time.Millisecond))
+	})
+	upstream.SetTimeout(50 * time.Millisecond)
 
 	go upstream.Serve(ul)
 
@@ -263,10 +263,10 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	defer p.Close()
 
 	// Set proxy's downstream proxy to invalid host:port to force failure.
-	p.Option(DownstreamProxy(&url.URL{
+	p.SetDownstreamProxy(&url.URL{
 		Host: "[::1]:0",
-	}))
-	p.Option(Timeout(50 * time.Millisecond))
+	})
+	p.SetTimeout(50 * time.Millisecond)
 
 	go p.Serve(l)
 
@@ -415,8 +415,8 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 
 	dtr := martiantest.NewTransport()
 	dtr.Respond(299)
-	downstream.Option(RoundTripper(dtr))
-	downstream.Option(Timeout(50 * time.Millisecond))
+	downstream.SetRoundTripper(dtr)
+	downstream.SetTimeout(50 * time.Millisecond)
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
 	if err != nil {
@@ -427,7 +427,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
-	downstream.Option(MITM(mc))
+	downstream.SetMITM(mc)
 
 	go downstream.Serve(dl)
 
@@ -441,10 +441,10 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	defer upstream.Close()
 
 	// Set upstream proxy's downstream proxy to the host:port of the first proxy.
-	upstream.Option(DownstreamProxy(&url.URL{
+	upstream.SetDownstreamProxy(&url.URL{
 		Host: dl.Addr().String(),
-	}))
-	upstream.Option(Timeout(50 * time.Millisecond))
+	})
+	upstream.SetTimeout(50 * time.Millisecond)
 
 	go upstream.Serve(ul)
 
@@ -521,7 +521,7 @@ func TestIntegrationMITM(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
-	p.Option(RoundTripper(tr))
+	p.SetRoundTripper(tr)
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
 	if err != nil {
@@ -532,7 +532,7 @@ func TestIntegrationMITM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
-	p.Option(MITM(mc))
+	p.SetMITM(mc)
 
 	tm := martiantest.NewModifier()
 	reqerr := errors.New("request error")
@@ -620,7 +620,7 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
-	p.Option(RoundTripper(tr))
+	p.SetRoundTripper(tr)
 
 	tm := martiantest.NewModifier()
 	p.SetRequestModifier(tm)
@@ -684,7 +684,7 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
-	p.Option(RoundTripper(tr))
+	p.SetRoundTripper(tr)
 
 	tm := martiantest.NewModifier()
 	p.SetRequestModifier(tm)
@@ -749,7 +749,7 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 	tr := martiantest.NewTransport()
 	trerr := errors.New("round trip error")
 	tr.RespondError(trerr)
-	p.Option(RoundTripper(tr))
+	p.SetRoundTripper(tr)
 
 	go p.Serve(l)
 
@@ -798,7 +798,7 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 	// Transport will be skipped, no 500.
 	tr := martiantest.NewTransport()
 	tr.Respond(500)
-	p.Option(RoundTripper(tr))
+	p.SetRoundTripper(tr)
 
 	tm := martiantest.NewModifier()
 	tm.RequestFunc(func(req *http.Request) {

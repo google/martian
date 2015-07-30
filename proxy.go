@@ -104,40 +104,25 @@ func NewProxy() *Proxy {
 	}
 }
 
-// Option sets the given options for the proxy.
-func (p *Proxy) Option(opts ...Option) {
-	for _, opt := range opts {
-		opt(p)
-	}
+// SetRoundTripper sets the http.RoundTripper of the proxy.
+func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
+	p.roundTripper = rt
 }
 
-// RoundTripper sets the http.RoundTripper of the proxy.
-func RoundTripper(rt http.RoundTripper) Option {
-	return func(p *Proxy) {
-		p.roundTripper = rt
-	}
+// SetTimeout sets the request timeout of the proxy.
+func (p *Proxy) SetTimeout(timeout time.Duration) {
+	p.timeout = timeout
 }
 
-// Timeout sets the request timeout of the proxy.
-func Timeout(timeout time.Duration) Option {
-	return func(p *Proxy) {
-		p.timeout = timeout
-	}
+// SetMITM sets the config to use for MITMing of CONNECT requests.
+func (p *Proxy) SetMITM(config *mitm.Config) {
+	p.mitm = config
 }
 
-// MITM sets the config to use for MITMing of CONNECT requests.
-func MITM(config *mitm.Config) Option {
-	return func(p *Proxy) {
-		p.mitm = config
-	}
-}
-
-// DownstreamProxy sets the proxy that receives requests from the upstream
+// SetDownstreamProxy sets the proxy that receives requests from the upstream
 // proxy.
-func DownstreamProxy(proxyURL *url.URL) Option {
-	return func(p *Proxy) {
-		p.proxyURL = proxyURL
-	}
+func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
+	p.proxyURL = proxyURL
 }
 
 // Close sets the proxying to the closing state and waits for all connections

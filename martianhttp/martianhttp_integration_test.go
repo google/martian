@@ -34,7 +34,7 @@ func TestIntegration(t *testing.T) {
 	proxy := martian.NewProxy()
 	defer proxy.Close()
 
-	proxy.Option(martian.RoundTripper(ptr))
+	proxy.SetRoundTripper(ptr)
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {

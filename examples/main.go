@@ -20,7 +20,7 @@ proxy specific paths using JSON.
 
 Supported configuration endpoints:
 
-	POST http://martian.proxy/modifiers
+	POST http://martian.proxy/configure
 
 sets the request and response modifier of the proxy; modifiers adhere to the
 following top-level JSON structure:
@@ -242,7 +242,7 @@ func main() {
 		mc.SetValidity(*validity)
 		mc.SetOrganization(*organization)
 
-		p.Option(martian.MITM(mc))
+		p.SetMITM(mc)
 
 		// Expose certificate authority.
 		ah := martianhttp.NewAuthorityHandler(x509c)
@@ -270,8 +270,8 @@ func main() {
 	// These handlers take precendence over proxy traffic and will not be
 	// intercepted.
 
-	// Update modifiers.
-	configure("/modifiers", m)
+	// Configure modifiers.
+	configure("/configure", m)
 
 	// Verify assertions.
 	vh := verify.NewHandler()
