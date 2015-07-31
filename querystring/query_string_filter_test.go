@@ -29,6 +29,26 @@ import (
 	_ "github.com/google/martian/header"
 )
 
+func TestNoModifiers(t *testing.T) {
+	f := NewFilter("", "")
+	f.SetRequestModifier(nil)
+	f.SetResponseModifier(nil)
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := f.ModifyRequest(req); err != nil {
+		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+}
+
 func TestQueryStringFilterWithQuery(t *testing.T) {
 	// Name only, no value.
 	f := NewFilter("match", "")

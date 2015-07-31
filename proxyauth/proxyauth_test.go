@@ -31,6 +31,30 @@ func encode(v string) string {
 	return base64.StdEncoding.EncodeToString([]byte(v))
 }
 
+func TestNoModifiers(t *testing.T) {
+	m := NewModifier()
+	m.SetRequestModifier(nil)
+	m.SetResponseModifier(nil)
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	if err := m.ModifyRequest(req); err != nil {
+		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := m.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+}
+
 func TestProxyAuth(t *testing.T) {
 	m := NewModifier()
 	tm := martiantest.NewModifier()

@@ -26,6 +26,18 @@ import (
 )
 
 func TestModifyRequest(t *testing.T) {
+	f := NewFilter("mARTian-teSTInG", "true")
+	f.SetRequestModifier(nil)
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := f.ModifyRequest(req); err != nil {
+		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
 	tt := []struct {
 		name   string
 		values []string
@@ -65,6 +77,15 @@ func TestModifyRequest(t *testing.T) {
 }
 
 func TestModifyResponse(t *testing.T) {
+	f := NewFilter("mARTian-teSTInG", "true")
+	f.SetResponseModifier(nil)
+
+	res := proxyutil.NewResponse(200, nil, nil)
+
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	tt := []struct {
 		name   string
 		values []string

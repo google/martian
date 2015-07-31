@@ -23,6 +23,8 @@ import (
 	"github.com/google/martian/verify"
 )
 
+var noop = martian.Noop("querystring.Filter")
+
 func init() {
 	parse.Register("querystring.Filter", filterFromJSON)
 }
@@ -46,18 +48,28 @@ type filterJSON struct {
 // value.
 func NewFilter(name, value string) *Filter {
 	return &Filter{
-		name:  name,
-		value: value,
+		name:   name,
+		value:  value,
+		reqmod: noop,
+		resmod: noop,
 	}
 }
 
 // SetRequestModifier sets the request modifier for filter.
 func (f *Filter) SetRequestModifier(reqmod martian.RequestModifier) {
+	if reqmod == nil {
+		reqmod = noop
+	}
+
 	f.reqmod = reqmod
 }
 
 // SetResponseModifier sets the response modifier for filter.
 func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
+	if resmod == nil {
+		resmod = noop
+	}
+
 	f.resmod = resmod
 }
 

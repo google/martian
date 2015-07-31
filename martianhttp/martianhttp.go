@@ -25,6 +25,8 @@ import (
 	"github.com/google/martian/verify"
 )
 
+var noop = martian.Noop("martianhttp.Modifier")
+
 // Modifier is a locking modifier that is configured via http.Handler.
 type Modifier struct {
 	mu     sync.RWMutex
@@ -34,11 +36,9 @@ type Modifier struct {
 
 // NewModifier returns a new martianhttp.Modifier.
 func NewModifier() *Modifier {
-	nm := martian.Noop("martianhttp.Modifier")
-
 	return &Modifier{
-		reqmod: nm,
-		resmod: nm,
+		reqmod: noop,
+		resmod: noop,
 	}
 }
 
@@ -48,8 +48,7 @@ func (m *Modifier) SetRequestModifier(reqmod martian.RequestModifier) {
 	defer m.mu.Unlock()
 
 	if reqmod == nil {
-		m.reqmod = martian.Noop("martianhttp.Modifier")
-		return
+		reqmod = noop
 	}
 
 	m.reqmod = reqmod
@@ -61,8 +60,7 @@ func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
 	defer m.mu.Unlock()
 
 	if resmod == nil {
-		m.resmod = martian.Noop("martianhttp.Modifier")
-		return
+		resmod = noop
 	}
 
 	m.resmod = resmod

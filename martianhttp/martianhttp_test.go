@@ -28,8 +28,10 @@ import (
 	_ "github.com/google/martian/header"
 )
 
-func TestModifyRequestNoModifier(t *testing.T) {
+func TestNoModifiers(t *testing.T) {
 	m := NewModifier()
+	m.SetRequestModifier(nil)
+	m.SetResponseModifier(nil)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -38,6 +40,11 @@ func TestModifyRequestNoModifier(t *testing.T) {
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := m.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
 	}
 }
 

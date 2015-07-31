@@ -23,6 +23,8 @@ import (
 	"github.com/google/martian/verify"
 )
 
+var noop = martian.Noop("header.Filter")
+
 // Filter filters requests and responses based on header name and value.
 type Filter struct {
 	name, value string
@@ -43,23 +45,31 @@ func init() {
 
 // NewFilter builds a new header filter.
 func NewFilter(name, value string) *Filter {
-	nm := martian.Noop("header.Filter")
-
 	return &Filter{
 		name:   http.CanonicalHeaderKey(name),
 		value:  value,
-		reqmod: nm,
-		resmod: nm,
+		reqmod: noop,
+		resmod: noop,
 	}
 }
 
 // SetRequestModifier sets the request modifier of filter.
 func (f *Filter) SetRequestModifier(reqmod martian.RequestModifier) {
+	if reqmod == nil {
+		f.reqmod = noop
+		return
+	}
+
 	f.reqmod = reqmod
 }
 
 // SetResponseModifier sets the response modifier of filter.
 func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
+	if resmod == nil {
+		f.resmod = noop
+		return
+	}
+
 	f.resmod = resmod
 }
 

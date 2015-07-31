@@ -16,25 +16,25 @@ package martian
 
 import "net/http"
 
-type noop struct {
+type noopModifier struct {
 	id string
 }
 
 // Noop returns a modifier that does not change the request or the response.
 func Noop(id string) RequestResponseModifier {
-	return &noop{
+	return &noopModifier{
 		id: id,
 	}
 }
 
 // ModifyRequest logs a debug line.
-func (nm *noop) ModifyRequest(*http.Request) error {
+func (nm *noopModifier) ModifyRequest(*http.Request) error {
 	Debugf("%s: no request modifier configured", nm.id)
 	return nil
 }
 
 // ModifyResponse logs a debug line.
-func (nm *noop) ModifyResponse(*http.Response) error {
+func (nm *noopModifier) ModifyResponse(*http.Response) error {
 	Debugf("%s: no response modifier configure", nm.id)
 	return nil
 }

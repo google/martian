@@ -25,6 +25,8 @@ import (
 	"github.com/google/martian/auth"
 )
 
+var noop = martian.Noop("proxyauth.Modifier")
+
 // Modifier is the proxy authentication modifier.
 type Modifier struct {
 	reqmod martian.RequestModifier
@@ -33,21 +35,27 @@ type Modifier struct {
 
 // NewModifier returns a new proxy authentication modifier.
 func NewModifier() *Modifier {
-	nm := martian.Noop("proxyauth.Modifier")
-
 	return &Modifier{
-		reqmod: nm,
-		resmod: nm,
+		reqmod: noop,
+		resmod: noop,
 	}
 }
 
 // SetRequestModifier sets the request modifier.
 func (m *Modifier) SetRequestModifier(reqmod martian.RequestModifier) {
+	if reqmod == nil {
+		reqmod = noop
+	}
+
 	m.reqmod = reqmod
 }
 
 // SetResponseModifier sets the response modifier.
 func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
+	if resmod == nil {
+		resmod = noop
+	}
+
 	m.resmod = resmod
 }
 

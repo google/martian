@@ -138,6 +138,9 @@ func TestIntegrationHTTP(t *testing.T) {
 	p := NewProxy()
 	defer p.Close()
 
+	p.SetRequestModifier(nil)
+	p.SetResponseModifier(nil)
+
 	tr := martiantest.NewTransport()
 	p.SetRoundTripper(tr)
 

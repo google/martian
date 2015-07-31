@@ -31,9 +31,10 @@ import (
 	"github.com/google/martian/session"
 )
 
-var (
-	closeConn = errors.New("closing connection")
+var closeConn = errors.New("closing connection")
+var noop = Noop("martian")
 
+var (
 	ctxmu sync.RWMutex
 	ctxs  = make(map[*http.Request]*session.Context)
 )
@@ -93,14 +94,12 @@ type Option func(p *Proxy)
 
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
-	nm := Noop("martian")
-
 	return &Proxy{
 		roundTripper: http.DefaultTransport,
 		timeout:      5 * time.Minute,
 		conns:        &sync.WaitGroup{},
-		reqmod:       nm,
-		resmod:       nm,
+		reqmod:       noop,
+		resmod:       noop,
 	}
 }
 
@@ -139,11 +138,19 @@ func (p *Proxy) Closing() bool {
 
 // SetRequestModifier sets the request modifier.
 func (p *Proxy) SetRequestModifier(reqmod RequestModifier) {
+	if reqmod == nil {
+		reqmod = noop
+	}
+
 	p.reqmod = reqmod
 }
 
 // SetResponseModifier sets the response modifier.
 func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
+	if resmod == nil {
+		resmod = noop
+	}
+
 	p.resmod = resmod
 }
 

@@ -28,6 +28,7 @@ import (
 
 func TestModifyRequest(t *testing.T) {
 	m := NewModifier()
+	m.SetRequestModifier(nil)
 
 	req, err := http.NewRequest("CONNECT", "https://www.example.com", nil)
 	if err != nil {
@@ -87,6 +88,7 @@ func TestModifyRequest(t *testing.T) {
 
 func TestModifyResponse(t *testing.T) {
 	m := NewModifier()
+	m.SetResponseModifier(nil)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
