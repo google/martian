@@ -79,6 +79,8 @@ func NewAuthority(name, organization string, validity time.Duration) (*x509.Cert
 	h.Write(pkixpub)
 	keyID := h.Sum(nil)
 
+	// TODO: keep a map of used serial numbers to avoid potentially reusing a
+	// serial multiple times.
 	serial, err := rand.Int(rand.Reader, MaxSerialNumber)
 	if err != nil {
 		return nil, nil, err

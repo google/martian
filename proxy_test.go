@@ -268,6 +268,12 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	})
 	p.SetTimeout(50 * time.Millisecond)
 
+	tm := martiantest.NewModifier()
+	reserr := errors.New("response error")
+	tm.ResponseError(reserr)
+
+	p.SetResponseModifier(tm)
+
 	go p.Serve(l)
 
 	// Open connection to upstream proxy.
@@ -296,6 +302,9 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 
 	if got, want := res.StatusCode, 502; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
+	}
+	if got, want := res.Header["Warning"][1], reserr.Error(); !strings.Contains(got, want) {
+		t.Errorf("res.Header.get(%q): got %q, want to contain %q", "Warning", got, want)
 	}
 }
 
@@ -354,7 +363,7 @@ func TestIntegrationConnect(t *testing.T) {
 		t.Error("tm.ResponseModified(): got false, want true")
 	}
 	if got, want := res.Header.Get("Warning"), reserr.Error(); !strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %s, want to contain %s", got, want)
+		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", got, want)
 	}
 
 	tlsconn := tls.Client(conn, &tls.Config{
@@ -572,7 +581,7 @@ func TestIntegrationMITM(t *testing.T) {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
 	if got, want := res.Header.Get("Warning"), reserr.Error(); !strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %s, want to contain %s", "Warning", got, want)
+		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", "Warning", got, want)
 	}
 
 	roots := x509.NewCertPool()
@@ -606,7 +615,7 @@ func TestIntegrationMITM(t *testing.T) {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
 	if got, want := res.Header.Get("Warning"), reserr.Error(); !strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %s, want to contain %s", "Warning", got, want)
+		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", "Warning", got, want)
 	}
 }
 
@@ -782,7 +791,7 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 	}
 
 	if got, want := res.Header.Get("Warning"), trerr.Error(); !strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %s, want to contain %s", "Warning", got, want)
+		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", "Warning", got, want)
 	}
 }
 

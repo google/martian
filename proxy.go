@@ -199,10 +199,7 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 
 	for {
 		deadline := time.Now().Add(p.timeout)
-		if err := conn.SetDeadline(deadline); err != nil {
-			Errorf("martian: failed to set connection deadline: %v", err)
-			return
-		}
+		conn.SetDeadline(deadline)
 
 		if err := p.handle(ctx, conn, brw); isCloseableError(err) {
 			Infof("martian: closing connection: %v", conn.RemoteAddr())
@@ -216,13 +213,13 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 	req, err := http.ReadRequest(brw.Reader)
 	if err != nil {
-		if !isCloseableError(err) {
-			Errorf("martian: failed to read request: %v", err)
-		}
+		Errorf("martian: failed to read request: %v", err)
 
-		// Failed to read request, close the connection.
+		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
+
 		return closeConn
 	}
+	defer req.Body.Close()
 
 	req.URL.Scheme = "http"
 	if ctx.IsSecure() {
@@ -265,10 +262,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 				proxyutil.Warning(res.Header, err)
 			}
 
-			if err := res.Write(brw); err != nil {
-				Errorf("martian: failed to write CONNECT response: %v", err)
-				return err
-			}
+			res.Write(brw)
 			brw.Flush()
 
 			Debugf("martian: completed MITM for connection: %s", req.Host)
@@ -282,33 +276,34 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		}
 
 		Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
-		res, dconn, cerr := p.connect(req)
+		res, cconn, cerr := p.connect(req)
 		if cerr != nil {
 			Errorf("martian: failed to CONNECT: %v", err)
 			res = proxyutil.NewResponse(502, nil, req)
 			proxyutil.Warning(res.Header, cerr)
+
+			if err := p.resmod.ModifyResponse(res); err != nil {
+				Errorf("martian: error modifying CONNECT response: %v", err)
+				proxyutil.Warning(res.Header, err)
+			}
+
+			res.Write(brw)
+			return brw.Flush()
 		}
+		defer res.Body.Close()
+		defer cconn.Close()
 
 		if err := p.resmod.ModifyResponse(res); err != nil {
 			Errorf("martian: error modifying CONNECT response: %v", err)
 			proxyutil.Warning(res.Header, err)
 		}
 
-		if err := res.Write(brw); err != nil {
-			Errorf("martian: failed to write CONNECT response: %v", err)
-			return err
-		}
+		res.Write(brw)
 		brw.Flush()
 
-		if cerr != nil {
-			return cerr
-		}
-
-		defer dconn.Close()
-
-		dbw := bufio.NewWriter(dconn)
-		dbr := bufio.NewReader(dconn)
-		defer dbw.Flush()
+		cbw := bufio.NewWriter(cconn)
+		cbr := bufio.NewReader(cconn)
+		defer cbw.Flush()
 
 		copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
 			io.Copy(w, r)
@@ -316,8 +311,8 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		}
 
 		donec := make(chan bool, 2)
-		go copySync(dbw, brw, donec)
-		go copySync(brw, dbr, donec)
+		go copySync(cbw, brw, donec)
+		go copySync(brw, cbr, donec)
 
 		Debugf("martian: established CONNECT tunnel, proxying traffic")
 		<-donec
@@ -338,6 +333,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		res = proxyutil.NewResponse(502, nil, req)
 		proxyutil.Warning(res.Header, err)
 	}
+	defer res.Body.Close()
 
 	if err := p.resmod.ModifyResponse(res); err != nil {
 		Errorf("martian: error modifying response: %v", err)
@@ -352,10 +348,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	}
 
 	Debugf("martian: sent response: %v", req.URL)
-	if err := res.Write(brw); err != nil {
-		Errorf("martian: failed to write response: %v", err)
-		return err
-	}
+	res.Write(brw)
 	brw.Flush()
 
 	return closing
@@ -385,9 +378,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 		pbw := bufio.NewWriter(conn)
 		pbr := bufio.NewReader(conn)
 
-		if err := req.Write(pbw); err != nil {
-			return nil, nil, err
-		}
+		req.Write(pbw)
 		pbw.Flush()
 
 		res, err := http.ReadResponse(pbr, req)
