@@ -381,7 +381,7 @@ func TestIntegrationConnect(t *testing.T) {
 	// TODO: Avoid creating real connection, spin up TLS server with fake
 	// certificate signed by generated CA.
 	//
-	// GET /humans.text HTTP/1.1
+	// GET /humans.txt HTTP/1.1
 	// Host: www.google.com
 	if err := req.Write(tlsconn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
@@ -598,7 +598,7 @@ func TestIntegrationMITM(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// GET /humans.text HTTP/1.1
+	// GET /humans.txt HTTP/1.1
 	// Host: www.google.com
 	if err := req.Write(tlsconn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
