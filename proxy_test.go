@@ -16,11 +16,9 @@ package martian
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -287,13 +285,13 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	}
 	defer conn.Close()
 
-	req, err := http.NewRequest("CONNECT", "//www.google.com:443", nil)
+	req, err := http.NewRequest("CONNECT", "//example.com:443", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// CONNECT www.google.com:443 HTTP/1.1
-	// Host: www.google.com
+	// CONNECT example.com:443 HTTP/1.1
+	// Host: example.com
 	if err := req.Write(conn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
@@ -321,9 +319,34 @@ func TestIntegrationConnect(t *testing.T) {
 	p := NewProxy()
 	defer p.Close()
 
+	// Test TLS server.
+	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", time.Hour)
+	if err != nil {
+		t.Fatalf("mitm.NewAuthority(): got %v, want no error", err)
+	}
+	mc, err := mitm.NewConfig(ca, priv)
+	if err != nil {
+		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
+	}
+
+	tl, err := tls.Listen("tcp", "[::1]:0", mc.TLS())
+	if err != nil {
+		t.Fatalf("tls.Listen(): got %v, want no error", err)
+	}
+
+	go http.Serve(tl, http.HandlerFunc(
+		func(rw http.ResponseWriter, req *http.Request) {
+			rw.WriteHeader(299)
+		}))
+
 	tm := martiantest.NewModifier()
 	reqerr := errors.New("request error")
 	reserr := errors.New("response error")
+
+	// Force the CONNECT request to dial the local TLS server.
+	tm.RequestFunc(func(req *http.Request) {
+		req.URL.Host = tl.Addr().String()
+	})
 
 	tm.RequestError(reqerr)
 	tm.ResponseError(reserr)
@@ -339,18 +362,20 @@ func TestIntegrationConnect(t *testing.T) {
 	}
 	defer conn.Close()
 
-	req, err := http.NewRequest("CONNECT", "//www.google.com:443", nil)
+	req, err := http.NewRequest("CONNECT", "//example.com:443", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// CONNECT www.google.com:443 HTTP/1.1
-	// Host: www.google.com:443
+	// CONNECT example.com:443 HTTP/1.1
+	// Host: example.com
+	//
+	// Rewritten to CONNECT to host:port in CONNECT request modifier.
 	if err := req.Write(conn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
 
-	// CONNECT response after establishing tunnel to production.
+	// CONNECT response after establishing tunnel.
 	res, err := http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
@@ -370,23 +395,24 @@ func TestIntegrationConnect(t *testing.T) {
 		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", got, want)
 	}
 
+	roots := x509.NewCertPool()
+	roots.AddCert(ca)
+
 	tlsconn := tls.Client(conn, &tls.Config{
-		// Validate the certificate is actually for Google.
-		ServerName: "www.google.com",
+		ServerName: "example.com",
+		RootCAs:    roots,
 	})
 	defer tlsconn.Close()
 
-	req, err = http.NewRequest("GET", "https://www.google.com/humans.txt", nil)
+	req, err = http.NewRequest("GET", "https://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
+	req.Header.Set("Connection", "close")
 
-	// Request is tunneled to a real Google server.
-	// TODO: Avoid creating real connection, spin up TLS server with fake
-	// certificate signed by generated CA.
-	//
-	// GET /humans.txt HTTP/1.1
-	// Host: www.google.com
+	// GET / HTTP/1.1
+	// Host: example.com
+	// Connection: close
 	if err := req.Write(tlsconn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
@@ -397,22 +423,11 @@ func TestIntegrationConnect(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if got, want := res.StatusCode, 200; got != want {
+	if got, want := res.StatusCode, 299; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
 	if got, want := res.Header.Get("Warning"), reserr.Error(); strings.Contains(got, want) {
 		t.Errorf("res.Header.Get(%q): got %s, want to not contain %s", got, want)
-	}
-
-	got, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
-	}
-
-	want := []byte("Google is built by a large team of engineers")
-
-	if !bytes.Contains(got, want) {
-		t.Fatalf("res.Body: got %q, want to contain %q", got, want)
 	}
 }
 
@@ -468,13 +483,13 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	}
 	defer conn.Close()
 
-	req, err := http.NewRequest("CONNECT", "//www.google.com:443", nil)
+	req, err := http.NewRequest("CONNECT", "//example.com:443", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// CONNECT www.google.com:443 HTTP/1.1
-	// Host: www.google.com
+	// CONNECT example.com:443 HTTP/1.1
+	// Host: example.com
 	if err := req.Write(conn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
@@ -493,21 +508,21 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	roots.AddCert(ca)
 
 	tlsconn := tls.Client(conn, &tls.Config{
-		// Validate the hostname is Google.
-		ServerName: "www.google.com",
+		// Validate the hostname.
+		ServerName: "example.com",
 		// The certificate will have been MITM'd, verify using the MITM CA
 		// certificate.
 		RootCAs: roots,
 	})
 	defer tlsconn.Close()
 
-	req, err = http.NewRequest("GET", "https://www.google.com/humans.txt", nil)
+	req, err = http.NewRequest("GET", "https://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// GET /humans.txt HTTP/1.1
-	// Host: www.google.com
+	// GET / HTTP/1.1
+	// Host: example.com
 	if err := req.Write(tlsconn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
@@ -571,13 +586,13 @@ func TestIntegrationMITM(t *testing.T) {
 	}
 	defer conn.Close()
 
-	req, err := http.NewRequest("CONNECT", "//www.google.com:443", nil)
+	req, err := http.NewRequest("CONNECT", "//example.com:443", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// CONNECT www.google.com:443 HTTP/1.1
-	// Host: www.google.com
+	// CONNECT example.com:443 HTTP/1.1
+	// Host: example.com
 	if err := req.Write(conn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
@@ -599,18 +614,18 @@ func TestIntegrationMITM(t *testing.T) {
 	roots.AddCert(ca)
 
 	tlsconn := tls.Client(conn, &tls.Config{
-		ServerName: "www.google.com",
+		ServerName: "example.com",
 		RootCAs:    roots,
 	})
 	defer tlsconn.Close()
 
-	req, err = http.NewRequest("GET", "https://www.google.com/humans.txt", nil)
+	req, err = http.NewRequest("GET", "https://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// GET /humans.txt HTTP/1.1
-	// Host: www.google.com
+	// GET / HTTP/1.1
+	// Host: example.com
 	if err := req.Write(tlsconn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
@@ -726,8 +741,8 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 	roots.AddCert(ca)
 
 	tlsconn, err := tls.Dial("tcp", l.Addr().String(), &tls.Config{
-		// Verify the hostname is www.google.com.
-		ServerName: "www.google.com",
+		// Verify the hostname is example.com.
+		ServerName: "example.com",
 		// The certificate will have been generated during MITM, so we need to
 		// verify it with the generated CA certificate.
 		RootCAs: roots,
@@ -737,14 +752,14 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 	}
 	defer tlsconn.Close()
 
-	req, err := http.NewRequest("GET", "https://www.google.com/humans.txt", nil)
+	req, err := http.NewRequest("GET", "https://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
 	// Write Encrypted request directly, no CONNECT.
-	// GET /humans.txt HTTP/1.1
-	// Host: www.google.com
+	// GET / HTTP/1.1
+	// Host: example.com
 	if err := req.Write(tlsconn); err != nil {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
