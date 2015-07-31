@@ -51,7 +51,7 @@ func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
 
 // ModifyRequest sets the auth ID in the context from the request iff it has
 // not already been set and runs reqmod.ModifyRequest. If the underlying
-// modifier has indicated via ctx.Auth.Error that no valid auth credentials
+// modifier has indicated via auth error that no valid auth credentials
 // have been found we set ctx.SkipRoundTrip.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.Context(req)
