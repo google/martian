@@ -24,6 +24,8 @@ import (
 	"github.com/google/martian/verify"
 )
 
+var noop = martian.Noop("url.Filter")
+
 func init() {
 	parse.Register("url.Filter", filterFromJSON)
 }
@@ -48,33 +50,43 @@ type filterJSON struct {
 // request URL matches all of the provided URL segments.
 func NewFilter(u *url.URL) *Filter {
 	return &Filter{
-		url: u,
+		url:    u,
+		reqmod: noop,
+		resmod: noop,
 	}
 }
 
 // SetRequestModifier sets the request modifier.
 func (f *Filter) SetRequestModifier(reqmod martian.RequestModifier) {
+	if reqmod == nil {
+		reqmod = noop
+	}
+
 	f.reqmod = reqmod
 }
 
 // SetResponseModifier sets the response modifier.
 func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
+	if resmod == nil {
+		resmod = noop
+	}
+
 	f.resmod = resmod
 }
 
 // ModifyRequest runs the modifier if the URL matches all provided matchers.
-func (f *Filter) ModifyRequest(ctx *martian.Context, req *http.Request) error {
-	if f.reqmod != nil && f.matches(req.URL) {
-		return f.reqmod.ModifyRequest(ctx, req)
+func (f *Filter) ModifyRequest(req *http.Request) error {
+	if f.matches(req.URL) {
+		return f.reqmod.ModifyRequest(req)
 	}
 
 	return nil
 }
 
 // ModifyResponse runs the modifier if the request URL matches urlMatcher.
-func (f *Filter) ModifyResponse(ctx *martian.Context, res *http.Response) error {
-	if f.resmod != nil && f.matches(res.Request.URL) {
-		return f.resmod.ModifyResponse(ctx, res)
+func (f *Filter) ModifyResponse(res *http.Response) error {
+	if f.matches(res.Request.URL) {
+		return f.resmod.ModifyResponse(res)
 	}
 
 	return nil

@@ -19,13 +19,25 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 )
 
 func TestModifyRequest(t *testing.T) {
+	f := NewFilter("mARTian-teSTInG", "true")
+	f.SetRequestModifier(nil)
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := f.ModifyRequest(req); err != nil {
+		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
 	tt := []struct {
 		name   string
 		values []string
@@ -44,14 +56,9 @@ func TestModifyRequest(t *testing.T) {
 	}
 
 	for i, tc := range tt {
-		var got bool
-
 		f := NewFilter("mARTian-teSTInG", "true")
-		f.SetRequestModifier(martian.RequestModifierFunc(
-			func(*martian.Context, *http.Request) error {
-				got = true
-				return nil
-			}))
+		tm := martiantest.NewModifier()
+		f.SetRequestModifier(tm)
 
 		req, err := http.NewRequest("GET", "http://example.com", nil)
 		if err != nil {
@@ -59,17 +66,26 @@ func TestModifyRequest(t *testing.T) {
 		}
 		req.Header[tc.name] = tc.values
 
-		if err := f.ModifyRequest(martian.NewContext(), req); err != nil {
+		if err := f.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
 		}
 
-		if got != tc.want {
-			t.Errorf("%d. modifier run: got %t, want %t", i, got, tc.want)
+		if tm.RequestModified() != tc.want {
+			t.Errorf("%d. tm.RequestModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
 		}
 	}
 }
 
 func TestModifyResponse(t *testing.T) {
+	f := NewFilter("mARTian-teSTInG", "true")
+	f.SetResponseModifier(nil)
+
+	res := proxyutil.NewResponse(200, nil, nil)
+
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	tt := []struct {
 		name   string
 		values []string
@@ -88,24 +104,19 @@ func TestModifyResponse(t *testing.T) {
 	}
 
 	for i, tc := range tt {
-		var got bool
-
 		f := NewFilter("mARTian-teSTInG", "true")
-		f.SetResponseModifier(martian.ResponseModifierFunc(
-			func(*martian.Context, *http.Response) error {
-				got = true
-				return nil
-			}))
+		tm := martiantest.NewModifier()
+		f.SetResponseModifier(tm)
 
 		res := proxyutil.NewResponse(200, nil, nil)
 		res.Header[tc.name] = tc.values
 
-		if err := f.ModifyResponse(martian.NewContext(), res); err != nil {
+		if err := f.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
 		}
 
-		if got != tc.want {
-			t.Errorf("%d. modifier run: got %t, want %t", i, got, tc.want)
+		if tm.ResponseModified() != tc.want {
+			t.Errorf("%d. tm.ResponseModified(): got %t, want %t", i, tm.ResponseModified(), tc.want)
 		}
 	}
 }
@@ -140,7 +151,7 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 	req.Header.Set("Martian-Passthru", "true")
-	if err := reqmod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Header.Get("Martian-Testing"), "true"; got != want {
@@ -154,7 +165,7 @@ func TestFilterFromJSON(t *testing.T) {
 
 	res := proxyutil.NewResponse(200, nil, nil)
 	res.Header.Set("Martian-Passthru", "true")
-	if err := resmod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 	if got, want := res.Header.Get("Martian-Testing"), "true"; got != want {

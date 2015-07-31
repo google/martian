@@ -22,7 +22,10 @@ import (
 	"strings"
 
 	"github.com/google/martian"
+	"github.com/google/martian/auth"
 )
+
+var noop = martian.Noop("proxyauth.Modifier")
 
 // Modifier is the proxy authentication modifier.
 type Modifier struct {
@@ -32,58 +35,60 @@ type Modifier struct {
 
 // NewModifier returns a new proxy authentication modifier.
 func NewModifier() *Modifier {
-	return &Modifier{}
+	return &Modifier{
+		reqmod: noop,
+		resmod: noop,
+	}
 }
 
 // SetRequestModifier sets the request modifier.
 func (m *Modifier) SetRequestModifier(reqmod martian.RequestModifier) {
+	if reqmod == nil {
+		reqmod = noop
+	}
+
 	m.reqmod = reqmod
 }
 
 // SetResponseModifier sets the response modifier.
 func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
+	if resmod == nil {
+		resmod = noop
+	}
+
 	m.resmod = resmod
 }
 
 // ModifyRequest sets the auth ID in the context from the request iff it has
 // not already been set and runs reqmod.ModifyRequest. If the underlying
-// modifier has indicated via ctx.Auth.Error that no valid auth credentials
+// modifier has indicated via auth error that no valid auth credentials
 // have been found we set ctx.SkipRoundTrip.
-func (m *Modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
-	ctx.Auth.ID = id(req.Header)
+func (m *Modifier) ModifyRequest(req *http.Request) error {
+	ctx := martian.Context(req)
+	actx := auth.FromContext(ctx)
 
-	if m.reqmod == nil {
-		return nil
+	actx.SetID(id(req.Header))
+
+	err := m.reqmod.ModifyRequest(req)
+
+	if actx.Error() != nil {
+		ctx.SkipRoundTrip()
 	}
 
-	if err := m.reqmod.ModifyRequest(ctx, req); err != nil {
-		return err
-	}
-
-	if ctx.Auth.Error != nil {
-		ctx.SkipRoundTrip = true
-	}
-
-	return nil
+	return err
 }
 
 // ModifyResponse runs resmod.ModifyResponse and modifies the response to
-// include the correct status code and headers if ctx.Auth.Error is present.
+// include the correct status code and headers if auth error is present.
 //
 // If an error is returned from resmod.ModifyResponse it is returned.
-func (m *Modifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
-	var err error
+func (m *Modifier) ModifyResponse(res *http.Response) error {
+	ctx := martian.Context(res.Request)
+	actx := auth.FromContext(ctx)
 
-	if m.resmod != nil {
-		err = m.resmod.ModifyResponse(ctx, res)
-	}
+	err := m.resmod.ModifyResponse(res)
 
-	if ctx.Auth.Error != nil {
-		// Reset the auth so we don't get stuck in a failed auth loop
-		// when dealing with Keep-Alive.
-		ctx.Auth.Reset()
-		ctx.SkipRoundTrip = false
-
+	if actx.Error() != nil {
 		res.StatusCode = http.StatusProxyAuthRequired
 		res.Header.Set("Proxy-Authenticate", "Basic")
 	}

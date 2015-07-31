@@ -20,7 +20,10 @@ import (
 	"net/http"
 
 	"github.com/google/martian"
+	"github.com/google/martian/auth"
 )
+
+var noop = martian.Noop("ipauth.Modifier")
 
 // Modifier is the IP authentication modifier.
 type Modifier struct {
@@ -30,62 +33,67 @@ type Modifier struct {
 
 // NewModifier returns a new IP authentication modifier.
 func NewModifier() *Modifier {
-	return &Modifier{}
+	return &Modifier{
+		reqmod: noop,
+		resmod: noop,
+	}
 }
 
 // SetRequestModifier sets the request modifier.
 func (m *Modifier) SetRequestModifier(reqmod martian.RequestModifier) {
+	if reqmod == nil {
+		reqmod = noop
+	}
+
 	m.reqmod = reqmod
 }
 
 // SetResponseModifier sets the response modifier.
 func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
+	if resmod == nil {
+		resmod = noop
+	}
+
 	m.resmod = resmod
 }
 
 // ModifyRequest sets the auth ID in the context from the request iff it has
 // not already been set and runs reqmod.ModifyRequest. If the underlying
-// modifier has indicated via ctx.Auth.Error that no valid auth credentials
+// modifier has indicated via auth error that no valid auth credentials
 // have been found we set ctx.SkipRoundTrip.
-func (m *Modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (m *Modifier) ModifyRequest(req *http.Request) error {
+	ctx := martian.Context(req)
+	actx := auth.FromContext(ctx)
+
 	ip, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		ip = req.RemoteAddr
 	}
 
-	ctx.Auth.ID = ip
+	actx.SetID(ip)
 
-	if m.reqmod == nil {
-		return nil
+	err = m.reqmod.ModifyRequest(req)
+
+	if actx.Error() != nil {
+		ctx.SkipRoundTrip()
 	}
 
-	if err := m.reqmod.ModifyRequest(ctx, req); err != nil {
-		return err
-	}
-
-	if ctx.Auth.Error != nil {
-		ctx.SkipRoundTrip = true
-	}
-
-	return nil
+	return err
 }
 
-// ModifyResponse runs cresmod.ModifyResponse and checks ctx.Auth.Error for
-// application specific auth failure.
+// ModifyResponse runs resmod.ModifyResponse.
 //
 // If an error is returned from resmod.ModifyResponse it is returned.
-func (m *Modifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
-	if m.resmod != nil {
-		if err := m.resmod.ModifyResponse(ctx, res); err != nil {
-			return err
-		}
+func (m *Modifier) ModifyResponse(res *http.Response) error {
+	ctx := martian.Context(res.Request)
+	actx := auth.FromContext(ctx)
+
+	err := m.resmod.ModifyResponse(res)
+
+	if actx.Error() != nil {
+		res.StatusCode = 403
+		res.Status = http.StatusText(403)
 	}
 
-	if err := ctx.Auth.Error; err != nil {
-		ctx.Auth.Reset()
-		ctx.SkipRoundTrip = false
-		return err
-	}
-
-	return nil
+	return err
 }

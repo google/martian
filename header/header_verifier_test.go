@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
@@ -39,7 +38,7 @@ func TestVerifyRequestsBlankValue(t *testing.T) {
 			req.Header.Set("Martian-Test", "true")
 		}
 
-		if err := v.ModifyRequest(martian.NewContext(), req); err != nil {
+		if err := v.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
 		}
 	}
@@ -94,7 +93,7 @@ func TestVerifierFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := reqv.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := reqv.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if err := reqv.VerifyRequests(); err == nil {
@@ -111,7 +110,7 @@ func TestVerifierFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := resv.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := resv.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 	if err := resv.VerifyResponses(); err == nil {
@@ -137,7 +136,7 @@ func TestVerifyRequests(t *testing.T) {
 			req.Header.Add("Martian-Test", "testing-odd")
 		}
 
-		if err := v.ModifyRequest(martian.NewContext(), req); err != nil {
+		if err := v.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
 		}
 	}
@@ -181,7 +180,7 @@ func TestVerifyResponsesBlankValue(t *testing.T) {
 			res.Header.Set("Martian-Test", "true")
 		}
 
-		if err := v.ModifyResponse(martian.NewContext(), res); err != nil {
+		if err := v.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
 		}
 	}
@@ -229,7 +228,7 @@ func TestVerifyResponses(t *testing.T) {
 			res.Header.Add("Martian-Test", "testing-odd")
 		}
 
-		if err := v.ModifyResponse(martian.NewContext(), res); err != nil {
+		if err := v.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
 		}
 	}

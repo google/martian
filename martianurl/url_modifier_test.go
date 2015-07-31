@@ -20,7 +20,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 )
 
@@ -69,7 +68,7 @@ func TestNewModifier(t *testing.T) {
 
 		mod := NewModifier(tc.url)
 
-		if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+		if err := mod.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %q, want no error", i, err)
 		}
 
@@ -99,7 +98,7 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("http.NewRequest(%q, %q, nil): got %v, want no error", "GET", "http://example.com/test", err)
 	}
 
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -138,7 +137,7 @@ func TestModifierFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := reqmod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 

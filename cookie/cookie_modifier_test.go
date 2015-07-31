@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -35,7 +34,7 @@ func TestCookieModifier(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	if err := mod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -50,7 +49,7 @@ func TestCookieModifier(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := mod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
@@ -90,7 +89,7 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatal("reqmod: got nil, want not nil")
 	}
 
-	if err := reqmod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -111,7 +110,7 @@ func TestModifierFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := resmod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 

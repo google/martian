@@ -46,7 +46,7 @@ func NewHopByHopModifier() martian.RequestResponseModifier {
 // ModifyRequest removes all hop-by-hop headers defined by RFC2616 as
 // well as any additional hop-by-hop headers specified in the
 // Connection header.
-func (m *hopByHopModifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (m *hopByHopModifier) ModifyRequest(req *http.Request) error {
 	removeHopByHopHeaders(req.Header)
 	return nil
 }
@@ -54,7 +54,7 @@ func (m *hopByHopModifier) ModifyRequest(ctx *martian.Context, req *http.Request
 // ModifyResponse removes all hop-by-hop headers defined by RFC2616 as
 // well as any additional hop-by-hop headers specified in the
 // Connection header.
-func (m *hopByHopModifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (m *hopByHopModifier) ModifyResponse(res *http.Response) error {
 	removeHopByHopHeaders(res.Header)
 	return nil
 }

@@ -17,12 +17,10 @@ package body
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 )
 
@@ -38,16 +36,16 @@ type Modifier struct {
 
 type modifierJSON struct {
 	ContentType string               `json:"contentType"`
-	Body        string               `json:"body"` // Body is expected to be a Base64 encoded string.
+	Body        []byte               `json:"body"` // Body is expected to be a Base64 encoded string.
 	Scope       []parse.ModifierType `json:"scope"`
 }
 
 // NewModifier constructs and returns a body.Modifier.
-func NewModifier(b []byte, contentType string) (*Modifier, error) {
+func NewModifier(b []byte, contentType string) *Modifier {
 	return &Modifier{
 		contentType: contentType,
 		body:        b,
-	}, nil
+	}
 }
 
 // modifierFromJSON takes a JSON message as a byte slice and returns a
@@ -65,28 +63,27 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	body, err := base64.StdEncoding.DecodeString(msg.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	mod, err := NewModifier(body, msg.ContentType)
-	if err != nil {
-		return nil, err
-	}
-
+	mod := NewModifier(msg.Body, msg.ContentType)
 	return parse.NewResult(mod, msg.Scope)
 }
 
-// ModifyRequest signals to the proxy to skip the roundtrip.
-func (m *Modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
-	ctx.SkipRoundTrip = true
+// ModifyRequest sets the Content-Type header and overrides the request body.
+func (m *Modifier) ModifyRequest(req *http.Request) error {
+	req.Body.Close()
+
+	req.Header.Set("Content-Type", m.contentType)
+
+	// Reset the Content-Encoding since we know that the new body isn't encoded.
+	req.Header.Del("Content-Encoding")
+
+	req.ContentLength = int64(len(m.body))
+	req.Body = ioutil.NopCloser(bytes.NewReader(m.body))
 
 	return nil
 }
 
 // ModifyResponse sets the Content-Type header and overrides the response body.
-func (m *Modifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (m *Modifier) ModifyResponse(res *http.Response) error {
 	// Replace the existing body, close it first.
 	res.Body.Close()
 

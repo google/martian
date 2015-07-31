@@ -21,16 +21,45 @@ import (
 	"testing"
 
 	"github.com/google/martian"
+	"github.com/google/martian/auth"
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/session"
 )
 
 func encode(v string) string {
 	return base64.StdEncoding.EncodeToString([]byte(v))
 }
 
-func TestModifyRequest(t *testing.T) {
+func TestNoModifiers(t *testing.T) {
 	m := NewModifier()
-	ctx := martian.NewContext()
+	m.SetRequestModifier(nil)
+	m.SetResponseModifier(nil)
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	if err := m.ModifyRequest(req); err != nil {
+		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := m.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+}
+
+func TestProxyAuth(t *testing.T) {
+	m := NewModifier()
+	tm := martiantest.NewModifier()
+	m.SetRequestModifier(tm)
+	m.SetResponseModifier(tm)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -38,104 +67,111 @@ func TestModifyRequest(t *testing.T) {
 	}
 	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	if err := m.ModifyRequest(ctx, req); err != nil {
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := ctx.Auth.ID, "user:pass"; got != want {
-		t.Fatalf("ctx.Auth.ID: got %q, want %q", got, want)
+
+	actx := auth.FromContext(ctx)
+	if got, want := actx.ID(), "user:pass"; got != want {
+		t.Fatalf("actx.ID(): got %q, want %q", got, want)
 	}
 
-	modifierRun := false
-	m.SetRequestModifier(martian.RequestModifierFunc(
-		func(*martian.Context, *http.Request) error {
-			modifierRun = true
-			return nil
-		}))
-
-	if err := m.ModifyRequest(ctx, req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if !modifierRun {
-		t.Error("modifierRun: got false, want true")
+	if !tm.RequestModified() {
+		t.Error("tm.RequestModified(): got false, want true")
 	}
-}
 
-func TestModifyResponse(t *testing.T) {
-	m := NewModifier()
-	ctx := martian.NewContext()
-	res := proxyutil.NewResponse(200, nil, nil)
+	res := proxyutil.NewResponse(200, nil, req)
 
-	if err := m.ModifyResponse(ctx, res); err != nil {
+	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
-	m.SetResponseModifier(martian.ResponseModifierFunc(
-		func(*martian.Context, *http.Response) error {
-			ctx.Auth.Error = errors.New("auth is required")
-			return nil
-		}))
-
-	if err := m.ModifyResponse(ctx, res); err != nil {
+	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if got, want := res.StatusCode, http.StatusProxyAuthRequired; got != want {
+
+	if !tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got false, want true")
+	}
+
+	if got, want := res.StatusCode, 200; got != want {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
-	if got, want := res.Header.Get("Proxy-Authenticate"), "Basic"; got != want {
+	if got, want := res.Header.Get("Proxy-Authenticate"), ""; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Proxy-Authenticate", got, want)
 	}
 }
 
-func TestModifyResponseResetAuth(t *testing.T) {
-	auth := NewModifier()
+func TestProxyAuthInvalidCredentials(t *testing.T) {
+	m := NewModifier()
+	autherr := errors.New("auth error")
 
-	auth.SetRequestModifier(martian.RequestModifierFunc(
-		func(ctx *martian.Context, req *http.Request) error {
-			if ctx.Auth.ID != "secret:pass" {
-				ctx.Auth.Error = errors.New("invalid auth")
-			}
-			return nil
-		}))
+	tm := martiantest.NewModifier()
+	tm.RequestFunc(func(req *http.Request) {
+		ctx := martian.Context(req)
+		actx := auth.FromContext(ctx)
+
+		actx.SetError(autherr)
+	})
+	tm.ResponseFunc(func(res *http.Response) {
+		ctx := martian.Context(res.Request)
+		actx := auth.FromContext(ctx)
+
+		actx.SetError(autherr)
+	})
+
+	m.SetRequestModifier(tm)
+	m.SetResponseModifier(tm)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	req.Header.Set("Proxy-Authorization", "Basic "+encode("wrong:pass"))
+	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	ctx := martian.NewContext()
-	// This will set ctx.Auth.Error since the ID isn't "secret:pass".
-	if err := auth.ModifyRequest(ctx, req); err != nil {
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
+
+	if !tm.RequestModified() {
+		t.Error("tm.RequestModified(): got false, want true")
+	}
+
+	actx := auth.FromContext(ctx)
+	if actx.Error() != autherr {
+		t.Fatalf("auth.Error(): got %v, want %v", actx.Error(), autherr)
+	}
+	actx.SetError(nil)
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := auth.ModifyResponse(ctx, res); err != nil {
+
+	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if got, want := res.StatusCode, 407; got != want {
+
+	if !tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got false, want true")
+	}
+
+	if actx.Error() != autherr {
+		t.Fatalf("auth.Error(): got %v, want %v", actx.Error(), autherr)
+	}
+
+	if got, want := res.StatusCode, http.StatusProxyAuthRequired; got != want {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
-
-	if got, want := ctx.Auth.ID, ""; got != want {
-		t.Errorf("ctx.Auth.ID: got %q, want %q", got, want)
-	}
-	if err := ctx.Auth.Error; err != nil {
-		t.Errorf("ctx.Auth.Error: got %v, want no error", err)
-	}
-
-	// This will be successful because the ID is "secret:pass".
-	req.Header.Set("Proxy-Authorization", "Basic "+encode("secret:pass"))
-	if err := auth.ModifyRequest(ctx, req); err != nil {
-		t.Fatalf("ModifyRequest(): got %v, want no error", err)
-	}
-
-	// Reset the response.
-	res = proxyutil.NewResponse(200, nil, req)
-	if err := auth.ModifyResponse(ctx, res); err != nil {
-		t.Fatalf("ModifyResponse(): got %v, want no error", err)
-	}
-	if got, want := res.StatusCode, 200; got != want {
-		t.Errorf("res.StatusCode: got %d, want %d", got, want)
+	if got, want := res.Header.Get("Proxy-Authenticate"), "Basic"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Proxy-Authenticate", got, want)
 	}
 }

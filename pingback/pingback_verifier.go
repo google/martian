@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -63,7 +62,7 @@ func NewVerifier(url *url.URL) verify.RequestVerifier {
 // matches the pingback, it is recorded by setting the error to nil. The error
 // will continue to be nil until the verifier has been reset, regardless of
 // subsequent requests matching.
-func (v *Verifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (v *Verifier) ModifyRequest(req *http.Request) error {
 	u := req.URL
 
 	switch {

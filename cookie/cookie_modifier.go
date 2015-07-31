@@ -45,7 +45,7 @@ type modifierJSON struct {
 }
 
 // ModifyRequest adds cookie to the request.
-func (m *modifier) ModifyRequest(_ *martian.Context, req *http.Request) error {
+func (m *modifier) ModifyRequest(req *http.Request) error {
 	req.AddCookie(m.cookie)
 	martian.Infof("%s: add cookie: %s", req.URL, m.cookie)
 
@@ -53,7 +53,7 @@ func (m *modifier) ModifyRequest(_ *martian.Context, req *http.Request) error {
 }
 
 // ModifyResponse sets cookie on the response.
-func (m *modifier) ModifyResponse(_ *martian.Context, res *http.Response) error {
+func (m *modifier) ModifyResponse(res *http.Response) error {
 	res.Header.Add("Set-Cookie", m.cookie.String())
 	martian.Infof("%s: add cookie: %s", res.Request.URL, m.cookie)
 

@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -41,7 +40,7 @@ func TestFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, nil)
-	if err := resmod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 	if got, want := res.StatusCode, 400; got != want {
@@ -64,7 +63,7 @@ func TestStatusModifierOnResponse(t *testing.T) {
 
 		mod := NewModifier(status)
 
-		if err := mod.ModifyResponse(martian.NewContext(), res); err != nil {
+		if err := mod.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
 		}
 

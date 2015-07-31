@@ -19,7 +19,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -80,7 +79,7 @@ func TestVerifyRequests(t *testing.T) {
 			t.Fatalf("%d. http.NewRequest(..., %s, ...): got %v, want no error", i, tc.got, err)
 		}
 
-		if err := v.ModifyRequest(martian.NewContext(), req); err != nil {
+		if err := v.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
 		}
 	}
@@ -108,7 +107,7 @@ func TestVerifyRequests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := v.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if err := v.VerifyRequests(); err != nil {
@@ -144,7 +143,7 @@ func TestVerifierFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := reqv.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := reqv.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if err := reqv.VerifyRequests(); err == nil {

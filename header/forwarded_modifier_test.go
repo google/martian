@@ -17,8 +17,6 @@ package header
 import (
 	"net/http"
 	"testing"
-
-	"github.com/google/martian"
 )
 
 func TestSetForwardHeaders(t *testing.T) {
@@ -32,7 +30,7 @@ func TestSetForwardHeaders(t *testing.T) {
 	}
 	req.RemoteAddr = "10.0.0.1:8112"
 
-	if m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
@@ -46,7 +44,7 @@ func TestSetForwardHeaders(t *testing.T) {
 	// Test with existing X-Forwarded-For.
 	req.RemoteAddr = "12.12.12.12"
 
-	if m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 

@@ -64,7 +64,7 @@ func (l *Logger) SetLogFunc(logFunc func(line string)) {
 // Connection: close
 // Other-Header: values
 // --------------------------------------------------------------------------------
-func (l *Logger) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (l *Logger) ModifyRequest(req *http.Request) error {
 	b := &bytes.Buffer{}
 
 	fmt.Fprintln(b, "")
@@ -96,7 +96,7 @@ func (l *Logger) ModifyRequest(ctx *martian.Context, req *http.Request) error {
 // Date: Tue, 15 Nov 1994 08:12:31 GMT
 // Other-Header: values
 // --------------------------------------------------------------------------------
-func (l *Logger) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (l *Logger) ModifyResponse(res *http.Response) error {
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "")
 	fmt.Fprintln(b, strings.Repeat("-", 80))

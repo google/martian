@@ -37,7 +37,7 @@ type modifierJSON struct {
 }
 
 // ModifyRequest sets the header at name with value on the request.
-func (m *modifier) ModifyRequest(_ *martian.Context, req *http.Request) error {
+func (m *modifier) ModifyRequest(req *http.Request) error {
 	// Host is treated differently by the http package and the header is
 	// explicitly ignored.
 	if m.name == "Host" {
@@ -50,7 +50,7 @@ func (m *modifier) ModifyRequest(_ *martian.Context, req *http.Request) error {
 }
 
 // ModifyResponse sets the header at name with value on the response.
-func (m *modifier) ModifyResponse(_ *martian.Context, res *http.Response) error {
+func (m *modifier) ModifyResponse(res *http.Response) error {
 	res.Header.Set(m.name, m.value)
 
 	return nil

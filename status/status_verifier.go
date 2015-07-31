@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -51,7 +50,7 @@ func NewVerifier(statusCode int) verify.ResponseVerifier {
 
 // ModifyResponse verifies that the status code for all requests
 // matches statusCode.
-func (v *Verifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (v *Verifier) ModifyResponse(res *http.Response) error {
 	if res.StatusCode != v.statusCode {
 		v.err.Add(fmt.Errorf(errFormat, res.Request.URL, res.StatusCode, v.statusCode))
 	}

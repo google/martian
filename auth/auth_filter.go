@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package auth provides filtering support for a martian.Proxy based on ctx.Auth.ID.
+// Package auth provides filtering support for a martian.Proxy based on auth
+// ID.
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -24,7 +24,7 @@ import (
 	"github.com/google/martian"
 )
 
-// Filter filters RequestModifiers and ResponseModifiers by ctx.Auth.ID.
+// Filter filters RequestModifiers and ResponseModifiers by auth ID.
 type Filter struct {
 	authRequired bool
 
@@ -32,9 +32,6 @@ type Filter struct {
 	reqmods map[string]martian.RequestModifier
 	resmods map[string]martian.ResponseModifier
 }
-
-// ErrIDRequired indicates that the filter must have an ID.
-var ErrIDRequired = errors.New("ID required")
 
 // NewFilter returns a new auth.Filter.
 func NewFilter() *Filter {
@@ -44,20 +41,15 @@ func NewFilter() *Filter {
 	}
 }
 
-// SetAuthRequired determines whether the ctx.Auth.ID must have an associated
-// RequestModifier or ResponseModifier. If true, it will set ctx.Auth.Error.
+// SetAuthRequired determines whether the auth ID must have an associated
+// RequestModifier or ResponseModifier. If true, it will set auth error.
 func (f *Filter) SetAuthRequired(required bool) {
 	f.authRequired = required
 }
 
 // SetRequestModifier sets the RequestModifier for the given ID. It will
 // overwrite any existing modifier with the same ID.
-// Returns ErrIDRequired if id is empty.
 func (f *Filter) SetRequestModifier(id string, reqmod martian.RequestModifier) error {
-	if id == "" {
-		return ErrIDRequired
-	}
-
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -72,12 +64,7 @@ func (f *Filter) SetRequestModifier(id string, reqmod martian.RequestModifier) e
 
 // SetResponseModifier sets the ResponseModifier for the given ID. It will
 // overwrite any existing modifier with the same ID.
-// Returns ErrIDRequired if id is empty.
 func (f *Filter) SetResponseModifier(id string, resmod martian.ResponseModifier) error {
-	if id == "" {
-		return ErrIDRequired
-	}
-
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -108,32 +95,46 @@ func (f *Filter) ResponseModifier(id string) martian.ResponseModifier {
 	return f.resmods[id]
 }
 
-// ModifyRequest runs the RequestModifier for the associated ctx.Auth.ID. If no
-// modifier is found for ctx.Auth.ID then ctx.Auth.Error is set.
-func (f *Filter) ModifyRequest(ctx *martian.Context, req *http.Request) error {
-	if reqmod := f.reqmods[ctx.Auth.ID]; reqmod != nil {
-		return reqmod.ModifyRequest(ctx, req)
+// ModifyRequest runs the RequestModifier for the associated auth ID. If no
+// modifier is found for auth ID then auth error is set.
+func (f *Filter) ModifyRequest(req *http.Request) error {
+	ctx := martian.Context(req)
+	actx := FromContext(ctx)
+
+	if reqmod, ok := f.reqmods[actx.ID()]; ok {
+		return reqmod.ModifyRequest(req)
 	}
 
-	return f.requireKnownAuth(ctx)
-}
-
-// ModifyResponse runs the ResponseModifier for the associated ctx.Auth.ID. If
-// no modifier is found for ctx.Auth.ID then ctx.Auth.Error is set.
-func (f *Filter) ModifyResponse(ctx *martian.Context, res *http.Response) error {
-	if resmod := f.resmods[ctx.Auth.ID]; resmod != nil {
-		return resmod.ModifyResponse(ctx, res)
+	if err := f.requireKnownAuth(actx.ID()); err != nil {
+		actx.SetError(err)
 	}
 
-	return f.requireKnownAuth(ctx)
+	return nil
 }
 
-func (f *Filter) requireKnownAuth(ctx *martian.Context) error {
-	_, reqok := f.reqmods[ctx.Auth.ID]
-	_, resok := f.resmods[ctx.Auth.ID]
+// ModifyResponse runs the ResponseModifier for the associated auth ID. If no
+// modifier is found for the auth ID then the auth error is set.
+func (f *Filter) ModifyResponse(res *http.Response) error {
+	ctx := martian.Context(res.Request)
+	actx := FromContext(ctx)
+
+	if resmod, ok := f.resmods[actx.ID()]; ok {
+		return resmod.ModifyResponse(res)
+	}
+
+	if err := f.requireKnownAuth(actx.ID()); err != nil {
+		actx.SetError(err)
+	}
+
+	return nil
+}
+
+func (f *Filter) requireKnownAuth(id string) error {
+	_, reqok := f.reqmods[id]
+	_, resok := f.resmods[id]
 
 	if !reqok && !resok && f.authRequired {
-		ctx.Auth.Error = fmt.Errorf("no modifiers found for %s", ctx.Auth.ID)
+		return fmt.Errorf("auth: unrecognized credentials: %s", id)
 	}
 
 	return nil

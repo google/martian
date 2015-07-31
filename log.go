@@ -16,58 +16,35 @@ package martian
 
 import (
 	"fmt"
-	"runtime"
-	"strings"
-
-	log "github.com/golang/glog"
+	"log"
 )
 
 // Infof logs an info message with caller information.
 func Infof(format string, args ...interface{}) {
-	msg := format
+	msg := fmt.Sprintf("INFO: %s", format)
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
 
-	log.InfoDepth(1, fmt.Sprintf("%s: %s", funcName(), msg))
+	log.Println(msg)
 }
 
 // Debugf logs a debug message with caller information.
 func Debugf(format string, args ...interface{}) {
-	msg := format
+	msg := fmt.Sprintf("DEBUG: %s", format)
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
 
-	if log.V(2) {
-		log.InfoDepth(1, fmt.Sprintf("%s: %s", funcName(), msg))
-	}
+	log.Println(msg)
 }
 
 // Errorf logs an error message with caller information.
 func Errorf(format string, args ...interface{}) {
-	msg := format
+	msg := fmt.Sprintf("ERROR: %s", format)
 	if len(args) > 0 {
 		msg = fmt.Sprintf(format, args...)
 	}
 
-	log.ErrorDepth(1, fmt.Sprintf("%s: %s", funcName(), msg))
-}
-
-// funcName finds a suitable function name for logging.
-func funcName() string {
-	pcs := make([]uintptr, 3)
-	runtime.Callers(3, pcs)
-
-	for _, pc := range pcs {
-		f := runtime.FuncForPC(pc)
-		if f == nil {
-			continue
-		}
-
-		name := f.Name()
-		return name[strings.LastIndex(name, "/")+1:]
-	}
-
-	return "anonymous"
+	log.Println(msg)
 }

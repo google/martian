@@ -44,7 +44,7 @@ func init() {
 }
 
 // ModifyRequest sets the fields of req.URL to m.Url if they are not the zero value.
-func (m *Modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (m *Modifier) ModifyRequest(req *http.Request) error {
 	if m.url.Scheme != "" {
 		req.URL.Scheme = m.url.Scheme
 	}

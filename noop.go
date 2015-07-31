@@ -14,23 +14,27 @@
 
 package martian
 
-import (
-	"errors"
-	"testing"
-)
+import "net/http"
 
-func TestAuthReset(t *testing.T) {
-	auth := &Auth{
-		ID:	"username",
-		Error:	errors.New("invalid auth"),
-	}
+type noopModifier struct {
+	id string
+}
 
-	auth.Reset()
+// Noop returns a modifier that does not change the request or the response.
+func Noop(id string) RequestResponseModifier {
+	return &noopModifier{
+		id: id,
+	}
+}
 
-	if got, want := auth.ID, ""; got != want {
-		t.Errorf("auth.ID: got %q, want %q", got, want)
-	}
-	if err := auth.Error; err != nil {
-		t.Errorf("auth.Error: got %v, want no error", err)
-	}
+// ModifyRequest logs a debug line.
+func (nm *noopModifier) ModifyRequest(*http.Request) error {
+	Debugf("%s: no request modifier configured", nm.id)
+	return nil
+}
+
+// ModifyResponse logs a debug line.
+func (nm *noopModifier) ModifyResponse(*http.Response) error {
+	Debugf("%s: no response modifier configure", nm.id)
+	return nil
 }

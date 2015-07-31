@@ -21,7 +21,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -59,7 +58,7 @@ func NewVerifier(url *url.URL) verify.RequestVerifier {
 
 // ModifyRequest verifies that the request URL matches all parts of url. If the
 // value in url is non-empty it must be an exact match.
-func (v *Verifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (v *Verifier) ModifyRequest(req *http.Request) error {
 	var failures []string
 
 	u := req.URL

@@ -20,97 +20,121 @@ import (
 	"testing"
 
 	"github.com/google/martian"
+	"github.com/google/martian/auth"
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/session"
 )
 
 func TestModifyRequest(t *testing.T) {
 	m := NewModifier()
-	ctx := martian.NewContext()
+	m.SetRequestModifier(nil)
 
 	req, err := http.NewRequest("CONNECT", "https://www.example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	if err := m.ModifyRequest(ctx, req); err != nil {
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := ctx.Auth.ID, ""; got != want {
-		t.Errorf("ctx.Auth.ID: got %q, want %q", got, want)
+
+	actx := auth.FromContext(ctx)
+
+	if got, want := actx.ID(), ""; got != want {
+		t.Errorf("actx.ID(): got %q, want %q", got, want)
 	}
 
 	// IP with port and modifier with error.
-	req.RemoteAddr = "1.1.1.1:8111"
-	reqErr := errors.New("request modifier failure")
-	m.SetRequestModifier(martian.RequestModifierFunc(
-		func(*martian.Context, *http.Request) error {
-			return reqErr
-		}))
+	tm := martiantest.NewModifier()
+	reqerr := errors.New("request error")
+	tm.RequestError(reqerr)
 
-	if err := m.ModifyRequest(ctx, req); err != reqErr {
-		t.Fatalf("ModifyConnectRequest(): got %v, want %v", err, reqErr)
+	req.RemoteAddr = "1.1.1.1:8111"
+	m.SetRequestModifier(tm)
+
+	if err := m.ModifyRequest(req); err != reqerr {
+		t.Fatalf("ModifyConnectRequest(): got %v, want %v", err, reqerr)
 	}
-	if got, want := ctx.Auth.ID, "1.1.1.1"; got != want {
-		t.Errorf("ctx.Auth.ID: got %q, want %q", got, want)
+
+	if got, want := actx.ID(), "1.1.1.1"; got != want {
+		t.Errorf("actx.ID(): got %q, want %q", got, want)
 	}
 
 	// IP without port and modifier with auth error.
 	req.RemoteAddr = "4.4.4.4"
-	m.SetRequestModifier(martian.RequestModifierFunc(
-		func(ctx *martian.Context, req *http.Request) error {
-			ctx.Auth.Error = errors.New("auth error")
-			return nil
-		}))
 
-	if err := m.ModifyRequest(ctx, req); err != nil {
-		t.Fatalf("ModifyConnectRequest(): got %v, want no error", err)
+	autherr := errors.New("auth error")
+	tm.RequestError(nil)
+	tm.RequestFunc(func(req *http.Request) {
+		ctx := martian.Context(req)
+		actx := auth.FromContext(ctx)
+
+		actx.SetError(autherr)
+	})
+
+	if err := m.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := ctx.Auth.ID, "4.4.4.4"; got != want {
-		t.Errorf("ctx.Auth.ID: got %q, want %q", got, want)
-	}
-	if !ctx.SkipRoundTrip {
-		t.Error("ctx.SkipRoundTrip: got false, want true")
+
+	if got, want := actx.ID(), ""; got != want {
+		t.Errorf("actx.ID(): got %q, want %q", got, want)
 	}
 }
 
 func TestModifyResponse(t *testing.T) {
 	m := NewModifier()
-	ctx := martian.NewContext()
+	m.SetResponseModifier(nil)
 
-	res := proxyutil.NewResponse(200, nil, nil)
-	if err := m.ModifyResponse(ctx, res); err != nil {
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
 	// Modifier with error.
-	resErr := errors.New("response modification failure")
-	m.SetResponseModifier(martian.ResponseModifierFunc(
-		func(*martian.Context, *http.Response) error {
-			return resErr
-		}))
-	if err := m.ModifyResponse(ctx, res); err != resErr {
-		t.Fatalf("ModifyResponse(): got %v, want %v", err, resErr)
+	tm := martiantest.NewModifier()
+	reserr := errors.New("response error")
+	tm.ResponseError(reserr)
+
+	m.SetResponseModifier(tm)
+	if err := m.ModifyResponse(res); err != reserr {
+		t.Fatalf("ModifyResponse(): got %v, want %v", err, reserr)
 	}
 
 	// Modifier with auth error.
-	authErr := errors.New("auth error")
-	m.SetResponseModifier(martian.ResponseModifierFunc(
-		func(ctx *martian.Context, res *http.Response) error {
-			ctx.Auth.Error = authErr
-			return nil
-		}))
+	tm.ResponseError(nil)
+	autherr := errors.New("auth error")
+	tm.ResponseFunc(func(res *http.Response) {
+		ctx := martian.Context(res.Request)
+		actx := auth.FromContext(ctx)
 
-	ctx.Auth.ID = "bad-auth"
-	ctx.SkipRoundTrip = true
-	if err := m.ModifyResponse(ctx, res); err != authErr {
-		t.Fatalf("ModifyResponse(): got %v, want %v", err, authErr)
+		actx.SetError(autherr)
+	})
+
+	actx := auth.FromContext(ctx)
+	actx.SetID("bad-auth")
+
+	if err := m.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+	if got, want := res.StatusCode, 403; got != want {
+		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
 
-	// ctx.Auth should be reset.
-	if got, want := ctx.Auth.ID, ""; got != want {
-		t.Errorf("ctx.Auth.ID: got %q, want %q", got, want)
-	}
-	if ctx.SkipRoundTrip {
-		t.Error("ctx.SkipRoundTrip: got true, want false")
+	if got, want := actx.Error(), autherr; got != want {
+		t.Errorf("actx.Error(): got %v, want %v", got, want)
 	}
 }

@@ -20,36 +20,50 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
 
 func TestBodyModifier(t *testing.T) {
-	mod, err := NewModifier([]byte("text"), "text/plain")
-	if err != nil {
-		t.Fatalf("NewModifier(): got %v, want no error", err)
-	}
+	mod := NewModifier([]byte("text"), "text/plain")
 
-	req, err := http.NewRequest("GET", "/", nil)
+	req, err := http.NewRequest("GET", "/", strings.NewReader(""))
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
+	req.Header.Set("Content-Encoding", "gzip")
 
-	ctx := martian.NewContext()
-	if err := mod.ModifyRequest(ctx, req); err != nil {
+	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if !ctx.SkipRoundTrip {
-		t.Error("ctx.SkipRoundTrip: got false, want true")
+
+	if got, want := req.Header.Get("Content-Type"), "text/plain"; got != want {
+		t.Errorf("req.Header.Get(%q): got %v, want %v", "Content-Type", got, want)
+	}
+	if got, want := req.ContentLength, int64(len([]byte("text"))); got != want {
+		t.Errorf("req.ContentLength: got %d, want %d", got, want)
+	}
+	if got, want := req.Header.Get("Content-Encoding"), ""; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Content-Encoding", got, want)
 	}
 
-	res := proxyutil.NewResponse(200, nil, nil)
+	got, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
+	}
+	req.Body.Close()
+
+	if want := []byte("text"); !bytes.Equal(got, want) {
+		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
 	res.Header.Set("Content-Encoding", "gzip")
 
-	if err := mod.ModifyResponse(ctx, res); err != nil {
+	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
@@ -63,7 +77,7 @@ func TestBodyModifier(t *testing.T) {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Content-Encoding", got, want)
 	}
 
-	got, err := ioutil.ReadAll(res.Body)
+	got, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
 	}
@@ -75,20 +89,16 @@ func TestBodyModifier(t *testing.T) {
 }
 
 func TestModifierFromJSON(t *testing.T) {
-	rawMsg := `
-	{
+	data := base64.StdEncoding.EncodeToString([]byte("data"))
+	msg := fmt.Sprintf(`{
 	  "body.Modifier":{
 		  "scope": ["response"],
   	  "contentType": "text/plain",
 	  	"body": %q
     }
-	}
-	`
+	}`, data)
 
-	payload := base64.StdEncoding.EncodeToString([]byte("data"))
-	msg := []byte(fmt.Sprintf(rawMsg, payload))
-
-	r, err := parse.FromJSON(msg)
+	r, err := parse.FromJSON([]byte(msg))
 	if err != nil {
 		t.Fatalf("parse.FromJSON(): got %v, want no error", err)
 	}
@@ -100,7 +110,7 @@ func TestModifierFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, nil)
-	if err := resmod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 

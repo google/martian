@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -41,7 +40,7 @@ func ExampleLogger() {
 	req.Header.Set("Other-Header", "values")
 	req.Close = true
 
-	if err := l.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := l.ModifyRequest(req); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -50,7 +49,7 @@ func ExampleLogger() {
 	res.Header.Set("Date", "Tue, 15 Nov 1994 08:12:31 GMT")
 	res.Header.Set("Other-Header", "values")
 
-	if err := l.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := l.ModifyResponse(res); err != nil {
 		fmt.Println(err)
 		return
 	}

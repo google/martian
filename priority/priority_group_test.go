@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/martian"
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 
@@ -29,45 +29,51 @@ import (
 )
 
 func TestPriorityGroupModifyRequest(t *testing.T) {
-	var priorities []int64
+	var order []string
 
 	pg := NewGroup()
-	f := func(*martian.Context, *http.Request) error {
-		priorities = append(priorities, 50)
-		return nil
-	}
-	pg.AddRequestModifier(martian.RequestModifierFunc(f), 50)
 
-	f = func(*martian.Context, *http.Request) error {
-		priorities = append(priorities, 100)
-		return nil
-	}
-	pg.AddRequestModifier(martian.RequestModifierFunc(f), 100)
+	tm50 := martiantest.NewModifier()
+	tm50.RequestFunc(func(*http.Request) {
+		order = append(order, "tm50")
+	})
+	pg.AddRequestModifier(tm50, 50)
 
-	f = func(*martian.Context, *http.Request) error {
-		priorities = append(priorities, 75)
-		return nil
-	}
+	tm100a := martiantest.NewModifier()
+	tm100a.RequestFunc(func(*http.Request) {
+		order = append(order, "tm100a")
+	})
+	pg.AddRequestModifier(tm100a, 100)
 
-	// Functions are not directly comparable, so we must wrap in a
-	// type that is.
-	m := &struct{ martian.RequestModifier }{martian.RequestModifierFunc(f)}
-	if err := pg.RemoveRequestModifier(m); err != ErrModifierNotFound {
+	tm100b := martiantest.NewModifier()
+	tm100b.RequestFunc(func(*http.Request) {
+		order = append(order, "tm100b")
+	})
+	pg.AddRequestModifier(tm100b, 100)
+
+	tm75 := martiantest.NewModifier()
+	tm75.RequestFunc(func(*http.Request) {
+		order = append(order, "tm75")
+	})
+
+	if err := pg.RemoveRequestModifier(tm75); err != ErrModifierNotFound {
 		t.Fatalf("RemoveRequestModifier(): got %v, want ErrModifierNotFound", err)
 	}
-	pg.AddRequestModifier(m, 75)
-	if err := pg.RemoveRequestModifier(m); err != nil {
+
+	pg.AddRequestModifier(tm75, 100)
+
+	if err := pg.RemoveRequestModifier(tm75); err != nil {
 		t.Fatalf("RemoveRequestModifier(): got %v, want no error", err)
 	}
 
-	req, err := http.NewRequest("GET", "/", nil)
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := pg.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := pg.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := priorities, []int64{100, 50}; !reflect.DeepEqual(got, want) {
+	if got, want := order, []string{"tm100b", "tm100a", "tm50"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("reflect.DeepEqual(%v, %v): got false, want true", got, want)
 	}
 }
@@ -75,64 +81,71 @@ func TestPriorityGroupModifyRequest(t *testing.T) {
 func TestPriorityGroupModifyRequestHaltsOnError(t *testing.T) {
 	pg := NewGroup()
 
-	errHalt := errors.New("modifier chain halted")
-	f := func(*martian.Context, *http.Request) error {
-		return errHalt
-	}
-	pg.AddRequestModifier(martian.RequestModifierFunc(f), 100)
+	reqerr := errors.New("request error")
+	tm := martiantest.NewModifier()
+	tm.RequestError(reqerr)
 
-	f = func(*martian.Context, *http.Request) error {
-		t.Fatal("ModifyRequest(): got called, want skipped")
-		return nil
-	}
-	pg.AddRequestModifier(martian.RequestModifierFunc(f), 75)
+	pg.AddRequestModifier(tm, 100)
 
-	req, err := http.NewRequest("GET", "/", nil)
+	tm2 := martiantest.NewModifier()
+	pg.AddRequestModifier(tm2, 75)
+
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := pg.ModifyRequest(martian.NewContext(), req); err != errHalt {
-		t.Fatalf("ModifyRequest(): got %v, want errHalt", err)
+	if err := pg.ModifyRequest(req); err != reqerr {
+		t.Fatalf("ModifyRequest(): got %v, want %v", err, reqerr)
+	}
+
+	if tm2.RequestModified() {
+		t.Error("tm2.RequestModified(): got true, want false")
 	}
 }
 
 func TestPriorityGroupModifyResponse(t *testing.T) {
-	var priorities []int64
+	var order []string
 
 	pg := NewGroup()
-	f := func(*martian.Context, *http.Response) error {
-		priorities = append(priorities, 50)
-		return nil
-	}
-	pg.AddResponseModifier(martian.ResponseModifierFunc(f), 50)
 
-	f = func(*martian.Context, *http.Response) error {
-		priorities = append(priorities, 100)
-		return nil
-	}
-	pg.AddResponseModifier(martian.ResponseModifierFunc(f), 100)
+	tm50 := martiantest.NewModifier()
+	tm50.ResponseFunc(func(*http.Response) {
+		order = append(order, "tm50")
+	})
+	pg.AddResponseModifier(tm50, 50)
 
-	f = func(*martian.Context, *http.Response) error {
-		priorities = append(priorities, 75)
-		return nil
-	}
+	tm100a := martiantest.NewModifier()
+	tm100a.ResponseFunc(func(*http.Response) {
+		order = append(order, "tm100a")
+	})
+	pg.AddResponseModifier(tm100a, 100)
 
-	// Functions are not directly comparable, so we must wrap in a
-	// type that is.
-	m := &struct{ martian.ResponseModifier }{martian.ResponseModifierFunc(f)}
-	if err := pg.RemoveResponseModifier(m); err != ErrModifierNotFound {
+	tm100b := martiantest.NewModifier()
+	tm100b.ResponseFunc(func(*http.Response) {
+		order = append(order, "tm100b")
+	})
+	pg.AddResponseModifier(tm100b, 100)
+
+	tm75 := martiantest.NewModifier()
+	tm75.ResponseFunc(func(*http.Response) {
+		order = append(order, "tm75")
+	})
+
+	if err := pg.RemoveResponseModifier(tm75); err != ErrModifierNotFound {
 		t.Fatalf("RemoveResponseModifier(): got %v, want ErrModifierNotFound", err)
 	}
-	pg.AddResponseModifier(m, 75)
-	if err := pg.RemoveResponseModifier(m); err != nil {
+
+	pg.AddResponseModifier(tm75, 100)
+
+	if err := pg.RemoveResponseModifier(tm75); err != nil {
 		t.Fatalf("RemoveResponseModifier(): got %v, want no error", err)
 	}
 
 	res := proxyutil.NewResponse(200, nil, nil)
-	if err := pg.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := pg.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if got, want := priorities, []int64{100, 50}; !reflect.DeepEqual(got, want) {
+	if got, want := order, []string{"tm100b", "tm100a", "tm50"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("reflect.DeepEqual(%v, %v): got false, want true", got, want)
 	}
 }
@@ -140,21 +153,22 @@ func TestPriorityGroupModifyResponse(t *testing.T) {
 func TestPriorityGroupModifyResponseHaltsOnError(t *testing.T) {
 	pg := NewGroup()
 
-	errHalt := errors.New("modifier chain halted")
-	f := func(*martian.Context, *http.Response) error {
-		return errHalt
-	}
-	pg.AddResponseModifier(martian.ResponseModifierFunc(f), 100)
+	reserr := errors.New("response error")
+	tm := martiantest.NewModifier()
+	tm.ResponseError(reserr)
 
-	f = func(*martian.Context, *http.Response) error {
-		t.Fatal("ModifyResponse(): got called, want skipped")
-		return nil
-	}
-	pg.AddResponseModifier(martian.ResponseModifierFunc(f), 75)
+	pg.AddResponseModifier(tm, 100)
+
+	tm2 := martiantest.NewModifier()
+	pg.AddResponseModifier(tm2, 75)
 
 	res := proxyutil.NewResponse(200, nil, nil)
-	if err := pg.ModifyResponse(martian.NewContext(), res); err != errHalt {
-		t.Fatalf("ModifyResponse(): got %v, want errHalt", err)
+	if err := pg.ModifyResponse(res); err != reserr {
+		t.Fatalf("ModifyRequest(): got %v, want %v", err, reserr)
+	}
+
+	if tm2.ResponseModified() {
+		t.Error("tm2.ResponseModified(): got true, want false")
 	}
 }
 
@@ -201,7 +215,7 @@ func TestGroupFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := reqmod.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Header.Get("X-Testing"), "true"; got != want {
@@ -217,7 +231,7 @@ func TestGroupFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := resmod.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 	if got, want := res.Header.Get("X-Testing"), "true"; got != want {

@@ -30,7 +30,7 @@ import (
 // http://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-3.3
 func NewBadFramingModifier() martian.RequestModifier {
 	return martian.RequestModifierFunc(
-		func(ctx *martian.Context, req *http.Request) error {
+		func(req *http.Request) error {
 			cls := req.Header["Content-Length"]
 			if len(cls) > 0 {
 				var length string

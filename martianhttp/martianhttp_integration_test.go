@@ -15,38 +15,45 @@
 package martianhttp
 
 import (
-	"bytes"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/google/martian"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/martiantest"
 
 	_ "github.com/google/martian/header"
 )
 
 func TestIntegration(t *testing.T) {
-	proxy := martian.NewProxy(nil)
-	proxy.RoundTripper = martian.RoundTripFunc(func(req *http.Request) (*http.Response, error) {
-		return proxyutil.NewResponse(200, nil, req), nil
-	})
+	ptr := martiantest.NewTransport()
+
+	proxy := martian.NewProxy()
+	defer proxy.Close()
+
+	proxy.SetRoundTripper(ptr)
+
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	go proxy.Serve(l)
 
 	m := NewModifier()
-
 	proxy.SetRequestModifier(m)
 	proxy.SetResponseModifier(m)
 
 	mux := http.NewServeMux()
-	mux.Handle("/martian/modifiers", m)
-	mux.Handle("/", proxy)
+	mux.Handle("/", m)
 
 	s := httptest.NewServer(mux)
 	defer s.Close()
 
-	msg := []byte(`
-	{
+	body := strings.NewReader(`{
 		"header.Modifier": {
       "scope": ["request", "response"],
 			"name": "Martian-Test",
@@ -54,24 +61,9 @@ func TestIntegration(t *testing.T) {
 		}
 	}`)
 
-	req, err := http.NewRequest("POST", s.URL+"/martian/modifiers", bytes.NewBuffer(msg))
+	res, err := http.Post(s.URL, "application/json", body)
 	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	u, err := url.Parse(s.URL)
-	if err != nil {
-		t.Fatalf("url.Parse(%s): got %v, want no error", s.URL, err)
-	}
-
-	transport := &http.Transport{
-		Proxy: http.ProxyURL(u),
-	}
-
-	res, err := transport.RoundTrip(req)
-	if err != nil {
-		t.Fatalf("transport.RoundTrip(%s): got %v, want no error", req.URL, err)
+		t.Fatalf("http.Post(%s): got %v, want no error", s.URL, err)
 	}
 	res.Body.Close()
 
@@ -79,16 +71,23 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
 
-	url := "http://example.com"
-	req, err = http.NewRequest("GET", url, nil)
+	tr := &http.Transport{
+		Proxy: http.ProxyURL(&url.URL{
+			Scheme: "http",
+			Host:   l.Addr().String(),
+		}),
+	}
+	defer tr.CloseIdleConnections()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
-		t.Fatalf("http.NewRequest(..., %q, nil): got %v, want no error", url, err)
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 	req.Header.Set("Connection", "close")
 
-	res, err = transport.RoundTrip(req)
+	res, err = tr.RoundTrip(req)
 	if err != nil {
-		t.Fatalf("transport.RoundTrip(%q): got %v, want no error", url, err)
+		t.Fatalf("transport.RoundTrip(%q): got %v, want no error", req.URL, err)
 	}
 	res.Body.Close()
 

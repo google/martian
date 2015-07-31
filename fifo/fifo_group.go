@@ -66,12 +66,12 @@ func (g *Group) AddResponseModifier(resmod martian.ResponseModifier) {
 
 // ModifyRequest modifies the request. If an error is returned by a
 // RequestModifier the error is returned and no further modifiers are run.
-func (g *Group) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (g *Group) ModifyRequest(req *http.Request) error {
 	g.reqmu.RLock()
 	defer g.reqmu.RUnlock()
 
 	for _, reqmod := range g.reqmods {
-		if err := reqmod.ModifyRequest(ctx, req); err != nil {
+		if err := reqmod.ModifyRequest(req); err != nil {
 			return err
 		}
 	}
@@ -81,12 +81,12 @@ func (g *Group) ModifyRequest(ctx *martian.Context, req *http.Request) error {
 
 // ModifyResponse modifies the request. If an error is returned by a
 // ResponseModifier the error is returned and no further modifiers are run.
-func (g *Group) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (g *Group) ModifyResponse(res *http.Response) error {
 	g.resmu.RLock()
 	defer g.resmu.RUnlock()
 
 	for _, resmod := range g.resmods {
-		if err := resmod.ModifyResponse(ctx, res); err != nil {
+		if err := resmod.ModifyResponse(res); err != nil {
 			return err
 		}
 	}

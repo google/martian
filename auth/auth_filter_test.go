@@ -19,165 +19,143 @@ import (
 	"testing"
 
 	"github.com/google/martian"
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/session"
 )
-
-func TestEmptyIDReturnsError(t *testing.T) {
-	f := NewFilter()
-
-	if err := f.SetRequestModifier("", nil); err != ErrIDRequired {
-		t.Errorf("SetRequestModifier(): got %v, want ErrIDRequired", err)
-	}
-
-	if err := f.SetResponseModifier("", nil); err != ErrIDRequired {
-		t.Errorf("SetResponseModifier(): got %v, want ErrIDRequired", err)
-	}
-}
 
 func TestFilter(t *testing.T) {
 	f := NewFilter()
-	if reqmod := f.RequestModifier("id"); reqmod != nil {
-		t.Fatalf("f.RequestModifier(%q): got reqmod, want no reqmod", "id")
+	if f.RequestModifier("id") != nil {
+		t.Fatalf("f.RequestModifier(%q): got reqmod, want nil", "id")
 	}
-	if resmod := f.ResponseModifier("id"); resmod != nil {
-		t.Fatalf("f.ResponseModifier(%q): got resmod, want no resmod", "id")
-	}
-
-	f.SetRequestModifier("id", martian.RequestModifierFunc(
-		func(*martian.Context, *http.Request) error {
-			return nil
-		}))
-
-	f.SetResponseModifier("id", martian.ResponseModifierFunc(
-		func(*martian.Context, *http.Response) error {
-			return nil
-		}))
-
-	if reqmod := f.RequestModifier("id"); reqmod == nil {
-		t.Errorf("f.RequestModifier(%q): got no reqmod, want reqmod", "id")
-	}
-	if resmod := f.ResponseModifier("id"); resmod == nil {
-		t.Errorf("f.ResponseModifier(%q): got no resmod, want resmod", "id")
+	if f.ResponseModifier("id") != nil {
+		t.Fatalf("f.ResponseModifier(%q): got resmod, want nil", "id")
 	}
 
-	f.SetRequestModifier("id", nil)
-	f.SetResponseModifier("id", nil)
-	if reqmod := f.RequestModifier("id"); reqmod != nil {
-		t.Fatalf("f.RequestModifier(%q): got reqmod, want no reqmod", "id")
+	tm := martiantest.NewModifier()
+	f.SetRequestModifier("id", tm)
+	f.SetResponseModifier("id", tm)
+
+	if f.RequestModifier("id") != tm {
+		t.Errorf("f.RequestModifier(%q): got nil, want martiantest.Modifier", "id")
 	}
-	if resmod := f.ResponseModifier("id"); resmod != nil {
-		t.Fatalf("f.ResponseModifier(%q): got resmod, want no resmod", "id")
+	if f.ResponseModifier("id") != tm {
+		t.Errorf("f.ResponseModifier(%q): got nil, want martiantest.Modifier", "id")
 	}
 }
 
 func TestModifyRequest(t *testing.T) {
 	f := NewFilter()
 
-	modifierRun := false
-	f.SetRequestModifier("id", martian.RequestModifierFunc(
-		func(*martian.Context, *http.Request) error {
-			modifierRun = true
-			return nil
-		}))
+	tm := martiantest.NewModifier()
+	f.SetRequestModifier("id", tm)
 
-	req, err := http.NewRequest("GET", "/", nil)
+	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
-	ctx := martian.NewContext()
 
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	if err := f.ModifyRequest(ctx, req); err != nil {
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	if err := f.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if ctx.Auth.Error == nil {
-		t.Error("ctx.Auth.Error: got nil, want error")
+
+	actx := FromContext(ctx)
+	if actx.Error() == nil {
+		t.Error("actx.Error(): got nil, want error")
 	}
-	if modifierRun {
-		t.Error("modifierRun: got true, want false")
+	if tm.RequestModified() {
+		t.Error("tm.RequestModified(): got true, want false")
 	}
+	tm.Reset()
 
 	// No ID, auth not required.
 	f.SetAuthRequired(false)
-	ctx.Auth.Error = nil
+	actx.SetError(nil)
 
-	if err := f.ModifyRequest(ctx, req); err != nil {
+	if err := f.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if ctx.Auth.Error != nil {
-		t.Errorf("ctx.Auth.Error: got %v, want no error", err)
+
+	if actx.Error() != nil {
+		t.Errorf("actx.Error(): got %v, want no error", err)
 	}
-	if modifierRun {
-		t.Error("modifierRun: got true, want false")
+	if tm.RequestModified() {
+		t.Error("tm.RequestModified(): got true, want false")
 	}
 
 	// Valid ID.
-	ctx.Auth.ID = "id"
-	ctx.Auth.Error = nil
-	if err := f.ModifyRequest(ctx, req); err != nil {
+	actx.SetError(nil)
+	actx.SetID("id")
+
+	if err := f.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if ctx.Auth.Error != nil {
-		t.Errorf("ctx.Auth.Error: got %v, want no error", ctx.Auth.Error)
+	if actx.Error() != nil {
+		t.Errorf("actx.Error(): got %v, want no error", actx.Error())
 	}
-	if !modifierRun {
-		t.Error("modifierRun: got false, want true")
+	if !tm.RequestModified() {
+		t.Error("tm.RequestModified(): got false, want true")
 	}
 }
 
 func TestModifyResponse(t *testing.T) {
 	f := NewFilter()
 
-	modifierRun := false
-	f.SetResponseModifier("id", martian.ResponseModifierFunc(
-		func(*martian.Context, *http.Response) error {
-			modifierRun = true
-			return nil
-		}))
+	tm := martiantest.NewModifier()
+	f.SetResponseModifier("id", tm)
 
-	res := proxyutil.NewResponse(200, nil, nil)
-	ctx := martian.NewContext()
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	res := proxyutil.NewResponse(200, nil, req)
 
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	if err := f.ModifyResponse(ctx, res); err != nil {
+	ctx := session.FromContext(nil)
+	martian.SetContext(req, ctx)
+	defer martian.RemoveContext(req)
+
+	if err := f.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if ctx.Auth.Error == nil {
-		t.Error("ctx.Auth.Error: got nil, want error")
+
+	actx := FromContext(ctx)
+
+	if actx.Error() == nil {
+		t.Error("actx.Error(): got nil, want error")
 	}
-	if modifierRun {
-		t.Error("modifierRun: got true, want false")
+	if tm.ResponseModified() {
+		t.Error("tm.RequestModified(): got true, want false")
 	}
 
 	// No ID, no auth required.
 	f.SetAuthRequired(false)
-	ctx.Auth.Error = nil
+	actx.SetError(nil)
 
-	if err := f.ModifyResponse(ctx, res); err != nil {
+	if err := f.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if ctx.Auth.Error != nil {
-		t.Errorf("ctx.Auth.Error: got %v, want no error", ctx.Auth.Error)
-	}
-	if modifierRun {
-		t.Error("modifierRun: got true, want false")
+	if tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got true, want false")
 	}
 
 	// Valid ID.
-	ctx.Auth.ID = "id"
-	ctx.Auth.Error = nil
+	actx.SetID("id")
 
-	if err := f.ModifyResponse(ctx, res); err != nil {
+	if err := f.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if ctx.Auth.Error != nil {
-		t.Errorf("ctx.Auth.Error: got %v, want no error", ctx.Auth.Error)
-	}
-	if !modifierRun {
-		t.Error("modifierRun: got false, want true")
+	if !tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got false, want true")
 	}
 }

@@ -38,7 +38,7 @@ func init() {
 
 // ModifyResponse overwrites the status text and code on an HTTP response and
 // returns nil.
-func (s *statusModifier) ModifyResponse(_ *martian.Context, res *http.Response) error {
+func (s *statusModifier) ModifyResponse(res *http.Response) error {
 	res.StatusCode = s.statusCode
 	res.Status = http.StatusText(s.statusCode)
 

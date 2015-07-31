@@ -25,6 +25,8 @@ import (
 	"github.com/google/martian/verify"
 )
 
+var noop = martian.Noop("martianhttp.Modifier")
+
 // Modifier is a locking modifier that is configured via http.Handler.
 type Modifier struct {
 	mu     sync.RWMutex
@@ -34,13 +36,20 @@ type Modifier struct {
 
 // NewModifier returns a new martianhttp.Modifier.
 func NewModifier() *Modifier {
-	return &Modifier{}
+	return &Modifier{
+		reqmod: noop,
+		resmod: noop,
+	}
 }
 
 // SetRequestModifier sets the request modifier.
 func (m *Modifier) SetRequestModifier(reqmod martian.RequestModifier) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if reqmod == nil {
+		reqmod = noop
+	}
 
 	m.reqmod = reqmod
 }
@@ -50,31 +59,27 @@ func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if resmod == nil {
+		resmod = noop
+	}
+
 	m.resmod = resmod
 }
 
 // ModifyRequest runs reqmod.
-func (m *Modifier) ModifyRequest(ctx *martian.Context, req *http.Request) error {
+func (m *Modifier) ModifyRequest(req *http.Request) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.reqmod == nil {
-		return nil
-	}
-
-	return m.reqmod.ModifyRequest(ctx, req)
+	return m.reqmod.ModifyRequest(req)
 }
 
 // ModifyResponse runs resmod.
-func (m *Modifier) ModifyResponse(ctx *martian.Context, res *http.Response) error {
+func (m *Modifier) ModifyResponse(res *http.Response) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.resmod == nil {
-		return nil
-	}
-
-	return m.resmod.ModifyResponse(ctx, res)
+	return m.resmod.ModifyResponse(res)
 }
 
 // VerifyRequests verifies reqmod, iff reqmod is a RequestVerifier.
@@ -148,9 +153,6 @@ func (m *Modifier) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.reqmod = r.RequestModifier()
-	m.resmod = r.ResponseModifier()
+	m.SetRequestModifier(r.RequestModifier())
+	m.SetResponseModifier(r.ResponseModifier())
 }

@@ -15,93 +15,92 @@
 package martianhttp
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
-	"github.com/google/martian"
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 
 	_ "github.com/google/martian/header"
 )
 
-func TestModifyRequestNoModifier(t *testing.T) {
+func TestNoModifiers(t *testing.T) {
 	m := NewModifier()
+	m.SetRequestModifier(nil)
+	m.SetResponseModifier(nil)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := m.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
 	}
 }
 
 func TestModifyRequest(t *testing.T) {
 	m := NewModifier()
+	tm := martiantest.NewModifier()
 
-	var modRun bool
-	m.SetRequestModifier(martian.RequestModifierFunc(
-		func(*martian.Context, *http.Request) error {
-			modRun = true
-			return nil
-		}))
+	m.SetRequestModifier(tm)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if !modRun {
-		t.Error("modRun: got false, want true")
+	if !tm.RequestModified() {
+		t.Error("tm.RequestModified(): got false, want true")
+	}
+
+	m.SetRequestModifier(nil)
+
+	if err := m.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 }
 
 func TestModifyResponse(t *testing.T) {
 	m := NewModifier()
+	tm := martiantest.NewModifier()
 
-	var modRun bool
-	m.SetResponseModifier(martian.ResponseModifierFunc(
-		func(*martian.Context, *http.Response) error {
-			modRun = true
-			return nil
-		}))
+	m.SetResponseModifier(tm)
 
 	res := proxyutil.NewResponse(200, nil, nil)
-	if err := m.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if !modRun {
-		t.Error("modRun: got false, want true")
+	if !tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got false, want true")
 	}
-}
 
-func TestModifyResponseNoModifier(t *testing.T) {
-	m := NewModifier()
-	res := proxyutil.NewResponse(200, nil, nil)
+	m.SetResponseModifier(nil)
 
-	if err := m.ModifyResponse(martian.NewContext(), res); err != nil {
-		t.Errorf("ModifyResponse(): got %v, want no error", err)
-	}
-}
-
-func TestVerifyRequestsNoVerifier(t *testing.T) {
-	m := NewModifier()
-
-	if err := m.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
+	if err := m.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 }
 
 func TestVerifyRequests(t *testing.T) {
 	m := NewModifier()
+
+	if err := m.VerifyRequests(); err != nil {
+		t.Errorf("VerifyRequests(): got %v, want no error", err)
+	}
+
 	verr := fmt.Errorf("request verification failure")
 
 	m.SetRequestModifier(&verify.TestVerifier{
@@ -111,26 +110,34 @@ func TestVerifyRequests(t *testing.T) {
 	if err := m.VerifyRequests(); err != verr {
 		t.Errorf("VerifyRequests(): got %v, want %v", err, verr)
 	}
-}
 
-func TestVerifyResponsesNoVerifier(t *testing.T) {
-	m := NewModifier()
+	m.ResetRequestVerifications()
 
-	if err := m.VerifyResponses(); err != nil {
-		t.Errorf("VerifyResponses(): got %v, want no error", err)
+	if err := m.VerifyRequests(); err != nil {
+		t.Errorf("m.VerifyRequests(): got %v, want no error", err)
 	}
 }
 
 func TestVerifyResponses(t *testing.T) {
 	m := NewModifier()
-	verr := fmt.Errorf("response verification failure")
 
+	if err := m.VerifyResponses(); err != nil {
+		t.Errorf("VerifyResponses(): got %v, want no error", err)
+	}
+
+	verr := fmt.Errorf("response verification failure")
 	m.SetResponseModifier(&verify.TestVerifier{
 		ResponseError: verr,
 	})
 
 	if err := m.VerifyResponses(); err != verr {
 		t.Errorf("VerifyResponses(): got %v, want %v", err, verr)
+	}
+
+	m.ResetResponseVerifications()
+
+	if err := m.VerifyResponses(); err != nil {
+		t.Errorf("m.VerifyResponses(): got %v, want no error", err)
 	}
 }
 
@@ -155,7 +162,7 @@ func TestServeHTTPInvalidMethod(t *testing.T) {
 func TestServeHTTPInvalidJSON(t *testing.T) {
 	m := NewModifier()
 
-	req, err := http.NewRequest("POST", "/martian/modifiers", bytes.NewBuffer([]byte("not-json")))
+	req, err := http.NewRequest("POST", "/martian/modifiers", strings.NewReader("not-json"))
 	if err != nil {
 		t.Fatalf("http.NewRequest(%q, %q, ...): got %v, want no error", "POST", "/martian/modifiers", err)
 	}
@@ -170,8 +177,7 @@ func TestServeHTTPInvalidJSON(t *testing.T) {
 func TestServeHTTP(t *testing.T) {
 	m := NewModifier()
 
-	msg := []byte(`
-	{
+	body := strings.NewReader(`{
     "header.Modifier": {
       "scope": ["request", "response"],
 			"name": "Martian-Test",
@@ -179,7 +185,7 @@ func TestServeHTTP(t *testing.T) {
 		}
 	}`)
 
-	req, err := http.NewRequest("POST", "/martian/modifiers?id=id", bytes.NewBuffer(msg))
+	req, err := http.NewRequest("POST", "/martian/modifiers?id=id", body)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
@@ -196,7 +202,7 @@ func TestServeHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := m.ModifyRequest(martian.NewContext(), req); err != nil {
+	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("m.ModifyRequest(): got %v, want no error", err)
 	}
 	if got, want := req.Header.Get("Martian-Test"), "true"; got != want {
@@ -204,7 +210,7 @@ func TestServeHTTP(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := m.ModifyResponse(martian.NewContext(), res); err != nil {
+	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("m.ModifyResponse(): got %v, want no error", err)
 	}
 	if got, want := res.Header.Get("Martian-Test"), "true"; got != want {
