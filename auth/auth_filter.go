@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package auth provides filtering support for a martian.Proxy based on ctx.Auth.ID.
+// Package auth provides filtering support for a martian.Proxy based on auth
+// ID.
 package auth
 
 import (
@@ -23,7 +24,7 @@ import (
 	"github.com/google/martian"
 )
 
-// Filter filters RequestModifiers and ResponseModifiers by ctx.Auth.ID.
+// Filter filters RequestModifiers and ResponseModifiers by auth ID.
 type Filter struct {
 	authRequired bool
 
@@ -40,8 +41,8 @@ func NewFilter() *Filter {
 	}
 }
 
-// SetAuthRequired determines whether the ctx.Auth.ID must have an associated
-// RequestModifier or ResponseModifier. If true, it will set ctx.Auth.Error.
+// SetAuthRequired determines whether the auth ID must have an associated
+// RequestModifier or ResponseModifier. If true, it will set auth error.
 func (f *Filter) SetAuthRequired(required bool) {
 	f.authRequired = required
 }
@@ -94,8 +95,8 @@ func (f *Filter) ResponseModifier(id string) martian.ResponseModifier {
 	return f.resmods[id]
 }
 
-// ModifyRequest runs the RequestModifier for the associated ctx.Auth.ID. If no
-// modifier is found for ctx.Auth.ID then ctx.Auth.Error is set.
+// ModifyRequest runs the RequestModifier for the associated auth ID. If no
+// modifier is found for auth ID then auth error is set.
 func (f *Filter) ModifyRequest(req *http.Request) error {
 	ctx := martian.Context(req)
 	actx := FromContext(ctx)
@@ -111,8 +112,8 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 	return nil
 }
 
-// ModifyResponse runs the ResponseModifier for the associated ctx.Auth.ID. If
-// no modifier is found for ctx.Auth.ID then ctx.Auth.Error is set.
+// ModifyResponse runs the ResponseModifier for the associated auth ID. If no
+// modifier is found for the auth ID then the auth error is set.
 func (f *Filter) ModifyResponse(res *http.Response) error {
 	ctx := martian.Context(res.Request)
 	actx := FromContext(ctx)
