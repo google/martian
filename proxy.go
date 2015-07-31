@@ -221,6 +221,17 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	}
 	defer req.Body.Close()
 
+	ctx = session.FromContext(ctx)
+	SetContext(req, ctx)
+	defer RemoveContext(req)
+
+	if tconn, ok := conn.(*tls.Conn); ok {
+		ctx.GetSession().MarkSecure()
+
+		cs := tconn.ConnectionState()
+		req.TLS = &cs
+	}
+
 	req.URL.Scheme = "http"
 	if ctx.GetSession().IsSecure() {
 		Debugf("martian: forcing HTTPS inside secure session")
@@ -231,17 +242,8 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	if req.URL.Host == "" {
 		req.URL.Host = req.Host
 	}
-	if tlsconn, ok := conn.(*tls.Conn); ok {
-		cs := tlsconn.ConnectionState()
-		req.TLS = &cs
-	}
 
 	Debugf("martian: received request: %s", req.URL)
-
-	ctx = session.FromContext(ctx)
-
-	SetContext(req, ctx)
-	defer RemoveContext(req)
 
 	if req.Method == "CONNECT" {
 		if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -262,7 +264,6 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 			brw.Flush()
 
 			Debugf("martian: completed MITM for connection: %s", req.Host)
-			ctx.GetSession().MarkSecure()
 
 			tlsconn := tls.Server(conn, p.mitm.TLSForHost(req.Host))
 			brw.Writer.Reset(tlsconn)

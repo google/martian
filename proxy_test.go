@@ -30,6 +30,7 @@ import (
 
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/mitm"
+	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/session"
 )
 
@@ -530,6 +531,13 @@ func TestIntegrationMITM(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
+	tr.Func(func(req *http.Request) (*http.Response, error) {
+		res := proxyutil.NewResponse(200, nil, req)
+		res.Header.Set("Request-Scheme", req.URL.Scheme)
+
+		return res, nil
+	})
+
 	p.SetRoundTripper(tr)
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
@@ -614,6 +622,9 @@ func TestIntegrationMITM(t *testing.T) {
 	if got, want := res.StatusCode, 200; got != want {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
+	if got, want := res.Header.Get("Request-Scheme"), "https"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Request-Scheme", got, want)
+	}
 	if got, want := res.Header.Get("Warning"), reserr.Error(); !strings.Contains(got, want) {
 		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", "Warning", got, want)
 	}
@@ -693,6 +704,13 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
+	tr.Func(func(req *http.Request) (*http.Response, error) {
+		res := proxyutil.NewResponse(200, nil, req)
+		res.Header.Set("Request-Scheme", req.URL.Scheme)
+
+		return res, nil
+	})
+
 	p.SetRoundTripper(tr)
 
 	tm := martiantest.NewModifier()
@@ -736,6 +754,9 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 
 	if got, want := res.StatusCode, 200; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
+	}
+	if got, want := res.Header.Get("Request-Scheme"), "https"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Request-Scheme", got, want)
 	}
 
 	if !tm.RequestModified() {
