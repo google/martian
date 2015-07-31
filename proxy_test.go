@@ -94,7 +94,7 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 
 	tr := martiantest.NewTransport()
 	p.SetRoundTripper(tr)
-	p.SetTimeout(100 * time.Millisecond)
+	p.SetTimeout(200 * time.Millisecond)
 
 	// Start the proxy with a listener that will return a temporary error on
 	// Accept() three times.
@@ -204,7 +204,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	dtr := martiantest.NewTransport()
 	dtr.Respond(299)
 	downstream.SetRoundTripper(dtr)
-	downstream.SetTimeout(50 * time.Millisecond)
+	downstream.SetTimeout(200 * time.Millisecond)
 
 	go downstream.Serve(dl)
 
@@ -221,7 +221,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	upstream.SetDownstreamProxy(&url.URL{
 		Host: dl.Addr().String(),
 	})
-	upstream.SetTimeout(50 * time.Millisecond)
+	upstream.SetTimeout(200 * time.Millisecond)
 
 	go upstream.Serve(ul)
 
@@ -267,7 +267,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	p.SetDownstreamProxy(&url.URL{
 		Host: "[::1]:0",
 	})
-	p.SetTimeout(50 * time.Millisecond)
+	p.SetTimeout(200 * time.Millisecond)
 
 	tm := martiantest.NewModifier()
 	reserr := errors.New("response error")
@@ -426,7 +426,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	dtr := martiantest.NewTransport()
 	dtr.Respond(299)
 	downstream.SetRoundTripper(dtr)
-	downstream.SetTimeout(50 * time.Millisecond)
+	downstream.SetTimeout(200 * time.Millisecond)
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
 	if err != nil {
@@ -454,7 +454,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	upstream.SetDownstreamProxy(&url.URL{
 		Host: dl.Addr().String(),
 	})
-	upstream.SetTimeout(50 * time.Millisecond)
+	upstream.SetTimeout(200 * time.Millisecond)
 
 	go upstream.Serve(ul)
 
