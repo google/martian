@@ -59,7 +59,7 @@ func TestModifyRequest(t *testing.T) {
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	ctx := session.NewContext()
+	ctx := session.FromContext(nil)
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 
@@ -121,7 +121,7 @@ func TestModifyResponse(t *testing.T) {
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	ctx := session.NewContext()
+	ctx := session.FromContext(nil)
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 

@@ -28,10 +28,7 @@ import (
 )
 
 func TestBodyModifier(t *testing.T) {
-	mod, err := NewModifier([]byte("text"), "text/plain")
-	if err != nil {
-		t.Fatalf("NewModifier(): got %v, want no error", err)
-	}
+	mod := NewModifier([]byte("text"), "text/plain")
 
 	req, err := http.NewRequest("GET", "/", strings.NewReader(""))
 	if err != nil {

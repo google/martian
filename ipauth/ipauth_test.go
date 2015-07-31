@@ -34,7 +34,7 @@ func TestModifyRequest(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx := session.NewContext()
+	ctx := session.FromContext(nil)
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 
@@ -93,7 +93,7 @@ func TestModifyResponse(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx := session.NewContext()
+	ctx := session.FromContext(nil)
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 

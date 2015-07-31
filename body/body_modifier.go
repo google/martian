@@ -17,7 +17,6 @@ package body
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -37,16 +36,16 @@ type Modifier struct {
 
 type modifierJSON struct {
 	ContentType string               `json:"contentType"`
-	Body        string               `json:"body"` // Body is expected to be a Base64 encoded string.
+	Body        []byte               `json:"body"` // Body is expected to be a Base64 encoded string.
 	Scope       []parse.ModifierType `json:"scope"`
 }
 
 // NewModifier constructs and returns a body.Modifier.
-func NewModifier(b []byte, contentType string) (*Modifier, error) {
+func NewModifier(b []byte, contentType string) *Modifier {
 	return &Modifier{
 		contentType: contentType,
 		body:        b,
-	}, nil
+	}
 }
 
 // modifierFromJSON takes a JSON message as a byte slice and returns a
@@ -64,16 +63,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	body, err := base64.StdEncoding.DecodeString(msg.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	mod, err := NewModifier(body, msg.ContentType)
-	if err != nil {
-		return nil, err
-	}
-
+	mod := NewModifier(msg.Body, msg.ContentType)
 	return parse.NewResult(mod, msg.Scope)
 }
 

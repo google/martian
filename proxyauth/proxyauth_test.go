@@ -43,7 +43,7 @@ func TestProxyAuth(t *testing.T) {
 	}
 	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	ctx := session.NewContext()
+	ctx := session.FromContext(nil)
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 
@@ -112,7 +112,7 @@ func TestProxyAuthInvalidCredentials(t *testing.T) {
 	}
 	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	ctx := session.NewContext()
+	ctx := session.FromContext(nil)
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 

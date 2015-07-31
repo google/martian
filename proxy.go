@@ -194,7 +194,7 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	defer p.conns.Done()
 	defer conn.Close()
 
-	ctx := session.NewContext()
+	ctx := session.FromContext(nil)
 	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
 	for {
@@ -222,7 +222,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	defer req.Body.Close()
 
 	req.URL.Scheme = "http"
-	if ctx.IsSecure() {
+	if ctx.GetSession().IsSecure() {
 		Debugf("martian: forcing HTTPS inside secure session")
 		req.URL.Scheme = "https"
 	}
@@ -238,11 +238,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 	Debugf("martian: received request: %s", req.URL)
 
-	ctx, err = session.FromContext(ctx)
-	if err != nil {
-		Errorf("martian: failed to derive context: %v", err)
-		return err
-	}
+	ctx = session.FromContext(ctx)
 
 	SetContext(req, ctx)
 	defer RemoveContext(req)
@@ -266,7 +262,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 			brw.Flush()
 
 			Debugf("martian: completed MITM for connection: %s", req.Host)
-			ctx.MarkSecure()
+			ctx.GetSession().MarkSecure()
 
 			tlsconn := tls.Server(conn, p.mitm.TLSForHost(req.Host))
 			brw.Writer.Reset(tlsconn)

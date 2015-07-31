@@ -14,53 +14,68 @@
 
 package auth
 
-import "github.com/google/martian/session"
+import (
+	"sync"
+
+	"github.com/google/martian/session"
+)
 
 const key = "auth.Context"
 
 // Context contains authentication information.
 type Context struct {
-	ctx *session.Context
+	mu  sync.RWMutex
+	id  string
 	err error
 }
 
 // FromContext retrieves the auth.Context from the session.
 func FromContext(ctx *session.Context) *Context {
-	v, ok := ctx.Get(key)
-	if !ok {
-		actx := &Context{
-			ctx: ctx,
-		}
-		ctx.Set(key, actx)
-		return actx
+	if v, ok := ctx.GetSession().Get(key); ok {
+		return v.(*Context)
 	}
 
-	return v.(*Context)
+	actx := &Context{}
+	ctx.GetSession().Set(key, actx)
+
+	return actx
 }
 
-// ID returns the session ID.
+// ID returns the ID.
 func (ctx *Context) ID() string {
-	return ctx.ctx.SessionID()
+	ctx.mu.RLock()
+	ctx.mu.RUnlock()
+
+	return ctx.id
 }
 
-// SetID sets the session ID.
+// SetID sets the ID.
 func (ctx *Context) SetID(id string) {
+	ctx.mu.Lock()
+	ctx.mu.Unlock()
+
 	ctx.err = nil
 
 	if id == "" {
 		return
 	}
 
-	ctx.ctx.SetSessionID(id)
+	ctx.id = id
 }
 
-// SetError sets the authentication error and resets the session ID.
+// SetError sets the error and resets the ID.
 func (ctx *Context) SetError(err error) {
-	ctx.ctx.SetSessionID("")
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+
+	ctx.id = ""
 	ctx.err = err
 }
 
-// Error returns the authentication error.
+// Error returns the error.
 func (ctx *Context) Error() error {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
 	return ctx.err
 }

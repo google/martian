@@ -17,7 +17,6 @@ package querystring
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
@@ -30,10 +29,10 @@ func init() {
 
 // Filter runs modifiers iff the request query parameter for name matches value.
 type Filter struct {
-	reqmod       martian.RequestModifier
-	resmod       martian.ResponseModifier
-	nameMatcher  *regexp.Regexp
-	valueMatcher *regexp.Regexp
+	name   string
+	value  string
+	reqmod martian.RequestModifier
+	resmod martian.ResponseModifier
 }
 
 type filterJSON struct {
@@ -43,13 +42,13 @@ type filterJSON struct {
 	Scope    []parse.ModifierType `json:"scope"`
 }
 
-// NewFilter constructs a querystring.Filter that filters modifiers based on
-// query parameters.
-func NewFilter(nameMatcher, valueMatcher *regexp.Regexp) (*Filter, error) {
+// NewFilter builds a querystring.Filter that filters on name and optionally
+// value.
+func NewFilter(name, value string) *Filter {
 	return &Filter{
-		nameMatcher:  nameMatcher,
-		valueMatcher: valueMatcher,
-	}, nil
+		name:  name,
+		value: value,
+	}
 }
 
 // SetRequestModifier sets the request modifier for filter.
@@ -77,38 +76,22 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	nameMatcher, err := regexp.Compile(msg.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	valueMatcher, err := regexp.Compile(msg.Value)
-	if err != nil {
-		return nil, err
-	}
-
-	filter, err := NewFilter(nameMatcher, valueMatcher)
-	if err != nil {
-		return nil, err
-	}
+	f := NewFilter(msg.Name, msg.Value)
 
 	r, err := parse.FromJSON(msg.Modifier)
 	if err != nil {
 		return nil, err
 	}
 
-	reqmod := r.RequestModifier()
-	filter.SetRequestModifier(reqmod)
+	f.SetRequestModifier(r.RequestModifier())
+	f.SetResponseModifier(r.ResponseModifier())
 
-	resmod := r.ResponseModifier()
-	filter.SetResponseModifier(resmod)
-
-	return parse.NewResult(filter, msg.Scope)
+	return parse.NewResult(f, msg.Scope)
 }
 
-// ModifyRequest applies the contained request modifier if the filter name and values
-// match the request query parameters. In the case of a nil valueMatcher, the modifier is
-// only applied when the nameMatcher matches.
+// ModifyRequest applies the request modifier if the filter name and values
+// match the request query parameters. In the case of an empty value, the modifier is
+// applied whenever any parameter matches name, regardless of its value.
 func (f *Filter) ModifyRequest(req *http.Request) error {
 	if f.matches(req) && f.reqmod != nil {
 		return f.reqmod.ModifyRequest(req)
@@ -117,8 +100,9 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 	return nil
 }
 
-// ModifyResponse applies the contained response modifier if the filter name and values match the
-// request query parameters.
+// ModifyResponse applies the response modifier if the filter name and values
+// match the request query parameters. In the case of an empty value, the modifier is
+// applied whenever any parameter matches name, regardless of its value.
 func (f *Filter) ModifyResponse(res *http.Response) error {
 	if f.matches(res.Request) && f.resmod != nil {
 		return f.resmod.ModifyResponse(res)
@@ -128,24 +112,21 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 }
 
 func (f *Filter) matches(req *http.Request) bool {
-	var matched bool
+	for n, vs := range req.URL.Query() {
+		if f.name == n {
+			if f.value == "" {
+				return true
+			}
 
-	for name, values := range req.URL.Query() {
-		if f.nameMatcher.MatchString(name) {
-			matched = true
-			if f.valueMatcher != nil {
-				matched = false
-				for _, value := range values {
-					if f.valueMatcher.MatchString(value) {
-						matched = true
-						break
-					}
+			for _, v := range vs {
+				if f.value == v {
+					return true
 				}
 			}
 		}
 	}
 
-	return matched
+	return false
 }
 
 // VerifyRequests returns an error containing all the verification errors

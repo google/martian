@@ -17,21 +17,7 @@ package session
 import "testing"
 
 func TestContext(t *testing.T) {
-	if _, err := FromContext(nil); err == nil {
-		t.Error("FromContext(nil): got nil, want error")
-	}
-
-	ctx := NewContext()
-
-	ctx.SetSessionID("id")
-	if got, want := ctx.SessionID(), "id"; got != want {
-		t.Errorf("ctx.SessionID(): got %q, want %q", got, want)
-	}
-
-	ctx.MarkSecure()
-	if !ctx.IsSecure() {
-		t.Error("ctx.IsSecure(): got false, want true")
-	}
+	ctx := FromContext(nil)
 
 	ctx.Set("key", "value")
 	got, ok := ctx.Get("key")
@@ -47,22 +33,50 @@ func TestContext(t *testing.T) {
 		t.Error("ctx.SkippingRoundTrip(): got false, want true")
 	}
 
-	ctx2, err := FromContext(ctx)
-	if err != nil {
-		t.Fatalf("FromContext(ctx): got %v, want no error", err)
+	session := ctx.GetSession()
+
+	session.SetID("id")
+	if got, want := session.ID(), "id"; got != want {
+		t.Errorf("session.ID(): got %q, want %q", got, want)
 	}
 
-	if got, want := ctx2.SessionID(), "id"; got != want {
-		t.Errorf("ctx2.SessionID(): got %q, want %q", got, want)
+	session.MarkSecure()
+	if !session.IsSecure() {
+		t.Error("session.IsSecure(): got false, want true")
 	}
-	if !ctx2.IsSecure() {
-		t.Error("ctx2.IsSecure(): got false, want true")
+
+	session.Set("key", "value")
+	got, ok = session.Get("key")
+	if !ok {
+		t.Errorf("session.Get(%q): got !ok, want ok", "key")
 	}
+	if want := "value"; got != want {
+		t.Errorf("session.Get(%q): got %q, want %q", "key", got, want)
+	}
+
+	ctx2 := FromContext(ctx)
 
 	if ctx2.SkippingRoundTrip() {
 		t.Error("ctx2.SkippingRoundTrip(): got true, want false")
 	}
 	if _, ok := ctx2.Get("key"); ok {
 		t.Errorf("ctx2.Get(%q): got ok, want !ok", "key")
+	}
+
+	session2 := ctx2.GetSession()
+	if got, want := session2.ID(), "id"; got != want {
+		t.Errorf("session2.ID(): got %q, want %q", got, want)
+	}
+
+	if !session2.IsSecure() {
+		t.Error("session2.IsSecure(): got false, want true")
+	}
+
+	got, ok = session2.Get("key")
+	if !ok {
+		t.Errorf("session2.Get(%q): got !ok, want ok", "key")
+	}
+	if want := "value"; got != want {
+		t.Errorf("session2.Get(%q): got %q, want %q", "key", got, want)
 	}
 }

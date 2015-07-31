@@ -16,89 +16,110 @@
 // connection and its associated requests and responses.
 package session
 
-import (
-	"errors"
-	"sync"
-)
+import "sync"
 
 // Context provides information and storage for a single request/response pair.
 // Contexts are linked to shared session that is used for multiple requests on
 // a single connection.
 type Context struct {
-	session       *session
-	skipRoundTrip bool
+	session *Session
 
-	valmu sync.RWMutex
-	vals  map[string]interface{}
+	mu            sync.RWMutex
+	vals          map[string]interface{}
+	skipRoundTrip bool
 }
 
-type session struct {
-	sync.Mutex
+// Session provides information and storage about a connection.
+type Session struct {
+	mu     sync.RWMutex
 	id     string
 	secure bool
+	vals   map[string]interface{}
 }
 
 // FromContext builds a new context from an existing context. The new context
 // shares the same session as the passed context, but does not inherit any of
-// its request specific values. The context cannot be nil.
-func FromContext(ctx *Context) (*Context, error) {
-	if ctx == nil {
-		return nil, errors.New("session: cannot build context from nil")
+// its request specific values. If ctx is nil, a new context and session are
+// created.
+func FromContext(ctx *Context) *Context {
+	session := &Session{
+		vals: make(map[string]interface{}),
+	}
+
+	if ctx != nil {
+		session = ctx.session
 	}
 
 	return &Context{
-		session: ctx.session,
-		vals:    make(map[string]interface{}),
-	}, nil
-}
-
-// NewContext builds a blank context.
-func NewContext() *Context {
-	return &Context{
-		session: &session{},
+		session: session,
 		vals:    make(map[string]interface{}),
 	}
 }
 
-// SetSessionID sets the ID for the session. The ID will be persisted across
+// SetID sets the ID for the session. The ID will be persisted across
 // multiple requests and responses.
-func (ctx *Context) SetSessionID(id string) {
-	ctx.session.Lock()
-	defer ctx.session.Unlock()
+func (s *Session) SetID(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	ctx.session.id = id
+	s.id = id
 }
 
-// SessionID returns the session ID.
-func (ctx *Context) SessionID() string {
-	ctx.session.Lock()
-	defer ctx.session.Unlock()
+// ID returns the session ID.
+func (s *Session) ID() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	return ctx.session.id
+	return s.id
 }
 
-// IsSecure returns whether the current request is from a secure connection,
-// such as when modifying a request from a TLS connection that has been MITM'd.
-func (ctx *Context) IsSecure() bool {
-	ctx.session.Lock()
-	defer ctx.session.Unlock()
+// IsSecure returns whether the current request is from a secure session, such
+// as when modifying a request from a TLS connection that has been MITM'd.
+func (s *Session) IsSecure() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	return ctx.session.secure
+	return s.secure
 }
 
 // MarkSecure marks the session as secure.
-func (ctx *Context) MarkSecure() {
-	ctx.session.Lock()
-	defer ctx.session.Unlock()
+func (s *Session) MarkSecure() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	ctx.session.secure = true
+	s.secure = true
 }
 
 // Get takes key and returns the associated value from the context.
+func (s *Session) Get(key string) (interface{}, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	val, ok := s.vals[key]
+
+	return val, ok
+}
+
+// Set takes a key and associates it with val in the session. The value is
+// persisted for the life the session across multiple requests and responses.
+func (s *Session) Set(key string, val interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.vals[key] = val
+}
+
+// GetSession returns the session for the context.
+func (ctx *Context) GetSession() *Session {
+	return ctx.session
+}
+
+// Get takes key and returns the associated value from the session.
 func (ctx *Context) Get(key string) (interface{}, bool) {
-	ctx.valmu.RLock()
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
 	val, ok := ctx.vals[key]
-	ctx.valmu.RUnlock()
 
 	return val, ok
 }
@@ -107,18 +128,24 @@ func (ctx *Context) Get(key string) (interface{}, bool) {
 // persisted for the duration of the request and is removed on the following
 // request.
 func (ctx *Context) Set(key string, val interface{}) {
-	ctx.valmu.Lock()
-	defer ctx.valmu.Unlock()
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
 
 	ctx.vals[key] = val
 }
 
 // SkipRoundTrip skips the round trip for the current request.
 func (ctx *Context) SkipRoundTrip() {
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+
 	ctx.skipRoundTrip = true
 }
 
 // SkippingRoundTrip returns whether the current round trip will be skipped.
 func (ctx *Context) SkippingRoundTrip() bool {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
 	return ctx.skipRoundTrip
 }

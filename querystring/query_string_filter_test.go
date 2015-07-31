@@ -17,8 +17,6 @@ package querystring
 import (
 	"errors"
 	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -31,130 +29,124 @@ import (
 	_ "github.com/google/martian/header"
 )
 
-func TestFilterWithQueryParamNameAndNoValue(t *testing.T) {
-	m, err := regexp.Compile("name")
-	if err != nil {
-		t.Fatalf("regexp.Compile(%q): got %v, want no error", "name", err)
-	}
-
-	filter, err := NewFilter(m, nil)
-	if err != nil {
-		t.Fatalf("NewFilter(): got %v, want no error", err)
-	}
+func TestQueryStringFilterWithQuery(t *testing.T) {
+	// Name only, no value.
+	f := NewFilter("match", "")
 
 	tm := martiantest.NewModifier()
-	filter.SetRequestModifier(tm)
+	f.SetRequestModifier(tm)
+	f.SetResponseModifier(tm)
 
-	req, err := http.NewRequest("GET", "http://martian.local?name", nil)
+	req, err := http.NewRequest("GET", "http://martian.local?match=any", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := filter.ModifyRequest(req); err != nil {
+	if err := f.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	if !tm.RequestModified() {
 		t.Error("tm.RequestModified(): got false, want true")
 	}
+	if !tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got false, want true")
+	}
 	tm.Reset()
 
-	req, err = http.NewRequest("GET", "http://martian.local?test", nil)
+	req, err = http.NewRequest("GET", "http://martian.local?nomatch", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := filter.ModifyRequest(req); err != nil {
+	if err := f.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
+
+	res = proxyutil.NewResponse(200, nil, req)
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	if tm.RequestModified() {
 		t.Error("tm.RequestModified(): got true, want false")
 	}
-}
-
-func TestFilterWithQueryStringNameAndValue(t *testing.T) {
-	nm, err := regexp.Compile("name")
-	if err != nil {
-		t.Fatalf("regexp.Compile(%q): got %v, want no error", "name", err)
+	if tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got true, want false")
 	}
-	vm, err := regexp.Compile("value")
-	if err != nil {
-		t.Fatalf("regexp.Compile(%q): got %v, want no error", "value", err)
-	}
+	tm.Reset()
 
-	filter, err := NewFilter(nm, vm)
-	if err != nil {
-		t.Fatalf("NewFilter(): got %v, want no error", err)
-	}
+	// Name and value.
+	f = NewFilter("match", "value")
+	f.SetRequestModifier(tm)
+	f.SetResponseModifier(tm)
 
-	tm := martiantest.NewModifier()
-	filter.SetRequestModifier(tm)
-
-	v := url.Values{}
-	v.Add("nomatch", "value")
-	req, err := http.NewRequest("POST", "http://martian.local?name=value", strings.NewReader(v.Encode()))
+	req, err = http.NewRequest("GET", "http://martian.local?match=value", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	if err := filter.ModifyRequest(req); err != nil {
+	if err := f.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
+
+	res = proxyutil.NewResponse(200, nil, req)
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	if !tm.RequestModified() {
 		t.Error("tm.RequestModified(): got false, want true")
 	}
-	tm.Reset()
-
-	v = url.Values{}
-	req, err = http.NewRequest("POST", "http://martian.local", strings.NewReader(v.Encode()))
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-
-	if err := filter.ModifyRequest(req); err != nil {
-		t.Errorf("ModifyRequest(): got %v, want no error", err)
-	}
-	if tm.RequestModified() {
-		t.Error("tm.RequestModified(): got true, want false")
-	}
-}
-
-func TestFilterWithQueryStringNameAndNilValueMatcher(t *testing.T) {
-	nm, err := regexp.Compile("name")
-	if err != nil {
-		t.Fatalf("regexp.Compile(%q): got %v, want no error", "name", err)
-	}
-
-	filter, err := NewFilter(nm, nil)
-	if err != nil {
-		t.Fatalf("NewFilter(): got %v, want no error", err)
-	}
-
-	tm := martiantest.NewModifier()
-	filter.SetRequestModifier(tm)
-
-	req, err := http.NewRequest("GET", "http://martian.local?name=value", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-
-	if err := filter.ModifyRequest(req); err != nil {
-		t.Errorf("ModifyRequest(): got %v, want no error", err)
-	}
-	if !tm.RequestModified() {
-		t.Error("tm.RequestModified(): got false, want true")
+	if !tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got false, want true")
 	}
 	tm.Reset()
 
-	req, err = http.NewRequest("GET", "http://martian.local", nil)
+	req, err = http.NewRequest("GET", "http://martian.local?match=notvalue", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-
-	if err := filter.ModifyRequest(req); err != nil {
+	if err := f.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
+
+	res = proxyutil.NewResponse(200, nil, req)
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	if tm.RequestModified() {
 		t.Error("tm.RequestModified(): got true, want false")
 	}
+	if tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got true, want false")
+	}
+	tm.Reset()
+
+	// Explicitly do not match POST data.
+	req, err = http.NewRequest("GET", "http://martian.local", strings.NewReader("match=value"))
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	if err := f.ModifyRequest(req); err != nil {
+		t.Errorf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res = proxyutil.NewResponse(200, nil, req)
+	if err := f.ModifyResponse(res); err != nil {
+		t.Errorf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if tm.RequestModified() {
+		t.Error("tm.RequestModified(): got true, want false")
+	}
+	if tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got true, want false")
+	}
+	tm.Reset()
 }
 
 func TestFilterFromJSON(t *testing.T) {
@@ -166,7 +158,7 @@ func TestFilterFromJSON(t *testing.T) {
       "modifier": {
         "header.Modifier": {
           "scope": ["request", "response"],
-          "name": "Mod-Run",
+          "name": "Martian-Modified",
           "value": "true"
         }
       }
@@ -192,8 +184,8 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
 	}
 
-	if got, want := req.Header.Get("Mod-Run"), "true"; got != want {
-		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	if got, want := req.Header.Get("Martian-Modified"), "true"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Martian-Modified", got, want)
 	}
 
 	resmod := r.ResponseModifier()
@@ -206,16 +198,13 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 
-	if got, want := res.Header.Get("Mod-Run"), "true"; got != want {
-		t.Errorf("res.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	if got, want := res.Header.Get("Martian-Modified"), "true"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Martian-Modified", got, want)
 	}
 }
 
-func TestPassThroughVerifyRequests(t *testing.T) {
-	f, err := NewFilter(nil, nil)
-	if err != nil {
-		t.Fatalf("NewFilter(): got %v, want no error", err)
-	}
+func TestVerifyRequests(t *testing.T) {
+	f := NewFilter("", "")
 
 	if err := f.VerifyRequests(); err != nil {
 		t.Fatalf("VerifyRequest(): got %v, want no error", err)
@@ -230,13 +219,16 @@ func TestPassThroughVerifyRequests(t *testing.T) {
 	if got, want := f.VerifyRequests(), tv.RequestError; got != want {
 		t.Fatalf("VerifyRequests(): got %v, want %v", got, want)
 	}
+
+	f.ResetRequestVerifications()
+
+	if err := f.VerifyRequests(); err != nil {
+		t.Fatalf("VerifyRequest(): got %v, want no error", err)
+	}
 }
 
-func TestPassThroughVerifyResponses(t *testing.T) {
-	f, err := NewFilter(nil, nil)
-	if err != nil {
-		t.Fatalf("NewFilter(): got %v, want no error", err)
-	}
+func TestVerifyResponses(t *testing.T) {
+	f := NewFilter("", "")
 
 	if err := f.VerifyResponses(); err != nil {
 		t.Fatalf("VerifyResponses(): got %v, want no error", err)
@@ -251,38 +243,10 @@ func TestPassThroughVerifyResponses(t *testing.T) {
 	if got, want := f.VerifyResponses(), tv.ResponseError; got != want {
 		t.Fatalf("VerifyResponses(): got %v, want %v", got, want)
 	}
-}
 
-func TestResets(t *testing.T) {
-	f, err := NewFilter(nil, nil)
-	if err != nil {
-		t.Fatalf("NewFilter(): got %v, want no error", err)
-	}
-
-	tv := &verify.TestVerifier{
-		ResponseError: errors.New("verify response failure"),
-	}
-	f.SetResponseModifier(tv)
-
-	tv = &verify.TestVerifier{
-		RequestError: errors.New("verify request failure"),
-	}
-	f.SetRequestModifier(tv)
-
-	if err := f.VerifyRequests(); err == nil {
-		t.Fatal("VerifyRequests(): got nil, want error")
-	}
-	if err := f.VerifyResponses(); err == nil {
-		t.Fatal("VerifyResponses(): got nil, want error")
-	}
-
-	f.ResetRequestVerifications()
 	f.ResetResponseVerifications()
 
-	if err := f.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
-	}
 	if err := f.VerifyResponses(); err != nil {
-		t.Errorf("VerifyResponses(): got %v, want no error", err)
+		t.Fatalf("VerifyResponses(): got %v, want no error", err)
 	}
 }
