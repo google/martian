@@ -73,8 +73,8 @@ func (s *Session) ID() string {
 	return s.id
 }
 
-// IsSecure returns whether the current request is from a secure session, such
-// as when modifying a request from a TLS connection that has been MITM'd.
+// IsSecure returns whether the current session is from a secure connection,
+// such as when receiving requests from a TLS connection that has been MITM'd.
 func (s *Session) IsSecure() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -90,7 +90,7 @@ func (s *Session) MarkSecure() {
 	s.secure = true
 }
 
-// Get takes key and returns the associated value from the context.
+// Get takes key and returns the associated value from the session.
 func (s *Session) Get(key string) (interface{}, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -101,7 +101,7 @@ func (s *Session) Get(key string) (interface{}, bool) {
 }
 
 // Set takes a key and associates it with val in the session. The value is
-// persisted for the life the session across multiple requests and responses.
+// persisted for the entire session across multiple requests and responses.
 func (s *Session) Set(key string, val interface{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -114,7 +114,7 @@ func (ctx *Context) GetSession() *Session {
 	return ctx.session
 }
 
-// Get takes key and returns the associated value from the session.
+// Get takes key and returns the associated value from the context.
 func (ctx *Context) Get(key string) (interface{}, bool) {
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()
