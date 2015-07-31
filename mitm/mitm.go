@@ -39,20 +39,15 @@ import (
 var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 
 type Config struct {
-	// ca is the CA certificate used to sign MITM certificates.
-	ca *x509.Certificate
-	// capriv is the private key of the CA used to sign MITM certificates.
+	ca     *x509.Certificate
 	capriv interface{}
-	// priv is the private key used to generate certificates on the fly.
-	priv *rsa.PrivateKey
-	// keyID is the PKIX Subject Key ID for generated certificates.
+
+	priv  *rsa.PrivateKey
 	keyID []byte
-	// validity is the window of time around time.Now() that the
-	// certificate will be valid.
+
 	validity time.Duration
-	// org that is displayed as the owner of the certificate.
-	org string
-	//
+	org      string
+
 	getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	roots          *x509.CertPool
 
