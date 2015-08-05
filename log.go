@@ -23,7 +23,7 @@ import (
 func Infof(format string, args ...interface{}) {
 	msg := fmt.Sprintf("INFO: %s", format)
 	if len(args) > 0 {
-		msg = fmt.Sprintf(format, args...)
+		msg = fmt.Sprintf(msg, args...)
 	}
 
 	log.Println(msg)
@@ -33,7 +33,7 @@ func Infof(format string, args ...interface{}) {
 func Debugf(format string, args ...interface{}) {
 	msg := fmt.Sprintf("DEBUG: %s", format)
 	if len(args) > 0 {
-		msg = fmt.Sprintf(format, args...)
+		msg = fmt.Sprintf(msg, args...)
 	}
 
 	log.Println(msg)
@@ -43,7 +43,7 @@ func Debugf(format string, args ...interface{}) {
 func Errorf(format string, args ...interface{}) {
 	msg := fmt.Sprintf("ERROR: %s", format)
 	if len(args) > 0 {
-		msg = fmt.Sprintf(format, args...)
+		msg = fmt.Sprintf(msg, args...)
 	}
 
 	log.Println(msg)

@@ -16,9 +16,11 @@ package martian
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -62,6 +64,8 @@ func (l *timeoutListener) Accept() (net.Conn, error) {
 }
 
 func TestContext(t *testing.T) {
+	t.Parallel()
+
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -82,6 +86,8 @@ func TestContext(t *testing.T) {
 }
 
 func TestIntegrationTemporaryTimeout(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Liste(): got %v, want no error", err)
@@ -128,6 +134,8 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 }
 
 func TestIntegrationHTTP(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -141,6 +149,7 @@ func TestIntegrationHTTP(t *testing.T) {
 
 	tr := martiantest.NewTransport()
 	p.SetRoundTripper(tr)
+	p.SetTimeout(200 * time.Millisecond)
 
 	tm := martiantest.NewModifier()
 
@@ -192,7 +201,74 @@ func TestIntegrationHTTP(t *testing.T) {
 	}
 }
 
+func TestIntegrationServeMux(t *testing.T) {
+	t.Parallel()
+
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	p := NewProxy()
+	defer p.Close()
+
+	p.SetTimeout(200 * time.Millisecond)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("martian.proxy/heartbeat", func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Request-ID", req.Header.Get("Request-ID"))
+		rw.Write([]byte("ok"))
+	})
+	p.SetMux(mux)
+
+	go p.Serve(l)
+
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatalf("net.Dial(): got %v, want no error", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest("GET", "http://martian.proxy/heartbeat", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Request-ID", "1")
+	req.Header.Set("Connection", "close")
+
+	// GET http://martian.proxy/heartbeat HTTP/1.1
+	// Host: martian.proxy
+	if err := req.WriteProxy(conn); err != nil {
+		t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+	}
+
+	res, err := http.ReadResponse(bufio.NewReader(conn), req)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.StatusCode, 200; got != want {
+		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
+	}
+
+	if got, want := res.Header.Get("Request-ID"), "1"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Request-ID", got, want)
+	}
+
+	got, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(res.Body): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	if want := []byte("ok"); !bytes.Equal(got, want) {
+		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+}
+
 func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
+	t.Parallel()
+
 	// Start first proxy to use as downstream.
 	dl, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
@@ -205,7 +281,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	dtr := martiantest.NewTransport()
 	dtr.Respond(299)
 	downstream.SetRoundTripper(dtr)
-	downstream.SetTimeout(200 * time.Millisecond)
+	downstream.SetTimeout(600 * time.Millisecond)
 
 	go downstream.Serve(dl)
 
@@ -222,7 +298,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	upstream.SetDownstreamProxy(&url.URL{
 		Host: dl.Addr().String(),
 	})
-	upstream.SetTimeout(200 * time.Millisecond)
+	upstream.SetTimeout(600 * time.Millisecond)
 
 	go upstream.Serve(ul)
 
@@ -256,6 +332,8 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 }
 
 func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -268,7 +346,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	p.SetDownstreamProxy(&url.URL{
 		Host: "[::1]:0",
 	})
-	p.SetTimeout(200 * time.Millisecond)
+	p.SetTimeout(600 * time.Millisecond)
 
 	tm := martiantest.NewModifier()
 	reserr := errors.New("response error")
@@ -311,6 +389,8 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 }
 
 func TestIntegrationConnect(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -432,6 +512,8 @@ func TestIntegrationConnect(t *testing.T) {
 }
 
 func TestIntegrationConnectDownstreamProxy(t *testing.T) {
+	t.Parallel()
+
 	// Start first proxy to use as downstream.
 	dl, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
@@ -444,7 +526,6 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	dtr := martiantest.NewTransport()
 	dtr.Respond(299)
 	downstream.SetRoundTripper(dtr)
-	downstream.SetTimeout(200 * time.Millisecond)
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
 	if err != nil {
@@ -472,7 +553,6 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	upstream.SetDownstreamProxy(&url.URL{
 		Host: dl.Addr().String(),
 	})
-	upstream.SetTimeout(200 * time.Millisecond)
 
 	go upstream.Serve(ul)
 
@@ -540,6 +620,8 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 }
 
 func TestIntegrationMITM(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -557,6 +639,7 @@ func TestIntegrationMITM(t *testing.T) {
 	})
 
 	p.SetRoundTripper(tr)
+	p.SetTimeout(600 * time.Millisecond)
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
 	if err != nil {
@@ -649,6 +732,8 @@ func TestIntegrationMITM(t *testing.T) {
 }
 
 func TestIntegrationTransparentHTTP(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -659,6 +744,7 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 
 	tr := martiantest.NewTransport()
 	p.SetRoundTripper(tr)
+	p.SetTimeout(200 * time.Millisecond)
 
 	tm := martiantest.NewModifier()
 	p.SetRequestModifier(tm)
@@ -701,6 +787,8 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 }
 
 func TestIntegrationTransparentMITM(t *testing.T) {
+	t.Parallel()
+
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
 	if err != nil {
 		t.Fatalf("mitm.NewAuthority(): got %v, want no error", err)
@@ -786,6 +874,8 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 }
 
 func TestIntegrationFailedRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -798,6 +888,7 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 	trerr := errors.New("round trip error")
 	tr.RespondError(trerr)
 	p.SetRoundTripper(tr)
+	p.SetTimeout(200 * time.Millisecond)
 
 	go p.Serve(l)
 
@@ -835,6 +926,8 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 }
 
 func TestIntegrationSkipRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -847,6 +940,7 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 	tr := martiantest.NewTransport()
 	tr.Respond(500)
 	p.SetRoundTripper(tr)
+	p.SetTimeout(200 * time.Millisecond)
 
 	tm := martiantest.NewModifier()
 	tm.RequestFunc(func(req *http.Request) {

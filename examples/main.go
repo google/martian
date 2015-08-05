@@ -137,9 +137,7 @@ may be called via AJAX
 The flags are:
 	-addr=":8080"
 		host:port of the proxy
-	-api-addr=":0"
-		host:port of the configuration API
-	-api-hostname="martian.proxy"
+	-api="martian.proxy"
 		hostname that can be used to reference the configuration API when
 		configuring through the proxy
 	-cert=""
@@ -172,7 +170,9 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
+	"os"
+	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/google/martian"
@@ -180,13 +180,13 @@ import (
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/header"
 	"github.com/google/martian/martianhttp"
-	"github.com/google/martian/martianurl"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/verify"
 
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
 	_ "github.com/google/martian/log"
+	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"
 	_ "github.com/google/martian/priority"
@@ -196,8 +196,7 @@ import (
 
 var (
 	addr         = flag.String("addr", ":8080", "host:port of the proxy")
-	apiAddr      = flag.String("api-addr", ":0", "host:port of the configuration API")
-	apiHostname  = flag.String("api-hostname", "martian.proxy", "hostname forwarded to apiAddr")
+	api          = flag.String("api", "martian.proxy", "hostname for the API")
 	generateCA   = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
 	cert         = flag.String("cert", "", "CA certificate used to sign MITM certificates")
 	key          = flag.String("key", "", "private key of the CA used to sign MITM certificates")
@@ -246,7 +245,7 @@ func main() {
 
 		// Expose certificate authority.
 		ah := martianhttp.NewAuthorityHandler(x509c)
-		http.Handle("/authority.cer", ah)
+		configure("/authority.cer", ah)
 	}
 
 	fg := fifo.NewGroup()
@@ -285,34 +284,21 @@ func main() {
 	rh.SetResponseVerifier(m)
 	configure("/verify/reset", rh)
 
-	cl, err := net.Listen("tcp", *apiAddr)
+	l, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Redirect *apiHostname to the API server host:port.
-	apif := martianurl.NewFilter(&url.URL{
-		Host: *apiHostname,
-	})
-	apim := martianurl.NewModifier(&url.URL{
-		Host: cl.Addr().String(),
-	})
-	apif.SetRequestModifier(apim)
+	log.Printf("martian: proxy started at %s\n", l.Addr())
 
-	fg.AddRequestModifier(apif)
+	go p.Serve(l)
 
-	go http.Serve(cl, nil)
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt, os.Kill)
 
-	log.Printf("martian: API started at %s\n", cl.Addr())
+	<-sigc
 
-	pl, err := net.Listen("tcp", *addr)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("martian: proxy started at %s\n", pl.Addr())
-
-	log.Fatal(p.Serve(pl))
+	log.Println("martian: shutting down")
 }
 
 // configure installs a configuration handler at path.
@@ -321,5 +307,5 @@ func configure(path string, handler http.Handler) {
 		handler = cors.NewHandler(handler)
 	}
 
-	http.Handle(path, handler)
+	http.Handle(filepath.Join(*api, path), handler)
 }
