@@ -244,6 +244,10 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 		h.ServeHTTP(rw, req)
 
+		// Call WriteHeader to ensure a response is sent, since the handler isn't
+		// required to call WriteHeader/Write.
+		rw.WriteHeader(200)
+
 		if req.Close {
 			return closeConn
 		}
