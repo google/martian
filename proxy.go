@@ -83,14 +83,12 @@ type Proxy struct {
 	mitm         *mitm.Config
 	proxyURL     *url.URL
 	conns        *sync.WaitGroup
+	mux          *http.ServeMux
 	closing      int32 // atomic
 
 	reqmod RequestModifier
 	resmod ResponseModifier
 }
-
-// Option is a configurable proxy setting.
-type Option func(p *Proxy)
 
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
@@ -98,6 +96,7 @@ func NewProxy() *Proxy {
 		roundTripper: http.DefaultTransport,
 		timeout:      5 * time.Minute,
 		conns:        &sync.WaitGroup{},
+		mux:          http.DefaultServeMux,
 		reqmod:       noop,
 		resmod:       noop,
 	}
@@ -124,9 +123,17 @@ func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
 	p.proxyURL = proxyURL
 }
 
+// SetMux sets the http.ServeMux to use for internal proxy requests. Defaults
+// to http.DefaultServeMux.
+func (p *Proxy) SetMux(mux *http.ServeMux) {
+	p.mux = mux
+}
+
 // Close sets the proxying to the closing state and waits for all connections
 // to resolve.
 func (p *Proxy) Close() {
+	Infof("martian: closing down proxy")
+
 	atomic.StoreInt32(&p.closing, 1)
 	p.conns.Wait()
 }
@@ -227,6 +234,22 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		return closeConn
 	}
 	defer req.Body.Close()
+
+	if h, pattern := p.mux.Handler(req); pattern != "" {
+		defer brw.Flush()
+
+		Infof("martian: received proxy specific request: %s", req.URL)
+		rw := newResponseWriter(brw)
+		defer rw.Close()
+
+		h.ServeHTTP(rw, req)
+
+		if req.Close {
+			return closeConn
+		}
+
+		return nil
+	}
 
 	ctx = session.FromContext(ctx)
 	SetContext(req, ctx)
