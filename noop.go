@@ -35,6 +35,6 @@ func (nm *noopModifier) ModifyRequest(*http.Request) error {
 
 // ModifyResponse logs a debug line.
 func (nm *noopModifier) ModifyResponse(*http.Response) error {
-	Debugf("%s: no response modifier configure", nm.id)
+	Debugf("%s: no response modifier configured", nm.id)
 	return nil
 }
