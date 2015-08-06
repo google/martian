@@ -26,12 +26,13 @@ import (
 
 func ExampleLogger() {
 	l := NewLogger()
+	l.IncludeBody(true)
 	l.SetLogFunc(func(line string) {
 		// Remove \r to make it easier to test with examples.
 		fmt.Print(strings.Replace(line, "\r", "", -1))
 	})
 
-	req, err := http.NewRequest("GET", "http://example.com/path?querystring", strings.NewReader("body"))
+	req, err := http.NewRequest("GET", "http://example.com/path?querystring", strings.NewReader("request content"))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -45,7 +46,8 @@ func ExampleLogger() {
 		return
 	}
 
-	res := proxyutil.NewResponse(200, strings.NewReader("body"), req)
+	res := proxyutil.NewResponse(200, strings.NewReader("response content"), req)
+	res.ContentLength = 16
 	res.Header.Set("Date", "Tue, 15 Nov 1994 08:12:31 GMT")
 	res.Header.Set("Other-Header", "values")
 
@@ -61,21 +63,27 @@ func ExampleLogger() {
 	// Host: example.com
 	// Connection: close
 	// Other-Header: values
+	//
+	// request content
 	// --------------------------------------------------------------------------------
 	//
 	// --------------------------------------------------------------------------------
 	// Response from http://example.com/path?querystring
 	// --------------------------------------------------------------------------------
 	// HTTP/1.1 200 OK
+	// Content-Length: 16
 	// Date: Tue, 15 Nov 1994 08:12:31 GMT
 	// Other-Header: values
+	//
+	// response content
 	// --------------------------------------------------------------------------------
 }
 
 func TestLoggerFromJSON(t *testing.T) {
 	msg := []byte(`{
 		"log.Logger": {
-			"scope": ["request", "response"]
+			"scope": ["request", "response"],
+			"includeBody": true
 		}
 	}`)
 
