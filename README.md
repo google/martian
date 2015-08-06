@@ -68,7 +68,7 @@ Let's break down the parts of this message.
   modifier, we need the `name` and `value` of the header.
 
 This is a simple configuration, for more complex configurations, modifiers are
-combined with groups and filters to compose the desired behavior. 
+combined with groups and filters to compose the desired behavior.
 
 To configure Martian, `POST` the JSON to `http://martian.proxy/modifiers`. You'll
 want to use whatever mechanism your language of choice provides you to make
