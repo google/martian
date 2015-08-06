@@ -472,7 +472,7 @@ func TestIntegrationConnect(t *testing.T) {
 		t.Error("tm.ResponseModified(): got false, want true")
 	}
 	if got, want := res.Header.Get("Warning"), reserr.Error(); !strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", got, want)
+		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", "Warning", got, want)
 	}
 
 	roots := x509.NewCertPool()
@@ -507,7 +507,7 @@ func TestIntegrationConnect(t *testing.T) {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
 	if got, want := res.Header.Get("Warning"), reserr.Error(); strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %s, want to not contain %s", got, want)
+		t.Errorf("res.Header.Get(%q): got %s, want to not contain %s", "Warning", got, want)
 	}
 }
 

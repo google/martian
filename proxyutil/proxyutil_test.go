@@ -106,6 +106,6 @@ func TestWarning(t *testing.T) {
 
 	want = `199 "martian" "modifier error" "Mon, 02 Jan 2006 15:04:05 GMT"`
 	if got := hdr["Warning"][1]; got != want {
-		t.Errorf("hdr[%q][1]: got %q, want %q", got, want)
+		t.Errorf("hdr[%q][1]: got %q, want %q", "Warning", got, want)
 	}
 }
