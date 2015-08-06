@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 
 	"github.com/google/martian"
@@ -28,18 +29,21 @@ import (
 
 // Logger is a modifier that logs requests and responses.
 type Logger struct {
-	log func(line string)
+	log         func(line string)
+	includeBody bool
 }
 
 type loggerJSON struct {
-	Scope []parse.ModifierType `json:"scope"`
+	Scope       []parse.ModifierType `json:"scope"`
+	IncludeBody bool                 `json:"includeBody"`
 }
 
 func init() {
 	parse.Register("log.Logger", loggerFromJSON)
 }
 
-// NewLogger returns a logger that logs requests and responses. Log function defaults to martian.Infof.
+// NewLogger returns a logger that logs requests and responses, optionally
+// logging the body. Log function defaults to martian.Infof.
 func NewLogger() *Logger {
 	return &Logger{
 		log: func(line string) {
@@ -48,12 +52,17 @@ func NewLogger() *Logger {
 	}
 }
 
+// IncludeBody sets whether to include the request/response body in the log.
+func (l *Logger) IncludeBody(includeBody bool) {
+	l.includeBody = includeBody
+}
+
 // SetLogFunc sets the logging function for the logger.
 func (l *Logger) SetLogFunc(logFunc func(line string)) {
 	l.log = logFunc
 }
 
-// ModifyRequest logs the request. Note that the body of the request is not logged.
+// ModifyRequest logs the request, optionally including the body.
 //
 // The format logged is:
 // --------------------------------------------------------------------------------
@@ -63,6 +72,8 @@ func (l *Logger) SetLogFunc(logFunc func(line string)) {
 // Host: www.google.com
 // Connection: close
 // Other-Header: values
+//
+// request content
 // --------------------------------------------------------------------------------
 func (l *Logger) ModifyRequest(req *http.Request) error {
 	b := &bytes.Buffer{}
@@ -71,14 +82,14 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 	fmt.Fprintln(b, strings.Repeat("-", 80))
 	fmt.Fprintf(b, "Request to %s\n", req.URL)
 	fmt.Fprintln(b, strings.Repeat("-", 80))
-	fmt.Fprintf(b, "%s %s %s\r\n", req.Method, req.RequestURI, req.Proto)
-	fmt.Fprintf(b, "Host: %s\r\n", req.Host)
 
-	if req.Close {
-		fmt.Fprint(b, "Connection: close\r\n")
+	dump, err := httputil.DumpRequest(req, l.includeBody)
+	if err != nil {
+		return err
 	}
+	b.Write(dump)
 
-	req.Header.Write(b)
+	fmt.Fprintln(b, "")
 	fmt.Fprintln(b, strings.Repeat("-", 80))
 
 	l.log(b.String())
@@ -86,7 +97,7 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 	return nil
 }
 
-// ModifyResponse logs the response. Note that the body of the response is not logged.
+// ModifyResponse logs the response, optionally including the body.
 //
 // The format logged is:
 // --------------------------------------------------------------------------------
@@ -95,6 +106,8 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 // HTTP/1.1 200 OK
 // Date: Tue, 15 Nov 1994 08:12:31 GMT
 // Other-Header: values
+//
+// response content
 // --------------------------------------------------------------------------------
 func (l *Logger) ModifyResponse(res *http.Response) error {
 	b := &bytes.Buffer{}
@@ -102,8 +115,14 @@ func (l *Logger) ModifyResponse(res *http.Response) error {
 	fmt.Fprintln(b, strings.Repeat("-", 80))
 	fmt.Fprintf(b, "Response from %s\n", res.Request.URL)
 	fmt.Fprintln(b, strings.Repeat("-", 80))
-	fmt.Fprintf(b, "%s %s\r\n", res.Proto, res.Status)
-	res.Header.Write(b)
+
+	dump, err := httputil.DumpResponse(res, l.includeBody)
+	if err != nil {
+		return err
+	}
+	b.Write(dump)
+
+	fmt.Fprintln(b, "")
 	fmt.Fprintln(b, strings.Repeat("-", 80))
 
 	l.log(b.String())
@@ -116,7 +135,8 @@ func (l *Logger) ModifyResponse(res *http.Response) error {
 // Example JSON:
 // {
 //   "log.Logger": {
-//     "scope": ["request", "response"]
+//     "scope": ["request", "response"],
+//		 "includeBody": true
 //   }
 // }
 func loggerFromJSON(b []byte) (*parse.Result, error) {
@@ -125,5 +145,8 @@ func loggerFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	return parse.NewResult(NewLogger(), msg.Scope)
+	l := NewLogger()
+	l.IncludeBody(msg.IncludeBody)
+
+	return parse.NewResult(l, msg.Scope)
 }
