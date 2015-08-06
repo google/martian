@@ -87,9 +87,9 @@ func (rw *responseWriter) Close() error {
 	wc, ok := rw.w.(io.Closer)
 	if ok {
 		err = wc.Close()
+		// Write additional CRLF to signal empty trailers.
+		rw.ow.Write([]byte("\r\n"))
 	}
-
-	rw.ow.Write([]byte("\r\n"))
 
 	return err
 }
