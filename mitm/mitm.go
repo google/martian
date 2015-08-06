@@ -38,6 +38,8 @@ import (
 // bytes (2^(8*20)-1).
 var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 
+// Config is a set of configuration values that are used to build TLS configs
+// capable of MITM.
 type Config struct {
 	ca     *x509.Certificate
 	capriv interface{}

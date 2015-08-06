@@ -31,7 +31,7 @@ import (
 	"github.com/google/martian/session"
 )
 
-var closeConn = errors.New("closing connection")
+var errClose = errors.New("closing connection")
 var noop = Noop("martian")
 
 var (
@@ -63,13 +63,13 @@ func Context(req *http.Request) *session.Context {
 	return ctxs[req]
 }
 
-func isCloseableError(err error) bool {
+func isCloseable(err error) bool {
 	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 		return true
 	}
 
 	switch err {
-	case io.EOF, io.ErrClosedPipe, closeConn:
+	case io.EOF, io.ErrClosedPipe, errClose:
 		return true
 	}
 
@@ -215,7 +215,7 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 		deadline := time.Now().Add(p.timeout)
 		conn.SetDeadline(deadline)
 
-		if err := p.handle(ctx, conn, brw); isCloseableError(err) {
+		if err := p.handle(ctx, conn, brw); isCloseable(err) {
 			Infof("martian: closing connection: %v", conn.RemoteAddr())
 			return
 		}
@@ -231,7 +231,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
 
-		return closeConn
+		return errClose
 	}
 	defer req.Body.Close()
 
@@ -249,7 +249,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		rw.WriteHeader(200)
 
 		if req.Close {
-			return closeConn
+			return errClose
 		}
 
 		return nil
@@ -350,7 +350,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		<-donec
 		Debugf("martian: closed CONNECT tunnel")
 
-		return closeConn
+		return errClose
 	}
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -375,7 +375,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	if req.Close || p.Closing() {
 		Debugf("martian: received close request: %v", req.RemoteAddr)
 		res.Header.Add("Connection", "close")
-		closing = closeConn
+		closing = errClose
 	}
 
 	Debugf("martian: sent response: %v", req.URL)

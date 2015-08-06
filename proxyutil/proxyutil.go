@@ -61,6 +61,8 @@ func NewErrorResponse(code int, err error, req *http.Request) *http.Response {
 	return res
 }
 
+// Warning adds an error to the Warning header in the format: 199 "martian"
+// "error message" "date".
 func Warning(header http.Header, err error) {
 	date := header.Get("Date")
 	if date == "" {
