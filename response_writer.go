@@ -27,17 +27,36 @@ import (
 // responseWriter does not support all of the functionality of the net/http
 // ResponseWriter; in particular, it does not sniff Content-Types.
 type responseWriter struct {
-	ow          io.Writer // original writer
-	w           io.Writer // current writer
+	ow          io.WriteCloser // original writer
+	cw          io.WriteCloser // current writer
 	hdr         http.Header
+	chunked     bool
 	wroteHeader bool
+}
+
+type writeCloser interface {
+	io.Writer
+	io.Closer
+}
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (wc *nopWriteCloser) Close() error {
+	return nil
 }
 
 // newResponseWriter returns a new http.ResponseWriter.
 func newResponseWriter(w io.Writer) *responseWriter {
+	wc, ok := w.(writeCloser)
+	if !ok {
+		wc = &nopWriteCloser{w}
+	}
+
 	return &responseWriter{
-		ow:  w,
-		w:   w,
+		ow:  wc,
+		cw:  wc,
 		hdr: http.Header{},
 	}
 }
@@ -54,7 +73,7 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 		rw.WriteHeader(200)
 	}
 
-	return rw.w.Write(b)
+	return rw.cw.Write(b)
 }
 
 // WriteHeader writes the status line and headers.
@@ -64,32 +83,27 @@ func (rw *responseWriter) WriteHeader(status int) {
 	}
 	rw.wroteHeader = true
 
-	fmt.Fprintf(rw.w, "HTTP/1.1 %d %s\r\n", status, http.StatusText(status))
+	fmt.Fprintf(rw.ow, "HTTP/1.1 %d %s\r\n", status, http.StatusText(status))
 
-	var chunked bool
 	if rw.hdr.Get("Content-Length") == "" {
 		rw.hdr.Set("Transfer-Encoding", "chunked")
-		chunked = true
+		rw.chunked = true
+		rw.cw = httputil.NewChunkedWriter(rw.ow)
 	}
-	rw.hdr.Write(rw.w)
 
-	rw.w.Write([]byte("\r\n"))
-
-	if chunked {
-		rw.w = httputil.NewChunkedWriter(rw.w)
-	}
+	rw.hdr.Write(rw.ow)
+	rw.ow.Write([]byte("\r\n"))
 }
 
 // Close closes the underlying writer if it is also an io.Closer.
 func (rw *responseWriter) Close() error {
-	var err error
+	if err := rw.cw.Close(); err != nil {
+		return err
+	}
 
-	wc, ok := rw.w.(io.Closer)
-	if ok {
-		err = wc.Close()
-		// Write additional CRLF to signal empty trailers.
+	if rw.chunked {
 		rw.ow.Write([]byte("\r\n"))
 	}
 
-	return err
+	return nil
 }
