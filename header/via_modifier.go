@@ -15,21 +15,28 @@
 package header
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/martian"
 )
 
-// NewViaModifier sets the Via header.
-//
-// If Via is already present, via is appended to the existing value.
+// NewViaModifier sets the Via header and provides loop-detection. If Via is
+// already present, via is appended to the existing value.
 //
 // http://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-9.9
-func NewViaModifier(via string) martian.RequestModifier {
+func NewViaModifier(requestedBy string) martian.RequestModifier {
 	return martian.RequestModifierFunc(
 		func(req *http.Request) error {
+			via := fmt.Sprintf("%d.%d %s", req.ProtoMajor, req.ProtoMinor, requestedBy)
+
 			if v := req.Header.Get("Via"); v != "" {
-				via = v + ", " + via
+				if strings.Contains(v, requestedBy) {
+					return fmt.Errorf("via: detected request loop, header contains %s", requestedBy)
+				}
+
+				via = fmt.Sprintf("%s, %s", v, via)
 			}
 
 			req.Header.Set("Via", via)

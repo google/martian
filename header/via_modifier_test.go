@@ -20,7 +20,7 @@ import (
 )
 
 func TestViaModifier(t *testing.T) {
-	m := NewViaModifier("1.1 martian")
+	m := NewViaModifier("martian")
 	req, err := http.NewRequest("GET", "/", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -39,5 +39,10 @@ func TestViaModifier(t *testing.T) {
 	}
 	if got, want := req.Header.Get("Via"), "1.0 alpha, 1.1 martian"; got != want {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", "Via", got, want)
+	}
+
+	req.Header.Set("Via", "1.0 alpha, 1.1 martian, 1.1 beta")
+	if err := m.ModifyRequest(req); err == nil {
+		t.Fatal("ModifyRequest(): got nil, want request loop error")
 	}
 }
