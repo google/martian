@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/google/martian"
-	"github.com/google/martian/session"
 )
 
 const viaLoopKey = "via.LoopDetection"
@@ -69,25 +68,12 @@ func (m *viaModifier) ModifyRequest(req *http.Request) error {
 func (m *viaModifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.Context(res.Request)
 
-	err := loopError(ctx)
-	if err != nil {
+	if err, _ := ctx.Get(viaLoopKey); err != nil {
 		res.StatusCode = 400
 		res.Status = http.StatusText(400)
+
+		return err.(error)
 	}
 
-	return err
-}
-
-func loopError(ctx *session.Context) error {
-	cerr, ok := ctx.Get(viaLoopKey)
-	if !ok {
-		return nil
-	}
-
-	err, ok := cerr.(error)
-	if !ok {
-		return nil
-	}
-
-	return err
+	return nil
 }
