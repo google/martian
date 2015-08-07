@@ -250,17 +250,20 @@ func main() {
 
 	fg := fifo.NewGroup()
 
-	hbhmod := header.NewHopByHopModifier()
-	fg.AddRequestModifier(hbhmod)
+	hbhm := header.NewHopByHopModifier()
+	fg.AddRequestModifier(hbhm)
 	fg.AddRequestModifier(header.NewForwardedModifier())
 	fg.AddRequestModifier(header.NewBadFramingModifier())
-	fg.AddRequestModifier(header.NewViaModifier("martian 1.1"))
+
+	vm := header.NewViaModifier("martian")
+	fg.AddRequestModifier(vm)
 
 	m := martianhttp.NewModifier()
 	fg.AddRequestModifier(m)
 	fg.AddResponseModifier(m)
 
-	fg.AddResponseModifier(hbhmod)
+	fg.AddResponseModifier(hbhm)
+	fg.AddResponseModifier(vm)
 
 	p.SetRequestModifier(fg)
 	p.SetResponseModifier(fg)
