@@ -29,9 +29,7 @@ type viaModifier struct {
 	requestedBy string
 }
 
-// NewViaModifier sets the Via header and provides loop-detection. If Via is
-// already present, via is appended to the existing value.
-//
+// NewViaModifier returns a new Via modifier.
 func NewViaModifier(requestedBy string) martian.RequestResponseModifier {
 	return &viaModifier{
 		requestedBy: requestedBy,
