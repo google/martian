@@ -20,27 +20,76 @@ import (
 	"strings"
 
 	"github.com/google/martian"
+	"github.com/google/martian/session"
 )
+
+const viaLoopKey = "via.LoopDetection"
+
+type viaModifier struct {
+	requestedBy string
+}
 
 // NewViaModifier sets the Via header and provides loop-detection. If Via is
 // already present, via is appended to the existing value.
 //
+func NewViaModifier(requestedBy string) martian.RequestResponseModifier {
+	return &viaModifier{
+		requestedBy: requestedBy,
+	}
+}
+
+// ModifyRequest sets the Via header and provides loop-detection. If Via is
+// already present, it will be appended to the existing value. If a loop is
+// detected an error is added to the context and the request round trip is
+// skipped.
+//
 // http://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-9.9
-func NewViaModifier(requestedBy string) martian.RequestModifier {
-	return martian.RequestModifierFunc(
-		func(req *http.Request) error {
-			via := fmt.Sprintf("%d.%d %s", req.ProtoMajor, req.ProtoMinor, requestedBy)
+func (m *viaModifier) ModifyRequest(req *http.Request) error {
+	via := fmt.Sprintf("%d.%d %s", req.ProtoMajor, req.ProtoMinor, m.requestedBy)
 
-			if v := req.Header.Get("Via"); v != "" {
-				if strings.Contains(v, requestedBy) {
-					return fmt.Errorf("via: detected request loop, header contains %s", requestedBy)
-				}
+	if v := req.Header.Get("Via"); v != "" {
+		if strings.Contains(v, m.requestedBy) {
+			err := fmt.Errorf("via: detected request loop, header contains %s", m.requestedBy)
 
-				via = fmt.Sprintf("%s, %s", v, via)
-			}
+			ctx := martian.Context(req)
+			ctx.Set(viaLoopKey, err)
+			ctx.SkipRoundTrip()
 
-			req.Header.Set("Via", via)
+			return err
+		}
 
-			return nil
-		})
+		via = fmt.Sprintf("%s, %s", v, via)
+	}
+
+	req.Header.Set("Via", via)
+
+	return nil
+}
+
+// ModifyResponse sets the status code to 400 Bad Request if a loop was
+// detected in the request.
+func (m *viaModifier) ModifyResponse(res *http.Response) error {
+	ctx := martian.Context(res.Request)
+
+	err := loopError(ctx)
+	if err != nil {
+		res.StatusCode = 400
+		res.Status = http.StatusText(400)
+	}
+
+	return err
+}
+
+func loopError(ctx *session.Context) error {
+	cerr, ok := ctx.Get(viaLoopKey)
+	if !ok {
+		return nil
+	}
+
+	err, ok := cerr.(error)
+	if !ok {
+		return nil
+	}
+
+	return err
 }
