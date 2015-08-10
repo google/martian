@@ -238,8 +238,10 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	if h, pattern := p.mux.Handler(req); pattern != "" {
 		defer brw.Flush()
 
+		closing := req.Close || p.Closing()
+
 		Infof("martian: received proxy specific request: %s", req.URL)
-		rw := newResponseWriter(brw)
+		rw := newResponseWriter(brw, closing)
 		defer rw.Close()
 
 		h.ServeHTTP(rw, req)
@@ -248,7 +250,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		// required to call WriteHeader/Write.
 		rw.WriteHeader(200)
 
-		if req.Close {
+		if closing {
 			return errClose
 		}
 

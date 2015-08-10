@@ -26,7 +26,7 @@ import (
 func TestResponseWriter(t *testing.T) {
 	buf := &bytes.Buffer{}
 
-	rw := newResponseWriter(buf)
+	rw := newResponseWriter(buf, true)
 	rw.Header().Set("Martian-Response", "true")
 	rw.Header().Set("Content-Length", "12")
 
@@ -48,6 +48,9 @@ func TestResponseWriter(t *testing.T) {
 	if got, want := res.StatusCode, 200; got != want {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
+	if !res.Close {
+		t.Error("res.Close: got false, want true")
+	}
 	if got, want := res.ContentLength, int64(12); got != want {
 		t.Errorf("res.ContentLength: got %d, want %d", got, want)
 	}
@@ -68,7 +71,7 @@ func TestResponseWriter(t *testing.T) {
 func TestResponseWriterChunkedEncoding(t *testing.T) {
 	buf := &bytes.Buffer{}
 
-	rw := newResponseWriter(buf)
+	rw := newResponseWriter(buf, true)
 	rw.Header().Set("Martian-Response", "true")
 
 	rw.Write([]byte("test "))
@@ -83,6 +86,9 @@ func TestResponseWriterChunkedEncoding(t *testing.T) {
 
 	if got, want := res.StatusCode, 200; got != want {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
+	}
+	if !res.Close {
+		t.Error("res.Close: got false, want true")
 	}
 	if got, want := res.TransferEncoding, []string{"chunked"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("res.TransferEncoding: got %v, want %v", got, want)

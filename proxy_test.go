@@ -248,9 +248,11 @@ func TestIntegrationServeMux(t *testing.T) {
 	}
 
 	if got, want := res.StatusCode, 200; got != want {
-		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
+		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
-
+	if !res.Close {
+		t.Error("res.Close: got false, want true")
+	}
 	if got, want := res.Header.Get("Request-ID"), "1"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Request-ID", got, want)
 	}

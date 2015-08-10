@@ -32,6 +32,7 @@ type responseWriter struct {
 	hdr         http.Header
 	chunked     bool
 	wroteHeader bool
+	closing     bool
 }
 
 type writeCloser interface {
@@ -48,16 +49,17 @@ func (wc *nopWriteCloser) Close() error {
 }
 
 // newResponseWriter returns a new http.ResponseWriter.
-func newResponseWriter(w io.Writer) *responseWriter {
+func newResponseWriter(w io.Writer, closing bool) *responseWriter {
 	wc, ok := w.(writeCloser)
 	if !ok {
 		wc = &nopWriteCloser{w}
 	}
 
 	return &responseWriter{
-		ow:  wc,
-		cw:  wc,
-		hdr: http.Header{},
+		ow:      wc,
+		cw:      wc,
+		hdr:     http.Header{},
+		closing: closing,
 	}
 }
 
@@ -84,6 +86,10 @@ func (rw *responseWriter) WriteHeader(status int) {
 	rw.wroteHeader = true
 
 	fmt.Fprintf(rw.ow, "HTTP/1.1 %d %s\r\n", status, http.StatusText(status))
+
+	if rw.closing {
+		rw.hdr.Set("Connection", "close")
+	}
 
 	if rw.hdr.Get("Content-Length") == "" {
 		rw.hdr.Set("Transfer-Encoding", "chunked")
