@@ -411,10 +411,11 @@ func TestIntegrationConnect(t *testing.T) {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
 
-	tl, err := tls.Listen("tcp", "[::1]:0", mc.TLS())
+	tl, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("tls.Listen(): got %v, want no error", err)
 	}
+	tl = tls.NewListener(tl, mc.TLS())
 
 	go http.Serve(tl, http.HandlerFunc(
 		func(rw http.ResponseWriter, req *http.Request) {
@@ -803,10 +804,14 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 
 	// Start TLS listener with config that will generate certificates based on
 	// SNI from connection.
-	l, err := tls.Listen("tcp", "[::1]:0", mc.TLS())
+	//
+	// BUG: tls.Listen will not accept a tls.Config where Certificates is empty,
+	// even though it is supported by tls.Server when GetCertificate is not nil.
+	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
+	l = tls.NewListener(l, mc.TLS())
 
 	p := NewProxy()
 	defer p.Close()

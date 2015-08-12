@@ -43,12 +43,6 @@ func TestMITM(t *testing.T) {
 	if got := conf.NextProtos; !reflect.DeepEqual(got, protos) {
 		t.Errorf("conf.NextProtos: got %v, want %v", got, protos)
 	}
-	if got, want := len(conf.Certificates), 1; got != want {
-		t.Fatalf("len(conf.Certificates): got %d, want %d", got, want)
-	}
-	if !conf.Certificates[0].Leaf.IsCA {
-		t.Error("conf.Certificates[0].Leaf.IsCA: got false, want true")
-	}
 
 	// Simulate a TLS connection without SNI.
 	clientHello := &tls.ClientHelloInfo{
@@ -75,12 +69,6 @@ func TestMITM(t *testing.T) {
 	conf = c.TLSForHost("example.com")
 	if got := conf.NextProtos; !reflect.DeepEqual(got, protos) {
 		t.Errorf("conf.NextProtos: got %v, want %v", got, protos)
-	}
-	if got, want := len(conf.Certificates), 1; got != want {
-		t.Fatalf("len(conf.Certificates): got %d, want %d", got, want)
-	}
-	if !conf.Certificates[0].Leaf.IsCA {
-		t.Error("conf.Certificates[0].Leaf.IsCA: got false, want true")
 	}
 
 	// Set SNI, takes precendence over host.
@@ -119,7 +107,7 @@ func TestCert(t *testing.T) {
 		t.Fatalf("NewConfig(): got %v, want no error", err)
 	}
 
-	tlsc, err := c.cert("example.com:8080")
+	tlsc, err := c.cert("example.com")
 	if err != nil {
 		t.Fatalf("c.cert(%q): got %v, want no error", "example.com:8080", err)
 	}
@@ -142,6 +130,10 @@ func TestCert(t *testing.T) {
 	if got, want := x509c.Subject.CommonName, "example.com"; got != want {
 		t.Errorf("X509c.Subject.CommonName: got %q, want %q", got, want)
 	}
+	if err := x509c.VerifyHostname("example.com"); err != nil {
+		t.Errorf("x509c.VerifyHostname(%q): got %v, want no error", "example.com", err)
+	}
+
 	if got, want := x509c.Subject.Organization, []string{"Martian Proxy"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("x509c.Subject.Organization: got %v, want %v", got, want)
 	}
