@@ -162,13 +162,6 @@ func (c *Config) SetOrganization(org string) {
 // the SNI extension in the TLS ClientHello.
 func (c *Config) TLS() *tls.Config {
 	return &tls.Config{
-		Certificates: []tls.Certificate{
-			{
-				Certificate: [][]byte{c.ca.Raw},
-				PrivateKey:  c.capriv,
-				Leaf:        c.ca,
-			},
-		},
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			if clientHello.ServerName == "" {
 				return nil, errors.New("mitm: SNI not provided, failed to build certificate")
@@ -184,19 +177,13 @@ func (c *Config) TLS() *tls.Config {
 // using SNI from the connection, or fall back to the provided hostname.
 func (c *Config) TLSForHost(hostname string) *tls.Config {
 	return &tls.Config{
-		Certificates: []tls.Certificate{
-			{
-				Certificate: [][]byte{c.ca.Raw},
-				PrivateKey:  c.capriv,
-				Leaf:        c.ca,
-			},
-		},
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			if clientHello.ServerName == "" {
-				return c.cert(hostname)
+			host := clientHello.ServerName
+			if host == "" {
+				host = hostname
 			}
 
-			return c.cert(clientHello.ServerName)
+			return c.cert(host)
 		},
 		NextProtos: []string{"http/1.1"},
 	}
@@ -267,7 +254,7 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 	}
 
 	tlsc = &tls.Certificate{
-		Certificate: [][]byte{raw},
+		Certificate: [][]byte{raw, c.ca.Raw},
 		PrivateKey:  c.priv,
 		Leaf:        x509c,
 	}
