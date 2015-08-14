@@ -14,6 +14,10 @@ Martian is a great tool to use if you want to:
 By taking advantage of Go cross-compilation, Martian can be deployed
 anywhere that Go can target.
 
+## Requirements
+
+Go 1.5 (for changes in crypto/tls)
+
 ## Getting Started
 
 ### Start the Proxy
@@ -247,9 +251,12 @@ There are 2 mandatory parts of a modifier:
 Any Go struct that implements those interfaces can act as a `modifier`.
 
 ## Contact
+For questions and comments on how to use Martian, features announcements, or
+design discussions check out our public Google Group at
+https://groups.google.com/forum/#!forum/martianproxy-users.
 
-Google Group (General and Dev): https://groups.google.com/forum/#!forum/martianproxy
-
+For security related issues please send a detailed report to our private core
+group at martianproxy-core@googlegroups.com.
 
 ## Disclaimer
 This is not an official Google product (experimental or otherwise), it is just
