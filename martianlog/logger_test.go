@@ -15,6 +15,8 @@
 package martianlog
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,20 +28,24 @@ import (
 
 func ExampleLogger() {
 	l := NewLogger()
-	l.IncludeBody(true)
 	l.SetLogFunc(func(line string) {
 		// Remove \r to make it easier to test with examples.
 		fmt.Print(strings.Replace(line, "\r", "", -1))
 	})
+	l.SetDecode(true)
 
-	req, err := http.NewRequest("GET", "http://example.com/path?querystring", strings.NewReader("request content"))
+	buf := new(bytes.Buffer)
+	gw := gzip.NewWriter(buf)
+	gw.Write([]byte("request content"))
+	gw.Close()
+
+	req, err := http.NewRequest("GET", "http://example.com/path?querystring", buf)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	req.RequestURI = req.URL.RequestURI()
-	req.Header.Set("Other-Header", "values")
-	req.Close = true
+	req.TransferEncoding = []string{"chunked"}
+	req.Header.Set("Content-Encoding", "gzip")
 
 	if err := l.ModifyRequest(req); err != nil {
 		fmt.Println(err)
@@ -59,12 +65,13 @@ func ExampleLogger() {
 	// --------------------------------------------------------------------------------
 	// Request to http://example.com/path?querystring
 	// --------------------------------------------------------------------------------
-	// GET /path?querystring HTTP/1.1
+	// GET http://example.com/path?querystring HTTP/1.1
 	// Host: example.com
-	// Connection: close
-	// Other-Header: values
+	// Transfer-Encoding: chunked
+	// Content-Encoding: gzip
 	//
 	// request content
+	//
 	// --------------------------------------------------------------------------------
 	//
 	// --------------------------------------------------------------------------------
@@ -83,7 +90,8 @@ func TestLoggerFromJSON(t *testing.T) {
 	msg := []byte(`{
 		"log.Logger": {
 			"scope": ["request", "response"],
-			"includeBody": true
+			"headersOnly": true,
+			"decode": true
 		}
 	}`)
 
@@ -104,7 +112,17 @@ func TestLoggerFromJSON(t *testing.T) {
 	if resmod == nil {
 		t.Fatal("r.ResponseModifier(): got nil, want not nil")
 	}
-	if _, ok := resmod.(*Logger); !ok {
+
+	l, ok := resmod.(*Logger)
+	if !ok {
 		t.Error("resmod.(*Logger); got !ok, want ok")
+	}
+
+	if !l.conf.HeadersOnly {
+		t.Error("l.conf.HeadersOnly: got false, want true")
+	}
+
+	if !l.conf.Decode {
+		t.Error("l.conf.Decode: got false, want true")
 	}
 }
