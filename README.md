@@ -14,6 +14,10 @@ Martian is a great tool to use if you want to:
 By taking advantage of Go cross-compilation, Martian can be deployed
 anywhere that Go can target.
 
+## Requirements
+
+Go 1.5 (for changes in crypto/tls)
+
 ## Getting Started
 
 ### Start the Proxy
