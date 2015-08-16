@@ -185,7 +185,7 @@ import (
 
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
-	_ "github.com/google/martian/log"
+	_ "github.com/google/martian/martianlog"
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"

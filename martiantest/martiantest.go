@@ -21,7 +21,8 @@ import (
 	"sync/atomic"
 )
 
-// Modifier keeps track of the number of requests and responses it has modified and can be configured to return errors or run custom functions.
+// Modifier keeps track of the number of requests and responses it has modified
+// and can be configured to return errors or run custom functions.
 type Modifier struct {
 	reqcount int32 // atomic
 	rescount int32 // atomic

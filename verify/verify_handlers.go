@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/martian"
+	"github.com/google/martian/log"
 )
 
 // Handler is an http.Handler that returns the request and response
@@ -73,7 +73,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != "GET" {
 		rw.Header().Set("Allow", "GET")
 		rw.WriteHeader(405)
-		martian.Errorf("Method: %v not allowed for URL: %v. Use GET.", req.Method, req.URL)
+		log.Errorf("verify: invalid request method: %s", req.Method)
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *ResetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != "POST" {
 		rw.Header().Set("Allow", "POST")
 		rw.WriteHeader(405)
-		martian.Errorf("Method: %v not allowed for URL: %v. Use GET.", req.Method, req.URL)
+		log.Errorf("verify: invalid request method: %s", req.Method)
 		return
 	}
 

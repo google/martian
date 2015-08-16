@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package log provides a Martian modifier that logs the request and response.
-package log
+// Package martianlog provides a Martian modifier that logs the request and response.
+package martianlog
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ import (
 	"net/http/httputil"
 	"strings"
 
-	"github.com/google/martian"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
 
@@ -47,7 +47,7 @@ func init() {
 func NewLogger() *Logger {
 	return &Logger{
 		log: func(line string) {
-			martian.Infof(line)
+			log.Infof(line)
 		},
 	}
 }
