@@ -262,6 +262,10 @@ func main() {
 	fg.AddRequestModifier(m)
 	fg.AddResponseModifier(m)
 
+	lm := martianlua.NewModifer()
+	fg.AddRequestModifier(lm)
+	fg.AddResponseModifier(lm)
+
 	fg.AddResponseModifier(hbhm)
 	fg.AddResponseModifier(vm)
 
@@ -286,6 +290,9 @@ func main() {
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
 	configure("/verify/reset", rh)
+
+	// Custom modifier behavior via Lua API.
+	configure("/script", martianlua.NewHandler(m))
 
 	l, err := net.Listen("tcp", *addr)
 	if err != nil {
