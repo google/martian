@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
 
@@ -47,7 +48,7 @@ type modifierJSON struct {
 // ModifyRequest adds cookie to the request.
 func (m *modifier) ModifyRequest(req *http.Request) error {
 	req.AddCookie(m.cookie)
-	martian.Infof("%s: add cookie: %s", req.URL, m.cookie)
+	log.Debugf("cookie: %s: append request cookie: %s", req.URL, m.cookie)
 
 	return nil
 }
@@ -55,7 +56,7 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 // ModifyResponse sets cookie on the response.
 func (m *modifier) ModifyResponse(res *http.Response) error {
 	res.Header.Add("Set-Cookie", m.cookie.String())
-	martian.Infof("%s: add cookie: %s", res.Request.URL, m.cookie)
+	log.Debugf("cookie: %s: append response cookie: %s", res.Request.URL, m.cookie)
 
 	return nil
 }

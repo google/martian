@@ -26,11 +26,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
-	"log"
 	"math/big"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/google/martian/log"
 )
 
 // MaxSerialNumber is the upper boundary that is used to create unique serial
@@ -201,7 +202,7 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 	c.certmu.RUnlock()
 
 	if ok {
-		log.Printf("mitm: cache hit for %s\n", hostname)
+		log.Debugf("mitm: cache hit for %s", hostname)
 
 		// Check validity of the certificate for hostname match, expiry, etc. In
 		// particular, if the cached certificate has expired, create a new one.
@@ -212,10 +213,10 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 			return tlsc, nil
 		}
 
-		log.Printf("mitm: invalid certificate in cache for %s\n", hostname)
+		log.Debugf("mitm: invalid certificate in cache for %s", hostname)
 	}
 
-	log.Printf("mitm: cache miss for %s\n", hostname)
+	log.Debugf("mitm: cache miss for %s", hostname)
 
 	serial, err := rand.Int(rand.Reader, MaxSerialNumber)
 	if err != nil {

@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -141,7 +142,7 @@ func (m *Modifier) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), 500)
-		martian.Errorf("error reading request body: %v", err)
+		log.Errorf("error reading request body: %v", err)
 		return
 	}
 	req.Body.Close()
@@ -149,7 +150,7 @@ func (m *Modifier) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	r, err := parse.FromJSON(body)
 	if err != nil {
 		http.Error(rw, err.Error(), 400)
-		martian.Errorf("error parsing JSON: %v", err)
+		log.Errorf("error parsing JSON: %v", err)
 		return
 	}
 

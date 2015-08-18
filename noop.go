@@ -14,7 +14,11 @@
 
 package martian
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/google/martian/log"
+)
 
 type noopModifier struct {
 	id string
@@ -29,12 +33,12 @@ func Noop(id string) RequestResponseModifier {
 
 // ModifyRequest logs a debug line.
 func (nm *noopModifier) ModifyRequest(*http.Request) error {
-	Debugf("%s: no request modifier configured", nm.id)
+	log.Debugf("%s: no request modifier configured", nm.id)
 	return nil
 }
 
 // ModifyResponse logs a debug line.
 func (nm *noopModifier) ModifyResponse(*http.Response) error {
-	Debugf("%s: no response modifier configured", nm.id)
+	log.Debugf("%s: no response modifier configured", nm.id)
 	return nil
 }

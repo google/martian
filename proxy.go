@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/martian/log"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/session"
@@ -132,7 +133,7 @@ func (p *Proxy) SetMux(mux *http.ServeMux) {
 // Close sets the proxying to the closing state and waits for all connections
 // to resolve.
 func (p *Proxy) Close() {
-	Infof("martian: closing down proxy")
+	log.Infof("martian: closing down proxy")
 
 	atomic.StoreInt32(&p.closing, 1)
 	p.conns.Wait()
@@ -183,16 +184,16 @@ func (p *Proxy) Serve(l net.Listener) error {
 					delay = max
 				}
 
-				Debugf("martian: temporary error on accept: %v", err)
+				log.Debugf("martian: temporary error on accept: %v", err)
 				time.Sleep(delay)
 				continue
 			}
 
-			Errorf("martian: failed to accept: %v", err)
+			log.Errorf("martian: failed to accept: %v", err)
 			return err
 		}
 		delay = 0
-		Debugf("martian: accepted connection from %s", conn.RemoteAddr())
+		log.Debugf("martian: accepted connection from %s", conn.RemoteAddr())
 
 		if tconn, ok := conn.(*net.TCPConn); ok {
 			tconn.SetKeepAlive(true)
@@ -216,18 +217,18 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 		conn.SetDeadline(deadline)
 
 		if err := p.handle(ctx, conn, brw); isCloseable(err) {
-			Infof("martian: closing connection: %v", conn.RemoteAddr())
+			log.Infof("martian: closing connection: %v", conn.RemoteAddr())
 			return
 		}
 	}
 }
 
 func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWriter) error {
-	Debugf("martian: waiting for request: %v", conn.RemoteAddr())
+	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 
 	req, err := http.ReadRequest(brw.Reader)
 	if err != nil {
-		Errorf("martian: failed to read request: %v", err)
+		log.Errorf("martian: failed to read request: %v", err)
 
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
 
@@ -240,7 +241,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 		closing := req.Close || p.Closing()
 
-		Infof("martian: received proxy specific request: %s", req.URL)
+		log.Infof("martian: received proxy specific request: %s", req.URL)
 		rw := newResponseWriter(brw, closing)
 		defer rw.Close()
 
@@ -270,7 +271,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 	req.URL.Scheme = "http"
 	if ctx.GetSession().IsSecure() {
-		Debugf("martian: forcing HTTPS inside secure session")
+		log.Debugf("martian: forcing HTTPS inside secure session")
 		req.URL.Scheme = "https"
 	}
 
@@ -279,27 +280,27 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		req.URL.Host = req.Host
 	}
 
-	Debugf("martian: received request: %s", req.URL)
+	log.Debugf("martian: received request: %s", req.URL)
 
 	if req.Method == "CONNECT" {
 		if err := p.reqmod.ModifyRequest(req); err != nil {
-			Errorf("martian: error modifying CONNECT request: %v", err)
+			log.Errorf("martian: error modifying CONNECT request: %v", err)
 			proxyutil.Warning(req.Header, err)
 		}
 
 		if p.mitm != nil {
-			Debugf("martian: attempting MITM for connection: %s", req.Host)
+			log.Debugf("martian: attempting MITM for connection: %s", req.Host)
 			res := proxyutil.NewResponse(200, nil, req)
 
 			if err := p.resmod.ModifyResponse(res); err != nil {
-				Errorf("martian: error modifying CONNECT response: %v", err)
+				log.Errorf("martian: error modifying CONNECT response: %v", err)
 				proxyutil.Warning(res.Header, err)
 			}
 
 			res.Write(brw)
 			brw.Flush()
 
-			Debugf("martian: completed MITM for connection: %s", req.Host)
+			log.Debugf("martian: completed MITM for connection: %s", req.Host)
 
 			tlsconn := tls.Server(conn, p.mitm.TLSForHost(req.Host))
 			brw.Writer.Reset(tlsconn)
@@ -308,15 +309,15 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 			return p.handle(ctx, tlsconn, brw)
 		}
 
-		Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
+		log.Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
 		res, cconn, cerr := p.connect(req)
 		if cerr != nil {
-			Errorf("martian: failed to CONNECT: %v", err)
+			log.Errorf("martian: failed to CONNECT: %v", err)
 			res = proxyutil.NewResponse(502, nil, req)
 			proxyutil.Warning(res.Header, cerr)
 
 			if err := p.resmod.ModifyResponse(res); err != nil {
-				Errorf("martian: error modifying CONNECT response: %v", err)
+				log.Errorf("martian: error modifying CONNECT response: %v", err)
 				proxyutil.Warning(res.Header, err)
 			}
 
@@ -327,7 +328,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		defer cconn.Close()
 
 		if err := p.resmod.ModifyResponse(res); err != nil {
-			Errorf("martian: error modifying CONNECT response: %v", err)
+			log.Errorf("martian: error modifying CONNECT response: %v", err)
 			proxyutil.Warning(res.Header, err)
 		}
 
@@ -347,40 +348,40 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		go copySync(cbw, brw, donec)
 		go copySync(brw, cbr, donec)
 
-		Debugf("martian: established CONNECT tunnel, proxying traffic")
+		log.Debugf("martian: established CONNECT tunnel, proxying traffic")
 		<-donec
 		<-donec
-		Debugf("martian: closed CONNECT tunnel")
+		log.Debugf("martian: closed CONNECT tunnel")
 
 		return errClose
 	}
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
-		Errorf("martian: error modifying request: %v", err)
+		log.Errorf("martian: error modifying request: %v", err)
 		proxyutil.Warning(req.Header, err)
 	}
 
 	res, err := p.roundTrip(ctx, req)
 	if err != nil {
-		Errorf("martian: failed to round trip: %v", err)
+		log.Errorf("martian: failed to round trip: %v", err)
 		res = proxyutil.NewResponse(502, nil, req)
 		proxyutil.Warning(res.Header, err)
 	}
 	defer res.Body.Close()
 
 	if err := p.resmod.ModifyResponse(res); err != nil {
-		Errorf("martian: error modifying response: %v", err)
+		log.Errorf("martian: error modifying response: %v", err)
 		proxyutil.Warning(res.Header, err)
 	}
 
 	var closing error
 	if req.Close || p.Closing() {
-		Debugf("martian: received close request: %v", req.RemoteAddr)
+		log.Debugf("martian: received close request: %v", req.RemoteAddr)
 		res.Header.Add("Connection", "close")
 		closing = errClose
 	}
 
-	Debugf("martian: sent response: %v", req.URL)
+	log.Debugf("martian: sent response: %v", req.URL)
 	res.Write(brw)
 	brw.Flush()
 
@@ -389,7 +390,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 func (p *Proxy) roundTrip(ctx *session.Context, req *http.Request) (*http.Response, error) {
 	if ctx.SkippingRoundTrip() {
-		Debugf("martian: skipping round trip")
+		log.Debugf("martian: skipping round trip")
 		return proxyutil.NewResponse(200, nil, req), nil
 	}
 
@@ -402,7 +403,7 @@ func (p *Proxy) roundTrip(ctx *session.Context, req *http.Request) (*http.Respon
 
 func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	if p.proxyURL != nil {
-		Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
+		log.Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
 
 		conn, err := net.Dial("tcp", p.proxyURL.Host)
 		if err != nil {

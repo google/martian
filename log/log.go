@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package martian
+// Package log provides a universal logger for martian packages.
+package log
 
 import (
 	"fmt"
 	"log"
 )
 
-// Infof logs an info message with caller information.
+// Infof logs an info message.
 func Infof(format string, args ...interface{}) {
 	msg := fmt.Sprintf("INFO: %s", format)
 	if len(args) > 0 {
@@ -29,7 +30,7 @@ func Infof(format string, args ...interface{}) {
 	log.Println(msg)
 }
 
-// Debugf logs a debug message with caller information.
+// Debugf logs a debug message.
 func Debugf(format string, args ...interface{}) {
 	msg := fmt.Sprintf("DEBUG: %s", format)
 	if len(args) > 0 {
@@ -39,7 +40,7 @@ func Debugf(format string, args ...interface{}) {
 	log.Println(msg)
 }
 
-// Errorf logs an error message with caller information.
+// Errorf logs an error message.
 func Errorf(format string, args ...interface{}) {
 	msg := fmt.Sprintf("ERROR: %s", format)
 	if len(args) > 0 {
