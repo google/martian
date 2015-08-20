@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/martian/log"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/proxyutil"
@@ -198,6 +200,118 @@ func TestIntegrationHTTP(t *testing.T) {
 
 	if got, want := res.Header.Get("Martian-Test"), "true"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Martian-Test", got, want)
+	}
+}
+
+func TestIntegrationHTTP100Continue(t *testing.T) {
+	t.Parallel()
+
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	p := NewProxy()
+	defer p.Close()
+
+	p.SetTimeout(2 * time.Second)
+
+	sl, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	go func() {
+		conn, err := sl.Accept()
+		if err != nil {
+			log.Errorf("proxy_test: failed to accept connection: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		log.Infof("proxy_test: accepted connection: %s", conn.RemoteAddr())
+
+		req, err := http.ReadRequest(bufio.NewReader(conn))
+		if err != nil {
+			log.Errorf("proxy_test: failed to read request: %v", err)
+			return
+		}
+
+		if req.Header.Get("Expect") == "100-continue" {
+			log.Infof("proxy_test: received 100-continue request")
+
+			conn.Write([]byte("HTTP/1.1 100 Continue\r\n\r\n"))
+
+			log.Infof("proxy_test: sent 100-continue response")
+		} else {
+			log.Infof("proxy_test: received non 100-continue request")
+
+			res := proxyutil.NewResponse(417, nil, req)
+			res.Header.Set("Connection", "close")
+			res.Write(conn)
+			return
+		}
+
+		res := proxyutil.NewResponse(200, req.Body, req)
+		res.Header.Set("Connection", "close")
+		res.Write(conn)
+
+		log.Infof("proxy_test: sent 200 response")
+	}()
+
+	tm := martiantest.NewModifier()
+	p.SetRequestModifier(tm)
+	p.SetResponseModifier(tm)
+
+	go p.Serve(l)
+
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatalf("net.Dial(): got %v, want no error", err)
+	}
+	defer conn.Close()
+
+	host := sl.Addr().String()
+	raw := fmt.Sprintf("POST http://%s/ HTTP/1.1\r\n"+
+		"Host: %s\r\n"+
+		"Content-Length: 12\r\n"+
+		"Expect: 100-continue\r\n\r\n", host, host)
+
+	if _, err := conn.Write([]byte(raw)); err != nil {
+		t.Fatalf("conn.Write(headers): got %v, want no error", err)
+	}
+
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			conn.Write([]byte("body content"))
+		}
+	}()
+
+	res, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+	defer res.Body.Close()
+
+	if got, want := res.StatusCode, 200; got != want {
+		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
+	}
+
+	got, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
+	}
+
+	if want := []byte("body content"); !bytes.Equal(got, want) {
+		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+
+	if !tm.RequestModified() {
+		t.Error("tm.RequestModified(): got false, want true")
+	}
+	if !tm.ResponseModified() {
+		t.Error("tm.ResponseModified(): got false, want true")
 	}
 }
 
