@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package proxyutil
+// Package messageview provides no-op snapshots for HTTP requests and
+// responses.
+package messageview
 
 import (
 	"bytes"
@@ -28,32 +30,43 @@ import (
 
 // MessageView is a static view of an HTTP request or response.
 type MessageView struct {
-	conf          *ViewConfig
 	message       []byte
 	chunked       bool
+	skipBody      bool
 	compress      string
 	bodyoffset    int64
 	traileroffset int64
 }
 
-// ViewConfig configures the functionality of a MessageView.
-type ViewConfig struct {
-	HeadersOnly bool
-	Decode      bool
+type config struct {
+	decode bool
 }
 
-// RequestView returns a new MessageView for req. If conf.HeadersOnly is false
+// Option is a configuration option for a MessageView.
+type Option func(*config)
+
+// Decode sets an option to decode the message body for logging purposes.
+func Decode() Option {
+	return func(c *config) {
+		c.decode = true
+	}
+}
+
+// New returns a new MessageView.
+func New() *MessageView {
+	return &MessageView{}
+}
+
+// SkipBody will skip reading the body when the view is loaded with a request
+// or response.
+func (mv *MessageView) SkipBody(skipBody bool) {
+	mv.skipBody = skipBody
+}
+
+// SnapshotRequest reads the request into the MessageView. If mv.skipBody is false
 // it will also read the body into memory and replace the existing body with
 // the in-memory copy. This method is semantically a no-op.
-func RequestView(req *http.Request, conf *ViewConfig) (*MessageView, error) {
-	if conf == nil {
-		conf = &ViewConfig{}
-	}
-
-	mv := &MessageView{
-		conf: conf,
-	}
-
+func (mv *MessageView) SnapshotRequest(req *http.Request) error {
 	buf := new(bytes.Buffer)
 
 	fmt.Fprintf(buf, "%s %s HTTP/%d.%d\r\n", req.Method,
@@ -84,15 +97,14 @@ func RequestView(req *http.Request, conf *ViewConfig) (*MessageView, error) {
 	mv.bodyoffset = int64(buf.Len())
 	mv.traileroffset = int64(buf.Len())
 
-	if mv.conf.HeadersOnly {
+	if mv.skipBody {
 		mv.message = buf.Bytes()
-
-		return mv, nil
+		return nil
 	}
 
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Body.Close()
 
@@ -116,21 +128,13 @@ func RequestView(req *http.Request, conf *ViewConfig) (*MessageView, error) {
 
 	mv.message = buf.Bytes()
 
-	return mv, nil
+	return nil
 }
 
-// ResponseView returns a new MessageView for res. If conf.HeadersOnly is false
-// it will also read the body into memory and replace the existing body with
-// the in-memory copy. This method is semantically a no-op.
-func ResponseView(res *http.Response, conf *ViewConfig) (*MessageView, error) {
-	if conf == nil {
-		conf = &ViewConfig{}
-	}
-
-	mv := &MessageView{
-		conf: conf,
-	}
-
+// SnapshotResponse reads the response into the MessageView. If mv.headersOnly
+// is false it will also read the body into memory and replace the existing
+// body with the in-memory copy. This method is semantically a no-op.
+func (mv *MessageView) SnapshotResponse(res *http.Response) error {
 	buf := new(bytes.Buffer)
 
 	fmt.Fprintf(buf, "HTTP/%d.%d %s\r\n", res.ProtoMajor, res.ProtoMinor, res.Status)
@@ -155,15 +159,14 @@ func ResponseView(res *http.Response, conf *ViewConfig) (*MessageView, error) {
 	mv.bodyoffset = int64(buf.Len())
 	mv.traileroffset = int64(buf.Len())
 
-	if mv.conf.HeadersOnly {
+	if mv.skipBody {
 		mv.message = buf.Bytes()
-
-		return mv, nil
+		return nil
 	}
 
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	res.Body.Close()
 
@@ -187,13 +190,13 @@ func ResponseView(res *http.Response, conf *ViewConfig) (*MessageView, error) {
 
 	mv.message = buf.Bytes()
 
-	return mv, nil
+	return nil
 }
 
 // Reader returns the an io.ReadCloser that reads the full HTTP message.
-func (mv *MessageView) Reader() (io.ReadCloser, error) {
+func (mv *MessageView) Reader(opts ...Option) (io.ReadCloser, error) {
 	hr := mv.HeaderReader()
-	br, err := mv.BodyReader()
+	br, err := mv.BodyReader(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -216,18 +219,23 @@ func (mv *MessageView) HeaderReader() io.Reader {
 }
 
 // BodyReader returns an io.ReadCloser that reads the HTTP request or response
-// body. If conf.HeadersOnly set the reader will immediately return io.EOF.
+// body. If mv.skipBody was set the reader will immediately return io.EOF.
 //
-// If conf.Decode is set the body will be unchunked if Transfer-Encoding is set
-// to "chunked", and will decode the following Content-Encodings: gzip,
-// deflate.
-func (mv *MessageView) BodyReader() (io.ReadCloser, error) {
+// If the Decode option is passed the body will be unchunked if
+// Transfer-Encoding is set to "chunked", and will decode the following
+// Content-Encodings: gzip, deflate.
+func (mv *MessageView) BodyReader(opts ...Option) (io.ReadCloser, error) {
 	var r io.Reader
+
+	conf := &config{}
+	for _, o := range opts {
+		o(conf)
+	}
 
 	br := bytes.NewReader(mv.message)
 	r = io.NewSectionReader(br, mv.bodyoffset, mv.traileroffset-mv.bodyoffset)
 
-	if !mv.conf.Decode {
+	if !conf.decode {
 		return ioutil.NopCloser(r), nil
 	}
 
