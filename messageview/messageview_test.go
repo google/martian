@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package proxyutil
+package messageview
 
 import (
 	"bufio"
@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/google/martian/proxyutil"
 )
 
 func TestRequestViewHeadersOnly(t *testing.T) {
@@ -35,11 +37,10 @@ func TestRequestViewHeadersOnly(t *testing.T) {
 	req.ContentLength = int64(body.Len())
 	req.Header.Set("Request-Header", "true")
 
-	mv, err := RequestView(req, &ViewConfig{
-		HeadersOnly: true,
-	})
-	if err != nil {
-		t.Fatalf("RequestView(): got %v, want no error", err)
+	mv := New()
+	mv.SkipBody(true)
+	if err := mv.SnapshotRequest(req); err != nil {
+		t.Fatalf("SnapshotRequest(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -88,9 +89,9 @@ func TestRequestView(t *testing.T) {
 	req.ContentLength = 12
 	req.Header.Set("Request-Header", "true")
 
-	mv, err := RequestView(req, nil)
-	if err != nil {
-		t.Fatalf("RequestView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotRequest(req); err != nil {
+		t.Fatalf("SnapshotRequest(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -152,9 +153,9 @@ func TestRequestViewChunkedTransferEncoding(t *testing.T) {
 		"Trailer-Header": []string{"true"},
 	}
 
-	mv, err := RequestView(req, nil)
-	if err != nil {
-		t.Fatalf("RequestView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotRequest(req); err != nil {
+		t.Fatalf("SnapshotRequest(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -229,11 +230,9 @@ func TestRequestViewDecodeGzipContentEncoding(t *testing.T) {
 	req.TransferEncoding = []string{"chunked"}
 	req.Header.Set("Content-Encoding", "gzip")
 
-	mv, err := RequestView(req, &ViewConfig{
-		Decode: true,
-	})
-	if err != nil {
-		t.Fatalf("RequestView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotRequest(req); err != nil {
+		t.Fatalf("SnapshotRequest(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -250,7 +249,7 @@ func TestRequestViewDecodeGzipContentEncoding(t *testing.T) {
 		t.Fatalf("mv.HeaderReader(): got %q, want %q", got, hdrwant)
 	}
 
-	br, err := mv.BodyReader()
+	br, err := mv.BodyReader(Decode())
 	if err != nil {
 		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
 	}
@@ -266,7 +265,7 @@ func TestRequestViewDecodeGzipContentEncoding(t *testing.T) {
 		t.Fatalf("mv.BodyReader(): got %q, want %q", got, bodywant)
 	}
 
-	r, err := mv.Reader()
+	r, err := mv.Reader(Decode())
 	if err != nil {
 		t.Fatalf("mv.Reader(): got %v, want no error", err)
 	}
@@ -297,11 +296,9 @@ func TestRequestViewDecodeDeflateContentEncoding(t *testing.T) {
 	req.TransferEncoding = []string{"chunked"}
 	req.Header.Set("Content-Encoding", "deflate")
 
-	mv, err := RequestView(req, &ViewConfig{
-		Decode: true,
-	})
-	if err != nil {
-		t.Fatalf("RequestView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotRequest(req); err != nil {
+		t.Fatalf("SnapshotRequest(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -318,14 +315,14 @@ func TestRequestViewDecodeDeflateContentEncoding(t *testing.T) {
 		t.Fatalf("mv.HeaderReader(): got %q, want %q", got, hdrwant)
 	}
 
-	br, err := mv.BodyReader()
+	br, err := mv.BodyReader(Decode())
 	if err != nil {
 		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
 	}
 
 	got, err = ioutil.ReadAll(br)
 	if err != nil {
-		t.Fatalf("ioutil.ReadAll(mv.BodyReader()): got %v, wt o error", err)
+		t.Fatalf("ioutil.ReadAll(mv.BodyReader()): got %v, want no error", err)
 	}
 
 	bodywant := "body content"
@@ -334,7 +331,7 @@ func TestRequestViewDecodeDeflateContentEncoding(t *testing.T) {
 		t.Fatalf("mv.BodyReader(): got %q, want %q", got, bodywant)
 	}
 
-	r, err := mv.Reader()
+	r, err := mv.Reader(Decode())
 	if err != nil {
 		t.Fatalf("mv.Reader(): got %v, want no error", err)
 	}
@@ -350,15 +347,14 @@ func TestRequestViewDecodeDeflateContentEncoding(t *testing.T) {
 
 func TestResponseViewHeadersOnly(t *testing.T) {
 	body := strings.NewReader("body content")
-	res := NewResponse(200, body, nil)
+	res := proxyutil.NewResponse(200, body, nil)
 	res.ContentLength = 12
 	res.Header.Set("Response-Header", "true")
 
-	mv, err := ResponseView(res, &ViewConfig{
-		HeadersOnly: true,
-	})
-	if err != nil {
-		t.Fatalf("ResponseView(): got %v, want no error", err)
+	mv := New()
+	mv.SkipBody(true)
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -399,13 +395,13 @@ func TestResponseViewHeadersOnly(t *testing.T) {
 
 func TestResponseView(t *testing.T) {
 	body := strings.NewReader("body content")
-	res := NewResponse(200, body, nil)
+	res := proxyutil.NewResponse(200, body, nil)
 	res.ContentLength = 12
 	res.Header.Set("Response-Header", "true")
 
-	mv, err := ResponseView(res, nil)
-	if err != nil {
-		t.Fatalf("ResponseView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -457,16 +453,16 @@ func TestResponseView(t *testing.T) {
 
 func TestResponseViewChunkedTransferEncoding(t *testing.T) {
 	body := strings.NewReader("body content")
-	res := NewResponse(200, body, nil)
+	res := proxyutil.NewResponse(200, body, nil)
 	res.TransferEncoding = []string{"chunked"}
 	res.Header.Set("Trailer", "Trailer-Header")
 	res.Trailer = http.Header{
 		"Trailer-Header": []string{"true"},
 	}
 
-	mv, err := ResponseView(res, nil)
-	if err != nil {
-		t.Fatalf("RequestView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -533,15 +529,13 @@ func TestResponseViewDecodeGzipContentEncoding(t *testing.T) {
 	gw.Flush()
 	gw.Close()
 
-	res := NewResponse(200, body, nil)
+	res := proxyutil.NewResponse(200, body, nil)
 	res.TransferEncoding = []string{"chunked"}
 	res.Header.Set("Content-Encoding", "gzip")
 
-	mv, err := ResponseView(res, &ViewConfig{
-		Decode: true,
-	})
-	if err != nil {
-		t.Fatalf("RequestView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -557,7 +551,7 @@ func TestResponseViewDecodeGzipContentEncoding(t *testing.T) {
 		t.Fatalf("mv.HeaderReader(): got %q, want %q", got, hdrwant)
 	}
 
-	br, err := mv.BodyReader()
+	br, err := mv.BodyReader(Decode())
 	if err != nil {
 		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
 	}
@@ -573,7 +567,7 @@ func TestResponseViewDecodeGzipContentEncoding(t *testing.T) {
 		t.Fatalf("mv.BodyReader(): got %q, want %q", got, bodywant)
 	}
 
-	r, err := mv.Reader()
+	r, err := mv.Reader(Decode())
 	if err != nil {
 		t.Fatalf("mv.Reader(): got %v, want no error", err)
 	}
@@ -597,15 +591,13 @@ func TestResponseViewDecodeDeflateContentEncoding(t *testing.T) {
 	dw.Flush()
 	dw.Close()
 
-	res := NewResponse(200, body, nil)
+	res := proxyutil.NewResponse(200, body, nil)
 	res.TransferEncoding = []string{"chunked"}
 	res.Header.Set("Content-Encoding", "deflate")
 
-	mv, err := ResponseView(res, &ViewConfig{
-		Decode: true,
-	})
-	if err != nil {
-		t.Fatalf("ResponseView(): got %v, want no error", err)
+	mv := New()
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
 	}
 
 	got, err := ioutil.ReadAll(mv.HeaderReader())
@@ -621,7 +613,7 @@ func TestResponseViewDecodeDeflateContentEncoding(t *testing.T) {
 		t.Fatalf("mv.HeaderReader(): got %q, want %q", got, hdrwant)
 	}
 
-	br, err := mv.BodyReader()
+	br, err := mv.BodyReader(Decode())
 	if err != nil {
 		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
 	}
@@ -637,7 +629,7 @@ func TestResponseViewDecodeDeflateContentEncoding(t *testing.T) {
 		t.Fatalf("mv.BodyReader(): got %q, want %q", got, bodywant)
 	}
 
-	r, err := mv.Reader()
+	r, err := mv.Reader(Decode())
 	if err != nil {
 		t.Fatalf("mv.Reader(): got %v, want no error", err)
 	}

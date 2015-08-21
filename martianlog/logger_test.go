@@ -118,11 +118,11 @@ func TestLoggerFromJSON(t *testing.T) {
 		t.Error("resmod.(*Logger); got !ok, want ok")
 	}
 
-	if !l.conf.HeadersOnly {
-		t.Error("l.conf.HeadersOnly: got false, want true")
+	if !l.headersOnly {
+		t.Error("l.headersOnly: got false, want true")
 	}
 
-	if !l.conf.Decode {
-		t.Error("l.conf.Decode: got false, want true")
+	if !l.decode {
+		t.Error("l.decode: got false, want true")
 	}
 }

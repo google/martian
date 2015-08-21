@@ -24,14 +24,15 @@ import (
 	"strings"
 
 	"github.com/google/martian/log"
+	"github.com/google/martian/messageview"
 	"github.com/google/martian/parse"
-	"github.com/google/martian/proxyutil"
 )
 
 // Logger is a modifier that logs requests and responses.
 type Logger struct {
-	log  func(line string)
-	conf *proxyutil.ViewConfig
+	log         func(line string)
+	headersOnly bool
+	decode      bool
 }
 
 type loggerJSON struct {
@@ -51,18 +52,17 @@ func NewLogger() *Logger {
 		log: func(line string) {
 			log.Infof(line)
 		},
-		conf: &proxyutil.ViewConfig{},
 	}
 }
 
 // SetHeadersOnly sets whether to log the request/response body in the log.
 func (l *Logger) SetHeadersOnly(headersOnly bool) {
-	l.conf.HeadersOnly = headersOnly
+	l.headersOnly = headersOnly
 }
 
 // SetDecode sets whether to decode the request/response body in the log.
 func (l *Logger) SetDecode(decode bool) {
-	l.conf.Decode = decode
+	l.decode = decode
 }
 
 // SetLogFunc sets the logging function for the logger.
@@ -91,12 +91,18 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 	fmt.Fprintf(b, "Request to %s\n", req.URL)
 	fmt.Fprintln(b, strings.Repeat("-", 80))
 
-	mv, err := proxyutil.RequestView(req, l.conf)
-	if err != nil {
+	mv := messageview.New()
+	mv.SkipBody(l.headersOnly)
+	if err := mv.SnapshotRequest(req); err != nil {
 		return err
 	}
 
-	r, err := mv.Reader()
+	opts := make([]messageview.Option, 0)
+	if l.decode {
+		opts = append(opts, messageview.Decode())
+	}
+
+	r, err := mv.Reader(opts...)
 	if err != nil {
 		return err
 	}
@@ -130,12 +136,18 @@ func (l *Logger) ModifyResponse(res *http.Response) error {
 	fmt.Fprintf(b, "Response from %s\n", res.Request.URL)
 	fmt.Fprintln(b, strings.Repeat("-", 80))
 
-	mv, err := proxyutil.ResponseView(res, l.conf)
-	if err != nil {
+	mv := messageview.New()
+	mv.SkipBody(l.headersOnly)
+	if err := mv.SnapshotResponse(res); err != nil {
 		return err
 	}
 
-	r, err := mv.Reader()
+	opts := make([]messageview.Option, 0)
+	if l.decode {
+		opts = append(opts, messageview.Decode())
+	}
+
+	r, err := mv.Reader(opts...)
 	if err != nil {
 		return err
 	}
