@@ -97,7 +97,7 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 		return err
 	}
 
-	opts := make([]messageview.Option, 0)
+	var opts []messageview.Option
 	if l.decode {
 		opts = append(opts, messageview.Decode())
 	}
@@ -142,7 +142,7 @@ func (l *Logger) ModifyResponse(res *http.Response) error {
 		return err
 	}
 
-	opts := make([]messageview.Option, 0)
+	var opts []messageview.Option
 	if l.decode {
 		opts = append(opts, messageview.Decode())
 	}
