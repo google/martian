@@ -16,26 +16,31 @@ anywhere that Go can target.
 
 ## Requirements
 
-Go 1.5 (for changes in crypto/tls)
+Go 1.5
 
 ## Getting Started
 
-### Start the Proxy
-Running an instance of Martian is as simple as
+### Installation
+Martian Proxy can be installed using `go install`
 
-    go run examples/main.go
+    go install github.com/google/martian/cmd/proxy
+
+### Start the Proxy
+Assuming you've installed Martian, running the proxy is as simple as
+
+    $GOPATH/bin/proxy
 
 If you want to see system logs as Martian is running, pass in the verbosity
 flag:
 
-    go run examples/main.go -- -v
+    $GOPATH/bin/proxy -v
 
 For logging of requests and responses a [logging modifier](https://github.com/google/martian/wiki/Modifier-Reference#logging) is available
 
 By default, Martian will be running on port 8080. The port can be specified via
 a flag:
 
-    go run examples/main.go -- --port=9999
+    $GOPATH/bin/proxy -port=9999
 
 ### Configure
 Once Martian is running, you need to configure its behavior. Without
