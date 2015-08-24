@@ -77,7 +77,9 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	vres := &verifyResponse{}
+	vres := &verifyResponse{
+		Errors: make([]verifyError, 0),
+	}
 
 	if h.reqv != nil {
 		if err := h.reqv.VerifyRequests(); err != nil {
