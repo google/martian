@@ -31,6 +31,7 @@ import (
 // MessageView is a static view of an HTTP request or response.
 type MessageView struct {
 	message       []byte
+	cts           []string
 	chunked       bool
 	skipBody      bool
 	compress      string
@@ -61,6 +62,13 @@ func New() *MessageView {
 // or response.
 func (mv *MessageView) SkipBody(skipBody bool) {
 	mv.skipBody = skipBody
+}
+
+// SkipBodyUnlessContentType will skip reading the body unless the
+// Content-Type matches one in cts.
+func (mv *MessageView) SkipBodyUnlessContentType(cts ...string) {
+	mv.skipBody = true
+	mv.cts = cts
 }
 
 // SnapshotRequest reads the request into the MessageView. If mv.skipBody is false
@@ -97,7 +105,8 @@ func (mv *MessageView) SnapshotRequest(req *http.Request) error {
 	mv.bodyoffset = int64(buf.Len())
 	mv.traileroffset = int64(buf.Len())
 
-	if mv.skipBody {
+	ct := req.Header.Get("Content-Type")
+	if mv.skipBody && !mv.matchContentType(ct) {
 		mv.message = buf.Bytes()
 		return nil
 	}
@@ -159,7 +168,8 @@ func (mv *MessageView) SnapshotResponse(res *http.Response) error {
 	mv.bodyoffset = int64(buf.Len())
 	mv.traileroffset = int64(buf.Len())
 
-	if mv.skipBody {
+	ct := res.Header.Get("Content-Type")
+	if mv.skipBody && !mv.matchContentType(ct) {
 		mv.message = buf.Bytes()
 		return nil
 	}
@@ -263,4 +273,14 @@ func (mv *MessageView) TrailerReader() io.Reader {
 	end := int64(len(mv.message)) - mv.traileroffset
 
 	return io.NewSectionReader(r, mv.traileroffset, end)
+}
+
+func (mv *MessageView) matchContentType(mct string) bool {
+	for _, ct := range mv.cts {
+		if strings.HasPrefix(mct, ct) {
+			return true
+		}
+	}
+
+	return false
 }

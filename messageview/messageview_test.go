@@ -142,6 +142,52 @@ func TestRequestView(t *testing.T) {
 	}
 }
 
+func TestRequestViewSkipBodyUnlessContentType(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://example.com", strings.NewReader("body content"))
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.ContentLength = 12
+	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+
+	mv := New()
+	mv.SkipBodyUnlessContentType("text/plain")
+	if err := mv.SnapshotRequest(req); err != nil {
+		t.Fatalf("SnapshotRequest(): got %v, want no error", err)
+	}
+
+	br, err := mv.BodyReader()
+	if err != nil {
+		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
+	}
+
+	got, err := ioutil.ReadAll(br)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(mv.BodyReader()): got %v, want no error", err)
+	}
+
+	bodywant := "body content"
+	if !bytes.Equal(got, []byte(bodywant)) {
+		t.Fatalf("mv.BodyReader(): got %q, want %q", got, bodywant)
+	}
+
+	req.Header.Set("Content-Type", "image/png")
+	mv = New()
+	mv.SkipBodyUnlessContentType("text/plain")
+	if err := mv.SnapshotRequest(req); err != nil {
+		t.Fatalf("SnapshotRequest(): got %v, want no error", err)
+	}
+
+	br, err = mv.BodyReader()
+	if err != nil {
+		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
+	}
+
+	if _, err := br.Read(nil); err != io.EOF {
+		t.Fatalf("br.Read(): got %v, want io.EOF", err)
+	}
+}
+
 func TestRequestViewChunkedTransferEncoding(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com/path?k=v", strings.NewReader("body content"))
 	if err != nil {
@@ -448,6 +494,49 @@ func TestResponseView(t *testing.T) {
 	// Sanity check to ensure it still parses.
 	if _, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(got)), nil); err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+}
+
+func TestResponseViewSkipBodyUnlessContentType(t *testing.T) {
+	res := proxyutil.NewResponse(200, strings.NewReader("body content"), nil)
+	res.ContentLength = 12
+	res.Header.Set("Content-Type", "text/plain; charset=utf-8")
+
+	mv := New()
+	mv.SkipBodyUnlessContentType("text/plain")
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
+	}
+
+	br, err := mv.BodyReader()
+	if err != nil {
+		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
+	}
+
+	got, err := ioutil.ReadAll(br)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(mv.BodyReader()): got %v, want no error", err)
+	}
+
+	bodywant := "body content"
+	if !bytes.Equal(got, []byte(bodywant)) {
+		t.Fatalf("mv.BodyReader(): got %q, want %q", got, bodywant)
+	}
+
+	res.Header.Set("Content-Type", "image/png")
+	mv = New()
+	mv.SkipBodyUnlessContentType("text/plain")
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
+	}
+
+	br, err = mv.BodyReader()
+	if err != nil {
+		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
+	}
+
+	if _, err := br.Read(nil); err != io.EOF {
+		t.Fatalf("br.Read(): got %v, want io.EOF", err)
 	}
 }
 
