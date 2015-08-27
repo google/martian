@@ -73,7 +73,11 @@ func TestContext(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	want := session.FromContext(nil)
+	want, err := session.FromContext(nil)
+	if err != nil {
+		t.Fatalf("session.FromContext(): got %v, want no error", err)
+	}
+
 	SetContext(req, want)
 
 	if got := Context(req); got != want {

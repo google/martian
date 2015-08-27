@@ -17,7 +17,14 @@ package session
 import "testing"
 
 func TestContext(t *testing.T) {
-	ctx := FromContext(nil)
+	ctx, err := FromContext(nil)
+	if err != nil {
+		t.Fatalf("FromContext(nil): got %v, want no error", err)
+	}
+
+	if len(ctx.ID()) != 16 {
+		t.Errorf("ctx.ID(): got %q, want 16 character random ID", ctx.ID())
+	}
 
 	ctx.Set("key", "value")
 	got, ok := ctx.Get("key")
@@ -35,9 +42,8 @@ func TestContext(t *testing.T) {
 
 	session := ctx.GetSession()
 
-	session.SetID("id")
-	if got, want := session.ID(), "id"; got != want {
-		t.Errorf("session.ID(): got %q, want %q", got, want)
+	if len(session.ID()) != 16 {
+		t.Errorf("session.ID(): got %q, want 16 character random ID", session.ID())
 	}
 
 	session.MarkSecure()
@@ -54,7 +60,10 @@ func TestContext(t *testing.T) {
 		t.Errorf("session.Get(%q): got %q, want %q", "key", got, want)
 	}
 
-	ctx2 := FromContext(ctx)
+	ctx2, err := FromContext(ctx)
+	if err != nil {
+		t.Fatalf("FromContext(ctx): got %v, want no error", err)
+	}
 
 	if ctx2.SkippingRoundTrip() {
 		t.Error("ctx2.SkippingRoundTrip(): got true, want false")
@@ -64,7 +73,7 @@ func TestContext(t *testing.T) {
 	}
 
 	session2 := ctx2.GetSession()
-	if got, want := session2.ID(), "id"; got != want {
+	if got, want := session2.ID(), session.ID(); got != want {
 		t.Errorf("session2.ID(): got %q, want %q", got, want)
 	}
 

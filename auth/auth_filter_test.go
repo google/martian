@@ -59,7 +59,11 @@ func TestModifyRequest(t *testing.T) {
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	ctx := session.FromContext(nil)
+	ctx, err := session.FromContext(nil)
+	if err != nil {
+		t.Fatalf("session.FromContext(): got %v, want no error", err)
+	}
+
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 
@@ -121,7 +125,11 @@ func TestModifyResponse(t *testing.T) {
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	ctx := session.FromContext(nil)
+	ctx, err := session.FromContext(nil)
+	if err != nil {
+		t.Fatalf("session.FromContext(): got %v, want no error", err)
+	}
+
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 

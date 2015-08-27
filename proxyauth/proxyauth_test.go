@@ -41,7 +41,11 @@ func TestNoModifiers(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx := session.FromContext(nil)
+	ctx, err := session.FromContext(nil)
+	if err != nil {
+		t.Fatalf("session.FromContext(): got %v, want no error", err)
+	}
+
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 
@@ -67,7 +71,11 @@ func TestProxyAuth(t *testing.T) {
 	}
 	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	ctx := session.FromContext(nil)
+	ctx, err := session.FromContext(nil)
+	if err != nil {
+		t.Fatalf("session.FromContext(): got %v, want no error", err)
+	}
+
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 
@@ -136,7 +144,11 @@ func TestProxyAuthInvalidCredentials(t *testing.T) {
 	}
 	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	ctx := session.FromContext(nil)
+	ctx, err := session.FromContext(nil)
+	if err != nil {
+		t.Fatalf("session.FromContext(): got %v, want no error", err)
+	}
+
 	martian.SetContext(req, ctx)
 	defer martian.RemoveContext(req)
 
