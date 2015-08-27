@@ -16,13 +16,18 @@
 // connection and its associated requests and responses.
 package session
 
-import "sync"
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"sync"
+)
 
 // Context provides information and storage for a single request/response pair.
 // Contexts are linked to shared session that is used for multiple requests on
 // a single connection.
 type Context struct {
 	session *Session
+	id      string
 
 	mu            sync.RWMutex
 	vals          map[string]interface{}
@@ -41,8 +46,14 @@ type Session struct {
 // shares the same session as the passed context, but does not inherit any of
 // its request specific values. If ctx is nil, a new context and session are
 // created.
-func FromContext(ctx *Context) *Context {
+func FromContext(ctx *Context) (*Context, error) {
+	sid, err := newID()
+	if err != nil {
+		return nil, err
+	}
+
 	session := &Session{
+		id:   sid,
 		vals: make(map[string]interface{}),
 	}
 
@@ -50,19 +61,16 @@ func FromContext(ctx *Context) *Context {
 		session = ctx.session
 	}
 
+	cid, err := newID()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Context{
 		session: session,
+		id:      cid,
 		vals:    make(map[string]interface{}),
-	}
-}
-
-// SetID sets the ID for the session. The ID will be persisted across
-// multiple requests and responses.
-func (s *Session) SetID(id string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.id = id
+	}, nil
 }
 
 // ID returns the session ID.
@@ -114,6 +122,11 @@ func (ctx *Context) GetSession() *Session {
 	return ctx.session
 }
 
+// ID returns the context ID.
+func (ctx *Context) ID() string {
+	return ctx.id
+}
+
 // Get takes key and returns the associated value from the context.
 func (ctx *Context) Get(key string) (interface{}, bool) {
 	ctx.mu.RLock()
@@ -148,4 +161,14 @@ func (ctx *Context) SkippingRoundTrip() bool {
 	defer ctx.mu.RUnlock()
 
 	return ctx.skipRoundTrip
+}
+
+// newID creates a new 16 character random hex ID; note these are not UUIDs.
+func newID() (string, error) {
+	src := make([]byte, 8)
+	if _, err := rand.Read(src); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(src), nil
 }

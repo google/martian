@@ -209,7 +209,12 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	defer p.conns.Done()
 	defer conn.Close()
 
-	ctx := session.FromContext(nil)
+	ctx, err := session.FromContext(nil)
+	if err != nil {
+		log.Errorf("martian: failed to create context: %v", err)
+		return
+	}
+
 	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
 	for {
@@ -258,7 +263,12 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		return nil
 	}
 
-	ctx = session.FromContext(ctx)
+	ctx, err = session.FromContext(ctx)
+	if err != nil {
+		log.Errorf("martian: failed to derive context: %v", err)
+		return err
+	}
+
 	SetContext(req, ctx)
 	defer RemoveContext(req)
 
