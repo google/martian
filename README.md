@@ -35,12 +35,34 @@ flag:
 
     $GOPATH/bin/proxy -v
 
-For logging of requests and responses a [logging modifier](https://github.com/google/martian/wiki/Modifier-Reference#logging) is available
-
 By default, Martian will be running on port 8080. The port can be specified via
 a flag:
 
     $GOPATH/bin/proxy -port=9999
+
+### Logging
+For logging of requests and responses a [logging
+modifier](https://github.com/google/martian/wiki/Modifier-Reference#logging) is
+available or [HAR](http://www.softwareishard.com/blog/har-12-spec/) logs are
+available if the `-har` flag is used.
+
+#### HAR Logging
+To enable HAR logging in Martian call the binary with the `-har` flag:
+
+    $GOPATH/bin/proxy -har
+
+If the `-har` flag has been enabled two HAR related endpoints will be
+available:
+
+    GET http://martian.proxy/har/logs
+
+Will retrieve the HAR log of all requests and responses seen by the proxy since
+the last reset.
+
+    DELETE http://martian.proxy/har/logs/reset
+
+Will reset the in-memory HAR log. Note that the log will grow unbounded unless
+it is periodically reset.
 
 ### Configure
 Once Martian is running, you need to configure its behavior. Without
