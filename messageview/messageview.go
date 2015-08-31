@@ -106,7 +106,7 @@ func (mv *MessageView) SnapshotRequest(req *http.Request) error {
 	mv.traileroffset = int64(buf.Len())
 
 	ct := req.Header.Get("Content-Type")
-	if mv.skipBody && !mv.matchContentType(ct) {
+	if mv.skipBody && !mv.matchContentType(ct) || req.Body == nil {
 		mv.message = buf.Bytes()
 		return nil
 	}
@@ -169,7 +169,7 @@ func (mv *MessageView) SnapshotResponse(res *http.Response) error {
 	mv.traileroffset = int64(buf.Len())
 
 	ct := res.Header.Get("Content-Type")
-	if mv.skipBody && !mv.matchContentType(ct) {
+	if mv.skipBody && !mv.matchContentType(ct) || res.Body == nil {
 		mv.message = buf.Bytes()
 		return nil
 	}
