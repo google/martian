@@ -130,6 +130,16 @@
 //
 // prompts the user to install the CA certificate used by the proxy if MITM is enabled
 //
+//   GET http://martian.proxy/har/logs
+//
+// retrieves the HAR logs for all requests and responses seen by the proxy if
+// the HAR flag is enabled
+//
+//   DELETE http://martian.proxy/har/logs/reset
+//
+// reset the in-memory HAR log; note that the log will grow unbounded unless it
+// is periodically reset
+//
 // passing the -cors flag will enable CORS support for the endpoints so that they
 // may be called via AJAX
 //
@@ -159,6 +169,9 @@
 //   -cors=false
 //     allow the proxy to be configured via CORS requests; such as when
 //     configuring the proxy via AJAX
+//   -har=false
+//     enable logging endpoints for retrieving full request/response logs in
+//     HAR format.
 package main
 
 import (
@@ -176,6 +189,7 @@ import (
 	"github.com/google/martian"
 	"github.com/google/martian/cors"
 	"github.com/google/martian/fifo"
+	"github.com/google/martian/har"
 	"github.com/google/martian/header"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
@@ -201,6 +215,7 @@ var (
 	organization = flag.String("organization", "Martian Proxy", "organization name for MITM certificates")
 	validity     = flag.Duration("validity", time.Hour, "window of time that MITM certificates are valid")
 	allowCORS    = flag.Bool("cors", false, "allow CORS requests to configure the proxy")
+	harLogging   = flag.Bool("har", false, "enable HAR logging API")
 )
 
 func main() {
@@ -262,6 +277,15 @@ func main() {
 
 	fg.AddResponseModifier(hbhm)
 	fg.AddResponseModifier(vm)
+
+	if *harLogging {
+		hl := har.NewLogger("martian", "2.0.0")
+		fg.AddRequestModifier(hl)
+		fg.AddResponseModifier(hl)
+
+		configure("/har/logs", har.NewExportHandler(hl))
+		configure("/har/logs/reset", har.NewResetHandler(hl))
+	}
 
 	p.SetRequestModifier(fg)
 	p.SetResponseModifier(fg)
