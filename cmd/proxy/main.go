@@ -285,6 +285,9 @@ func main() {
 
 		configure("/har/logs", har.NewExportHandler(hl))
 		configure("/har/logs/reset", har.NewResetHandler(hl))
+	} else {
+		configure("/har/logs", &disabledHARHandler{})
+		configure("/har/logs/reset", &disabledHARHandler{})
 	}
 
 	p.SetRequestModifier(fg)
@@ -333,4 +336,11 @@ func configure(path string, handler http.Handler) {
 	}
 
 	http.Handle(filepath.Join(*api, path), handler)
+}
+
+type disabledHARHandler struct {
+}
+
+func (dh *disabledHARHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "HAR logging is not enabled.", 503)
 }
