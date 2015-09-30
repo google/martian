@@ -223,6 +223,9 @@ func main() {
 
 	p := martian.NewProxy()
 
+	// Respond with 404 to any unknown proxy path.
+	http.Handle(*api+"/", http.HandlerFunc(http.NotFound))
+
 	var x509c *x509.Certificate
 	var priv interface{}
 
