@@ -15,10 +15,8 @@
 package proxyutil
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
@@ -29,6 +27,7 @@ func TestNewResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
+	req.Close = true
 
 	res := NewResponse(200, nil, req)
 	if got, want := res.StatusCode, 200; got != want {
@@ -36,6 +35,9 @@ func TestNewResponse(t *testing.T) {
 	}
 	if got, want := res.Status, "200 OK"; got != want {
 		t.Errorf("res.Status: got %q, want %q", got, want)
+	}
+	if !res.Close {
+		t.Error("res.Close: got false, want true")
 	}
 	if got, want := res.Proto, "HTTP/1.1"; got != want {
 		t.Errorf("res.Proto: got %q, want %q", got, want)
@@ -54,31 +56,6 @@ func TestNewResponse(t *testing.T) {
 	}
 	if got, want := res.Request, req; got != want {
 		t.Errorf("res.Request: got %v, want %v", got, want)
-	}
-}
-
-func TestNewErrorResponse(t *testing.T) {
-	err := fmt.Errorf("response error")
-	res := NewErrorResponse(502, err, nil)
-
-	if got, want := res.StatusCode, 502; got != want {
-		t.Errorf("res.StatusCode: got %d, want %d", got, want)
-	}
-	if got, want := res.Status, "502 Bad Gateway"; got != want {
-		t.Errorf("res.Status: got %q, want %q", got, want)
-	}
-	if got, want := res.Header.Get("Content-Type"), "text/plain; charset=utf-8"; got != want {
-		t.Errorf("res.Header.Get(%q): got %q, want %q", "Content-Type", got, want)
-	}
-	if got, want := res.ContentLength, int64(len("response error")); got != want {
-		t.Errorf("res.ContentLength: got %d, want %d", got, want)
-	}
-	got, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
-	}
-	if want := []byte("response error"); !bytes.Equal(got, want) {
-		t.Errorf("res.Body: got %q, want %q", got, want)
 	}
 }
 
