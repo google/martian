@@ -222,7 +222,7 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 		conn.SetDeadline(deadline)
 
 		if err := p.handle(ctx, conn, brw); isCloseable(err) {
-			log.Infof("martian: closing connection: %v", conn.RemoteAddr())
+			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
 			return
 		}
 	}
@@ -233,7 +233,11 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 	req, err := http.ReadRequest(brw.Reader)
 	if err != nil {
-		log.Errorf("martian: failed to read request: %v", err)
+		if isCloseable(err) {
+			log.Debugf("martian: connection closed prematurely: %v", err)
+		} else {
+			log.Errorf("martian: failed to read request: %v", err)
+		}
 
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
 
@@ -246,7 +250,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 
 		closing := req.Close || p.Closing()
 
-		log.Infof("martian: received proxy specific request: %s", req.URL)
+		log.Infof("martian: intercepted configuration request: %s", req.URL)
 		rw := newResponseWriter(brw, closing)
 		defer rw.Close()
 
@@ -290,7 +294,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		req.URL.Host = req.Host
 	}
 
-	log.Debugf("martian: received request: %s", req.URL)
+	log.Infof("martian: received request: %s", req.URL)
 
 	if req.Method == "CONNECT" {
 		if err := p.reqmod.ModifyRequest(req); err != nil {
