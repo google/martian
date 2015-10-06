@@ -54,12 +54,12 @@ To enable HAR logging in Martian call the binary with the `-har` flag:
 If the `-har` flag has been enabled two HAR related endpoints will be
 available:
 
-    GET http://martian.proxy/har/logs
+    GET http://martian.proxy/logs
 
 Will retrieve the HAR log of all requests and responses seen by the proxy since
 the last reset.
 
-    DELETE http://martian.proxy/har/logs/reset
+    DELETE http://martian.proxy/logs/reset
 
 Will reset the in-memory HAR log. Note that the log will grow unbounded unless
 it is periodically reset.
