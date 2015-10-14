@@ -29,6 +29,10 @@ func TestLog(t *testing.T) {
 	stdlog.SetOutput(buf)
 	defer stdlog.SetOutput(os.Stdout)
 
+	// Reset log level after tests.
+	defer func(l int) { level = l }(level)
+	level = Debug
+
 	Infof("log: %s test", "info")
 	if got, want := buf.String(), "INFO: log: info test\n"; !strings.HasSuffix(got, want) {
 		t.Errorf("Infof(): got %q, want to contain %q", got, want)

@@ -172,6 +172,12 @@
 //   -har=false
 //     enable logging endpoints for retrieving full request/response logs in
 //     HAR format.
+//   -traffic-shaping=false
+//     enable traffic shaping endpoints for simulating latency and constrained
+//     bandwidth conditions (e.g. mobile, exotic network infrastructure, the
+//     90's)
+//   -v=0
+//     log level for console logs; defaults to error only.
 package main
 
 import (
@@ -193,10 +199,12 @@ import (
 	"github.com/google/martian/header"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
+	"github.com/google/martian/trafficshape"
 	"github.com/google/martian/verify"
 
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
+	mlog "github.com/google/martian/log"
 	_ "github.com/google/martian/martianlog"
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
@@ -207,19 +215,23 @@ import (
 )
 
 var (
-	addr         = flag.String("addr", ":8080", "host:port of the proxy")
-	api          = flag.String("api", "martian.proxy", "hostname for the API")
-	generateCA   = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
-	cert         = flag.String("cert", "", "CA certificate used to sign MITM certificates")
-	key          = flag.String("key", "", "private key of the CA used to sign MITM certificates")
-	organization = flag.String("organization", "Martian Proxy", "organization name for MITM certificates")
-	validity     = flag.Duration("validity", time.Hour, "window of time that MITM certificates are valid")
-	allowCORS    = flag.Bool("cors", false, "allow CORS requests to configure the proxy")
-	harLogging   = flag.Bool("har", false, "enable HAR logging API")
+	level          = flag.Int("v", 0, "log level")
+	addr           = flag.String("addr", ":8080", "host:port of the proxy")
+	api            = flag.String("api", "martian.proxy", "hostname for the API")
+	generateCA     = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
+	cert           = flag.String("cert", "", "CA certificate used to sign MITM certificates")
+	key            = flag.String("key", "", "private key of the CA used to sign MITM certificates")
+	organization   = flag.String("organization", "Martian Proxy", "organization name for MITM certificates")
+	validity       = flag.Duration("validity", time.Hour, "window of time that MITM certificates are valid")
+	allowCORS      = flag.Bool("cors", false, "allow CORS requests to configure the proxy")
+	harLogging     = flag.Bool("har", false, "enable HAR logging API")
+	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 )
 
 func main() {
 	flag.Parse()
+
+	mlog.SetLevel(*level)
 
 	p := martian.NewProxy()
 
@@ -315,6 +327,14 @@ func main() {
 	l, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *trafficShaping {
+		tsl := trafficshape.NewListener(l)
+		tsh := trafficshape.NewHandler(tsl)
+		configure("/shape-traffic", tsh)
+
+		l = tsl
 	}
 
 	log.Println("martian: proxy started on:", l.Addr())

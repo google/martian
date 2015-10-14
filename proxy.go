@@ -354,7 +354,11 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		defer cbw.Flush()
 
 		copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
-			io.Copy(w, r)
+			if _, err := io.Copy(w, r); err != nil {
+				log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
+			}
+
+			log.Debugf("martian: CONNECT tunnel finished copying")
 			donec <- true
 		}
 
@@ -436,6 +440,8 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 		return res, conn, nil
 	}
+
+	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
 
 	conn, err := net.Dial("tcp", req.URL.Host)
 	if err != nil {
