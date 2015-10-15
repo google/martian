@@ -130,12 +130,12 @@
 //
 // prompts the user to install the CA certificate used by the proxy if MITM is enabled
 //
-//   GET http://martian.proxy/har/logs
+//   GET http://martian.proxy/logs
 //
 // retrieves the HAR logs for all requests and responses seen by the proxy if
 // the HAR flag is enabled
 //
-//   DELETE http://martian.proxy/har/logs/reset
+//   DELETE http://martian.proxy/logs/reset
 //
 // reset the in-memory HAR log; note that the log will grow unbounded unless it
 // is periodically reset
@@ -286,8 +286,8 @@ func main() {
 		fg.AddRequestModifier(hl)
 		fg.AddResponseModifier(hl)
 
-		configure("/har/logs", har.NewExportHandler(hl))
-		configure("/har/logs/reset", har.NewResetHandler(hl))
+		configure("/logs", har.NewExportHandler(hl))
+		configure("/logs/reset", har.NewResetHandler(hl))
 	}
 
 	p.SetRequestModifier(fg)
