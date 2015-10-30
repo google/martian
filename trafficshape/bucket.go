@@ -76,21 +76,20 @@ func (b *Bucket) Close() error {
 	return nil
 }
 
-// FillThrottle calls the fill function with the available capacity remaining
-// (capacity-fill) and fills the bucket with the number of tokens returned by the
-// fill function. If the remaining capacity is <= 0, FillThrottle will wait for
-// the next drain before running the fill function.
+// FillThrottle calls fn with the available capacity remaining (capacity-fill)
+// and fills the bucket with the number of tokens returned by fn. If the
+// remaining capacity is <= 0, FillThrottle will wait for the next drain before
+// running fn.
 //
-// If the fill function returns an error, it will be returned by FillThrottle
-// along with the number of tokens processed by the fill function.
+// If fn returns an error, it will be returned by FillThrottle along with the
+// number of tokens processed by fn.
 //
-// The fill function is provided the remaining capacity as a soft maximum, the
-// fill function is allowed to use more than the remaining capacity without
-// incurring spillage.
+// fn is provided the remaining capacity as a soft maximum, fn is allowed to
+// use more than the remaining capacity without incurring spillage.
 //
 // If the bucket is closed when FillThrottle is called, or while waiting for
-// the next drain, the fill function will not be executed and FillThrottle will
-// return with an error.
+// the next drain, fn will not be executed and FillThrottle will return with an
+// error.
 func (b *Bucket) FillThrottle(fn func(int64) (int64, error)) (int64, error) {
 	for {
 		if b.closed() {
@@ -114,21 +113,21 @@ func (b *Bucket) FillThrottle(fn func(int64) (int64, error)) (int64, error) {
 	}
 }
 
-// Fill calls the fill function with the available capacity remaining
-// (capacity-fill) and fills the bucket with the number of tokens returned by the
-// fill function. If the remaining capacity is 0, Fill returns 0, nil. If the
-// remaining capacity is < 0, Fill returns 0, ErrBucketOverflow.
+// Fill calls fn with the available capacity remaining (capacity-fill) and
+// fills the bucket with the number of tokens returned by fn. If the remaining
+// capacity is 0, Fill returns 0, nil. If the remaining capacity is < 0, Fill
+// returns 0, ErrBucketOverflow.
 //
-// If the fill function returns an error, it will be returned by Fill along
-// with the remaining capacity.
+// If fn returns an error, it will be returned by Fill along with the remaining
+// capacity.
 //
-// The fill function is provided the remaining capacity as a soft maximum, the
-// fill function is allowed to use more than the remaining capacity without
-// incurring spillage, though this will cause subsequent calls to Fill to
-// return ErrBucketOverflow until the next drain.
+// fn is provided the remaining capacity as a soft maximum, fn is allowed to
+// use more than the remaining capacity without incurring spillage, though this
+// will cause subsequent calls to Fill to return ErrBucketOverflow until the
+// next drain.
 //
-// If the bucket is closed when Fill is called, the fill function will not be
-// executed and Fill will return with an error.
+// If the bucket is closed when Fill is called, fn will not be executed and
+// Fill will return with an error.
 func (b *Bucket) Fill(fn func(int64) (int64, error)) (int64, error) {
 	if b.closed() {
 		log.Errorf("trafficshape: fill on closed bucket")
