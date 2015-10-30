@@ -65,9 +65,10 @@ func TestBucket(t *testing.T) {
 		t.Fatalf("Fill(): got %v, want no error", err)
 	}
 
+	// Wait for the bucket to drain.
 	for {
 		if atomic.LoadInt64(&b.fill) == 0 {
-			return
+			break
 		}
 		// Allow for a goroutine switch, required for GOMAXPROCS = 1.
 		runtime.Gosched()
