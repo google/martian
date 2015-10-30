@@ -142,8 +142,8 @@ func (c *conn) Read(b []byte) (int, error) {
 		n, err := c.Conn.Read(b[:max])
 		return int64(n), err
 	})
-	if err != nil {
-		log.Errorf("trafficshape: error on read throttle: %v", err)
+	if err != nil && err != io.EOF {
+		log.Errorf("trafficshape: error on throttled read: %v", err)
 	}
 
 	return int(n), err
@@ -188,7 +188,9 @@ func (c *conn) WriteTo(w io.Writer) (int64, error) {
 		total += n
 
 		if err != nil {
-			log.Errorf("trafficshape: failed copying to writer: %v", err)
+			if err != io.EOF {
+				log.Errorf("trafficshape: failed copying to writer: %v", err)
+			}
 			return total, err
 		}
 	}
@@ -217,7 +219,9 @@ func (c *conn) Write(b []byte) (int, error) {
 		total += n
 
 		if err != nil {
-			log.Errorf("trafficshape: failed write: %v", err)
+			if err != io.EOF {
+				log.Errorf("trafficshape: failed write: %v", err)
+			}
 			return int(total), err
 		}
 

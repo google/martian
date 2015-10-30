@@ -354,7 +354,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		defer cbw.Flush()
 
 		copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
-			if _, err := io.Copy(w, r); err != nil {
+			if _, err := io.Copy(w, r); err != nil && err != io.EOF {
 				log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
 			}
 
