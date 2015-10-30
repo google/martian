@@ -81,15 +81,15 @@ func (b *Bucket) Close() error {
 // fill function. If the remaining capacity is <= 0, FillThrottle will wait for
 // the next drain before running the fill function.
 //
-// If the fill function returns an error it will be returned by FillThrottle
+// If the fill function returns an error, it will be returned by FillThrottle
 // along with the number of tokens processed by the fill function.
 //
 // The fill function is provided the remaining capacity as a soft maximum, the
 // fill function is allowed to use more than the remaining capacity without
 // incurring spillage.
 //
-// If the bucket is closed when FillThrottle is called or while waiting for the
-// next drain the fill function will not be executed and FillThrottle will
+// If the bucket is closed when FillThrottle is called, or while waiting for
+// the next drain, the fill function will not be executed and FillThrottle will
 // return with an error.
 func (b *Bucket) FillThrottle(fn func(int64) (int64, error)) (int64, error) {
 	for {
@@ -119,15 +119,15 @@ func (b *Bucket) FillThrottle(fn func(int64) (int64, error)) (int64, error) {
 // fill function. If the remaining capacity is 0, Fill returns 0, nil. If the
 // remaining capacity is < 0, Fill returns 0, ErrBucketOverflow.
 //
-// If the fill function returns an error it will be returned by Fill along with
-// the remaining capacity.
+// If the fill function returns an error, it will be returned by Fill along
+// with the remaining capacity.
 //
 // The fill function is provided the remaining capacity as a soft maximum, the
 // fill function is allowed to use more than the remaining capacity without
 // incurring spillage, though this will cause subsequent calls to Fill to
 // return ErrBucketOverflow until the next drain.
 //
-// If the bucket is closed when Fill is called the fill function will not be
+// If the bucket is closed when Fill is called, the fill function will not be
 // executed and Fill will return with an error.
 func (b *Bucket) Fill(fn func(int64) (int64, error)) (int64, error) {
 	if b.closed() {
