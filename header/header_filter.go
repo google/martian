@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
+	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 )
 
@@ -75,7 +76,14 @@ func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
 
 // ModifyRequest runs reqmod iff req has a header with name matching value.
 func (f *Filter) ModifyRequest(req *http.Request) error {
-	for _, v := range req.Header[f.name] {
+	h := proxyutil.RequestHeader(req)
+
+	vs, ok := h.All(f.name)
+	if !ok {
+		return nil
+	}
+
+	for _, v := range vs {
 		if v == f.value {
 			return f.reqmod.ModifyRequest(req)
 		}
@@ -86,7 +94,14 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 
 // ModifyResponse runs resmod iff res has a header with name matching value.
 func (f *Filter) ModifyResponse(res *http.Response) error {
-	for _, v := range res.Header[f.name] {
+	h := proxyutil.ResponseHeader(res)
+
+	vs, ok := h.All(f.name)
+	if !ok {
+		return nil
+	}
+
+	for _, v := range vs {
 		if v == f.value {
 			return f.resmod.ModifyResponse(res)
 		}

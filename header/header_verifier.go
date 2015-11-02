@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/google/martian/parse"
+	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 )
 
@@ -62,17 +63,19 @@ func NewVerifier(name, value string) verify.RequestResponseVerifier {
 // header for name. An error will be added to the contained *MultiError for
 // every unmatched request.
 func (v *verifier) ModifyRequest(req *http.Request) error {
-	vs := req.Header[v.name]
+	h := proxyutil.RequestHeader(req)
+
+	vs, ok := h.All(v.name)
+	if !ok {
+		v.reqerr.Add(fmt.Errorf(headerErrFormat, "request", req.URL, v.name))
+		return nil
+	}
 
 	for _, value := range vs {
 		switch v.value {
 		case "", value:
 			return nil
 		}
-	}
-	if len(vs) == 0 {
-		v.reqerr.Add(fmt.Errorf(headerErrFormat, "request", req.URL, v.name))
-		return nil
 	}
 
 	v.reqerr.Add(fmt.Errorf(valueErrFormat, "request", req.URL, v.name,
@@ -86,17 +89,19 @@ func (v *verifier) ModifyRequest(req *http.Request) error {
 // header for name. An error will be added to the contained *MultiError for
 // every unmatched response.
 func (v *verifier) ModifyResponse(res *http.Response) error {
-	vs := res.Header[v.name]
+	h := proxyutil.ResponseHeader(res)
+
+	vs, ok := h.All(v.name)
+	if !ok {
+		v.reserr.Add(fmt.Errorf(headerErrFormat, "response", res.Request.URL, v.name))
+		return nil
+	}
 
 	for _, value := range vs {
 		switch v.value {
 		case "", value:
 			return nil
 		}
-	}
-	if len(vs) == 0 {
-		v.reserr.Add(fmt.Errorf(headerErrFormat, "response", res.Request.URL, v.name))
-		return nil
 	}
 
 	v.reserr.Add(fmt.Errorf(valueErrFormat, "response", res.Request.URL, v.name,
