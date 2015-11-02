@@ -117,8 +117,8 @@ func (s *Session) Set(key string, val interface{}) {
 	s.vals[key] = val
 }
 
-// GetSession returns the session for the context.
-func (ctx *Context) GetSession() *Session {
+// Session returns the session for the context.
+func (ctx *Context) Session() *Session {
 	return ctx.session
 }
 

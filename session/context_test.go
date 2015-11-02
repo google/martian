@@ -40,7 +40,7 @@ func TestContext(t *testing.T) {
 		t.Error("ctx.SkippingRoundTrip(): got false, want true")
 	}
 
-	session := ctx.GetSession()
+	session := ctx.Session()
 
 	if len(session.ID()) != 16 {
 		t.Errorf("session.ID(): got %q, want 16 character random ID", session.ID())
@@ -72,7 +72,7 @@ func TestContext(t *testing.T) {
 		t.Errorf("ctx2.Get(%q): got ok, want !ok", "key")
 	}
 
-	session2 := ctx2.GetSession()
+	session2 := ctx2.Session()
 	if got, want := session2.ID(), session.ID(); got != want {
 		t.Errorf("session2.ID(): got %q, want %q", got, want)
 	}

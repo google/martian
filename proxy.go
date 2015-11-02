@@ -277,14 +277,14 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	defer RemoveContext(req)
 
 	if tconn, ok := conn.(*tls.Conn); ok {
-		ctx.GetSession().MarkSecure()
+		ctx.Session().MarkSecure()
 
 		cs := tconn.ConnectionState()
 		req.TLS = &cs
 	}
 
 	req.URL.Scheme = "http"
-	if ctx.GetSession().IsSecure() {
+	if ctx.Session().IsSecure() {
 		log.Debugf("martian: forcing HTTPS inside secure session")
 		req.URL.Scheme = "https"
 	}

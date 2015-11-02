@@ -31,12 +31,12 @@ type Context struct {
 
 // FromContext retrieves the auth.Context from the session.
 func FromContext(ctx *session.Context) *Context {
-	if v, ok := ctx.GetSession().Get(key); ok {
+	if v, ok := ctx.Session().Get(key); ok {
 		return v.(*Context)
 	}
 
 	actx := &Context{}
-	ctx.GetSession().Set(key, actx)
+	ctx.Session().Set(key, actx)
 
 	return actx
 }
