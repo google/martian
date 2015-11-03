@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/session"
 )
 
 func TestExportHandlerServeHTTP(t *testing.T) {
@@ -33,12 +32,11 @@ func TestExportHandlerServeHTTP(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, err := session.FromContext(nil)
+	_, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

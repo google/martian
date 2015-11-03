@@ -48,7 +48,7 @@ func (m *viaModifier) ModifyRequest(req *http.Request) error {
 		if strings.Contains(v, m.requestedBy) {
 			err := fmt.Errorf("via: detected request loop, header contains %s", m.requestedBy)
 
-			ctx := martian.Context(req)
+			ctx := martian.NewContext(req)
 			ctx.Set(viaLoopKey, err)
 			ctx.SkipRoundTrip()
 
@@ -66,7 +66,7 @@ func (m *viaModifier) ModifyRequest(req *http.Request) error {
 // ModifyResponse sets the status code to 400 Bad Request if a loop was
 // detected in the request.
 func (m *viaModifier) ModifyResponse(res *http.Response) error {
-	ctx := martian.Context(res.Request)
+	ctx := martian.NewContext(res.Request)
 
 	if err, _ := ctx.Get(viaLoopKey); err != nil {
 		res.StatusCode = 400

@@ -21,7 +21,6 @@ import (
 	"github.com/google/martian"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/session"
 )
 
 func TestFilter(t *testing.T) {
@@ -59,13 +58,11 @@ func TestModifyRequest(t *testing.T) {
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	ctx, err := session.FromContext(nil)
+	ctx, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := f.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -125,20 +122,17 @@ func TestModifyResponse(t *testing.T) {
 	// No ID, auth required.
 	f.SetAuthRequired(true)
 
-	ctx, err := session.FromContext(nil)
+	ctx, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := f.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
 	actx := FromContext(ctx)
-
 	if actx.Error() == nil {
 		t.Error("actx.Error(): got nil, want error")
 	}

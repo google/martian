@@ -33,7 +33,6 @@ import (
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/session"
 )
 
 type tempError struct{}
@@ -63,32 +62,6 @@ func (l *timeoutListener) Accept() (net.Conn, error) {
 	}
 
 	return l.Listener.Accept()
-}
-
-func TestContext(t *testing.T) {
-	t.Parallel()
-
-	req, err := http.NewRequest("GET", "http://example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-
-	want, err := session.FromContext(nil)
-	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
-	}
-
-	SetContext(req, want)
-
-	if got := Context(req); got != want {
-		t.Errorf("Context(req): got %v, want %v", got, want)
-	}
-
-	RemoveContext(req)
-
-	if got := Context(req); got != nil {
-		t.Errorf("Context(req): got %v, want nil", got)
-	}
 }
 
 func TestIntegrationTemporaryTimeout(t *testing.T) {
@@ -160,12 +133,12 @@ func TestIntegrationHTTP(t *testing.T) {
 	tm := martiantest.NewModifier()
 
 	tm.RequestFunc(func(req *http.Request) {
-		ctx := Context(req)
+		ctx := NewContext(req)
 		ctx.Set("martian.test", "true")
 	})
 
 	tm.ResponseFunc(func(res *http.Response) {
-		ctx := Context(res.Request)
+		ctx := NewContext(res.Request)
 		v, _ := ctx.Get("martian.test")
 
 		res.Header.Set("Martian-Test", v.(string))
@@ -1069,7 +1042,7 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 
 	tm := martiantest.NewModifier()
 	tm.RequestFunc(func(req *http.Request) {
-		ctx := Context(req)
+		ctx := NewContext(req)
 		ctx.SkipRoundTrip()
 	})
 	p.SetRequestModifier(tm)

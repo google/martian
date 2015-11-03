@@ -245,7 +245,7 @@ func NewLogger(name, version string) *Logger {
 
 // ModifyRequest logs requests.
 func (l *Logger) ModifyRequest(req *http.Request) error {
-	ctx := martian.Context(req)
+	ctx := martian.NewContext(req)
 	id := ctx.ID()
 
 	return l.LogRequest(id, req)
@@ -297,7 +297,7 @@ func (l *Logger) LogRequest(id string, req *http.Request) error {
 
 // ModifyResponse logs responses.
 func (l *Logger) ModifyResponse(res *http.Response) error {
-	ctx := martian.Context(res.Request)
+	ctx := martian.NewContext(res.Request)
 	id := ctx.ID()
 
 	return l.LogResponse(id, res)
