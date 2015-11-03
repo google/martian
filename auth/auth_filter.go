@@ -98,7 +98,7 @@ func (f *Filter) ResponseModifier(id string) martian.ResponseModifier {
 // ModifyRequest runs the RequestModifier for the associated auth ID. If no
 // modifier is found for auth ID then auth error is set.
 func (f *Filter) ModifyRequest(req *http.Request) error {
-	ctx := martian.Context(req)
+	ctx := martian.NewContext(req)
 	actx := FromContext(ctx)
 
 	if reqmod, ok := f.reqmods[actx.ID()]; ok {
@@ -115,7 +115,7 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 // ModifyResponse runs the ResponseModifier for the associated auth ID. If no
 // modifier is found for the auth ID then the auth error is set.
 func (f *Filter) ModifyResponse(res *http.Response) error {
-	ctx := martian.Context(res.Request)
+	ctx := martian.NewContext(res.Request)
 	actx := FromContext(ctx)
 
 	if resmod, ok := f.resmods[actx.ID()]; ok {

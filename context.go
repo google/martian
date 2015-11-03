@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package session provides contextual information about a single HTTP/S
-// connection and its associated requests and responses.
-package session
+package martian
 
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"net/http"
 	"sync"
 )
 
@@ -42,35 +41,45 @@ type Session struct {
 	vals   map[string]interface{}
 }
 
-// FromContext builds a new context from an existing context. The new context
-// shares the same session as the passed context, but does not inherit any of
-// its request specific values. If ctx is nil, a new context and session are
-// created.
-func FromContext(ctx *Context) (*Context, error) {
-	sid, err := newID()
+var (
+	ctxmu sync.RWMutex
+	ctxs  = make(map[*http.Request]*Context)
+)
+
+// NewContext returns a context for the in-flight HTTP request.
+func NewContext(req *http.Request) *Context {
+	ctxmu.RLock()
+	defer ctxmu.RUnlock()
+
+	return ctxs[req]
+}
+
+// TestContext builds a new session and associated context and returns the
+// context and a function to remove the associated context. If it fails to
+// generate either a new session or a new context it will return an error.
+// Intended for tests only.
+func TestContext(req *http.Request) (ctx *Context, remove func(), err error) {
+	ctxmu.Lock()
+	defer ctxmu.Unlock()
+
+	ctx, ok := ctxs[req]
+	if ok {
+		return ctx, func() { unlink(req) }, nil
+	}
+
+	s, err := newSession()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	session := &Session{
-		id:   sid,
-		vals: make(map[string]interface{}),
-	}
-
-	if ctx != nil {
-		session = ctx.session
-	}
-
-	cid, err := newID()
+	ctx, err = withSession(s)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &Context{
-		session: session,
-		id:      cid,
-		vals:    make(map[string]interface{}),
-	}, nil
+	ctxs[req] = ctx
+
+	return ctx, func() { unlink(req) }, nil
 }
 
 // ID returns the session ID.
@@ -171,4 +180,48 @@ func newID() (string, error) {
 	}
 
 	return hex.EncodeToString(src), nil
+}
+
+// link associates the context with request.
+func link(req *http.Request, ctx *Context) {
+	ctxmu.Lock()
+	defer ctxmu.Unlock()
+
+	ctxs[req] = ctx
+}
+
+// unlink removes the context for request.
+func unlink(req *http.Request) {
+	ctxmu.Lock()
+	defer ctxmu.Unlock()
+
+	delete(ctxs, req)
+}
+
+// newSession builds a new session.
+func newSession() (*Session, error) {
+	sid, err := newID()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Session{
+		id:   sid,
+		vals: make(map[string]interface{}),
+	}, nil
+}
+
+// withSession builds a new context from an existing session. Session must be
+// non-nil.
+func withSession(s *Session) (*Context, error) {
+	cid, err := newID()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Context{
+		session: s,
+		id:      cid,
+		vals:    make(map[string]interface{}),
+	}, nil
 }

@@ -24,7 +24,6 @@ import (
 	"github.com/google/martian/auth"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/session"
 )
 
 func encode(v string) string {
@@ -41,13 +40,11 @@ func TestNoModifiers(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, err := session.FromContext(nil)
+	_, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
@@ -71,13 +68,11 @@ func TestProxyAuth(t *testing.T) {
 	}
 	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	ctx, err := session.FromContext(nil)
+	ctx, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -123,13 +118,13 @@ func TestProxyAuthInvalidCredentials(t *testing.T) {
 
 	tm := martiantest.NewModifier()
 	tm.RequestFunc(func(req *http.Request) {
-		ctx := martian.Context(req)
+		ctx := martian.NewContext(req)
 		actx := auth.FromContext(ctx)
 
 		actx.SetError(autherr)
 	})
 	tm.ResponseFunc(func(res *http.Response) {
-		ctx := martian.Context(res.Request)
+		ctx := martian.NewContext(res.Request)
 		actx := auth.FromContext(ctx)
 
 		actx.SetError(autherr)
@@ -144,13 +139,11 @@ func TestProxyAuthInvalidCredentials(t *testing.T) {
 	}
 	req.Header.Set("Proxy-Authorization", "Basic "+encode("user:pass"))
 
-	ctx, err := session.FromContext(nil)
+	ctx, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

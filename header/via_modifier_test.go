@@ -20,7 +20,6 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/session"
 )
 
 func TestViaModifier(t *testing.T) {
@@ -31,13 +30,11 @@ func TestViaModifier(t *testing.T) {
 	}
 	res := proxyutil.NewResponse(200, nil, req)
 
-	ctx, err := session.FromContext(nil)
+	ctx, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

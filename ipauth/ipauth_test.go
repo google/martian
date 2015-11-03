@@ -23,7 +23,6 @@ import (
 	"github.com/google/martian/auth"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/session"
 )
 
 func TestModifyRequest(t *testing.T) {
@@ -35,13 +34,11 @@ func TestModifyRequest(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, err := session.FromContext(nil)
+	ctx, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -75,7 +72,7 @@ func TestModifyRequest(t *testing.T) {
 	autherr := errors.New("auth error")
 	tm.RequestError(nil)
 	tm.RequestFunc(func(req *http.Request) {
-		ctx := martian.Context(req)
+		ctx := martian.NewContext(req)
 		actx := auth.FromContext(ctx)
 
 		actx.SetError(autherr)
@@ -99,13 +96,11 @@ func TestModifyResponse(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, err := session.FromContext(nil)
+	ctx, remove, err := martian.TestContext(req)
 	if err != nil {
-		t.Fatalf("session.FromContext(): got %v, want no error", err)
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
-
-	martian.SetContext(req, ctx)
-	defer martian.RemoveContext(req)
+	defer remove()
 
 	res := proxyutil.NewResponse(200, nil, req)
 	if err := m.ModifyResponse(res); err != nil {
@@ -126,7 +121,7 @@ func TestModifyResponse(t *testing.T) {
 	tm.ResponseError(nil)
 	autherr := errors.New("auth error")
 	tm.ResponseFunc(func(res *http.Response) {
-		ctx := martian.Context(res.Request)
+		ctx := martian.NewContext(res.Request)
 		actx := auth.FromContext(ctx)
 
 		actx.SetError(autherr)

@@ -17,7 +17,7 @@ package auth
 import (
 	"sync"
 
-	"github.com/google/martian/session"
+	"github.com/google/martian"
 )
 
 const key = "auth.Context"
@@ -30,7 +30,7 @@ type Context struct {
 }
 
 // FromContext retrieves the auth.Context from the session.
-func FromContext(ctx *session.Context) *Context {
+func FromContext(ctx *martian.Context) *Context {
 	if v, ok := ctx.Session().Get(key); ok {
 		return v.(*Context)
 	}

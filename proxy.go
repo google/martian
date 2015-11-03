@@ -29,40 +29,10 @@ import (
 	"github.com/google/martian/log"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/session"
 )
 
 var errClose = errors.New("closing connection")
 var noop = Noop("martian")
-
-var (
-	ctxmu sync.RWMutex
-	ctxs  = make(map[*http.Request]*session.Context)
-)
-
-// SetContext associates the context with request.
-func SetContext(req *http.Request, ctx *session.Context) {
-	ctxmu.Lock()
-	defer ctxmu.Unlock()
-
-	ctxs[req] = ctx
-}
-
-// RemoveContext removes the context for a given request.
-func RemoveContext(req *http.Request) {
-	ctxmu.Lock()
-	defer ctxmu.Unlock()
-
-	delete(ctxs, req)
-}
-
-// Context returns the associated context for the request.
-func Context(req *http.Request) *session.Context {
-	ctxmu.RLock()
-	defer ctxmu.RUnlock()
-
-	return ctxs[req]
-}
 
 func isCloseable(err error) bool {
 	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
@@ -209,7 +179,13 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	defer p.conns.Done()
 	defer conn.Close()
 
-	ctx, err := session.FromContext(nil)
+	s, err := newSession()
+	if err != nil {
+		log.Errorf("martian: failed to create session: %v", err)
+		return
+	}
+
+	ctx, err := withSession(s)
 	if err != nil {
 		log.Errorf("martian: failed to create context: %v", err)
 		return
@@ -228,7 +204,7 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	}
 }
 
-func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWriter) error {
+func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error {
 	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 
 	req, err := http.ReadRequest(brw.Reader)
@@ -267,14 +243,14 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 		return nil
 	}
 
-	ctx, err = session.FromContext(ctx)
+	ctx, err = withSession(ctx.Session())
 	if err != nil {
-		log.Errorf("martian: failed to derive context: %v", err)
+		log.Errorf("martian: failed to build new context: %v", err)
 		return err
 	}
 
-	SetContext(req, ctx)
-	defer RemoveContext(req)
+	link(req, ctx)
+	defer unlink(req)
 
 	if tconn, ok := conn.(*tls.Conn); ok {
 		ctx.Session().MarkSecure()
@@ -402,7 +378,7 @@ func (p *Proxy) handle(ctx *session.Context, conn net.Conn, brw *bufio.ReadWrite
 	return closing
 }
 
-func (p *Proxy) roundTrip(ctx *session.Context, req *http.Request) (*http.Response, error) {
+func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, error) {
 	if ctx.SkippingRoundTrip() {
 		log.Debugf("martian: skipping round trip")
 		return proxyutil.NewResponse(200, nil, req), nil

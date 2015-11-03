@@ -64,7 +64,7 @@ func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
 // modifier has indicated via auth error that no valid auth credentials
 // have been found we set ctx.SkipRoundTrip.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
-	ctx := martian.Context(req)
+	ctx := martian.NewContext(req)
 	actx := auth.FromContext(ctx)
 
 	actx.SetID(id(req.Header))
@@ -83,7 +83,7 @@ func (m *Modifier) ModifyRequest(req *http.Request) error {
 //
 // If an error is returned from resmod.ModifyResponse it is returned.
 func (m *Modifier) ModifyResponse(res *http.Response) error {
-	ctx := martian.Context(res.Request)
+	ctx := martian.NewContext(res.Request)
 	actx := auth.FromContext(ctx)
 
 	err := m.resmod.ModifyResponse(res)
