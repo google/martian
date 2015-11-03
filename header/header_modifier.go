@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
+	"github.com/google/martian/proxyutil"
 )
 
 func init() {
@@ -38,22 +39,12 @@ type modifierJSON struct {
 
 // ModifyRequest sets the header at name with value on the request.
 func (m *modifier) ModifyRequest(req *http.Request) error {
-	// Host is treated differently by the http package and the header is
-	// explicitly ignored.
-	if m.name == "Host" {
-		req.Host = m.value
-	} else {
-		req.Header.Set(m.name, m.value)
-	}
-
-	return nil
+	return proxyutil.RequestHeader(req).Set(m.name, m.value)
 }
 
 // ModifyResponse sets the header at name with value on the response.
 func (m *modifier) ModifyResponse(res *http.Response) error {
-	res.Header.Set(m.name, m.value)
-
-	return nil
+	return proxyutil.ResponseHeader(res).Set(m.name, m.value)
 }
 
 // NewModifier returns a modifier that will set the header at name with

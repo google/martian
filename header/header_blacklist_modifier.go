@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
+	"github.com/google/martian/proxyutil"
 )
 
 func init() {
@@ -37,8 +38,10 @@ type blacklistModifierJSON struct {
 
 // ModifyRequest deletes all request headers based on the header name.
 func (m *blacklistModifier) ModifyRequest(req *http.Request) error {
+	h := proxyutil.RequestHeader(req)
+
 	for _, name := range m.names {
-		req.Header.Del(name)
+		h.Del(name)
 	}
 
 	return nil
@@ -46,8 +49,10 @@ func (m *blacklistModifier) ModifyRequest(req *http.Request) error {
 
 // ModifyResponse deletes all response headers based on the header name.
 func (m *blacklistModifier) ModifyResponse(res *http.Response) error {
+	h := proxyutil.ResponseHeader(res)
+
 	for _, name := range m.names {
-		res.Header.Del(name)
+		h.Del(name)
 	}
 
 	return nil
