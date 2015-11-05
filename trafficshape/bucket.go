@@ -151,7 +151,7 @@ func (b *Bucket) Fill(fn func(int64) (int64, error)) (int64, error) {
 		return 0, ErrBucketOverflow
 	}
 
-	log.Debugf("trafficshape: bucket full (%d, %d)", fill, capacity)
+	log.Debugf("trafficshape: bucket full (%d/%d)", fill, capacity)
 	return 0, nil
 }
 

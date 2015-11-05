@@ -133,8 +133,8 @@ func (l *Listener) Close() error {
 func (c *conn) Read(b []byte) (int, error) {
 	c.ronce.Do(c.sleepLatency)
 
-	n, err := c.rb.FillThrottle(func(left int64) (int64, error) {
-		max := left
+	n, err := c.rb.FillThrottle(func(remaining int64) (int64, error) {
+		max := remaining
 		if l := int64(len(b)); max > l {
 			max = l
 		}
@@ -157,8 +157,8 @@ func (c *conn) ReadFrom(r io.Reader) (int64, error) {
 
 	var total int64
 	for {
-		n, err := c.rb.FillThrottle(func(left int64) (int64, error) {
-			return io.CopyN(c.Conn, r, left)
+		n, err := c.rb.FillThrottle(func(remaining int64) (int64, error) {
+			return io.CopyN(c.Conn, r, remaining)
 		})
 
 		total += n
@@ -181,8 +181,8 @@ func (c *conn) WriteTo(w io.Writer) (int64, error) {
 
 	var total int64
 	for {
-		n, err := c.wb.FillThrottle(func(left int64) (int64, error) {
-			return io.CopyN(w, c.Conn, left)
+		n, err := c.wb.FillThrottle(func(remaining int64) (int64, error) {
+			return io.CopyN(w, c.Conn, remaining)
 		})
 
 		total += n
@@ -206,9 +206,9 @@ func (c *conn) Write(b []byte) (int, error) {
 	for len(b) > 0 {
 		var max int64
 
-		n, err := c.wb.FillThrottle(func(left int64) (int64, error) {
-			max = left
-			if l := int64(len(b)); left >= l {
+		n, err := c.wb.FillThrottle(func(remaining int64) (int64, error) {
+			max = remaining
+			if l := int64(len(b)); remaining >= l {
 				max = l
 			}
 

@@ -32,9 +32,9 @@ func TestBucket(t *testing.T) {
 		t.Fatalf("b.Capacity(): got %d, want %d", got, want)
 	}
 
-	n, err := b.Fill(func(left int64) (int64, error) {
-		if want := int64(10); left != want {
-			t.Errorf("left: got %d, want %d", left, want)
+	n, err := b.Fill(func(remaining int64) (int64, error) {
+		if want := int64(10); remaining != want {
+			t.Errorf("remaining: got %d, want %d", remaining, want)
 		}
 		return 5, nil
 	})
@@ -45,9 +45,9 @@ func TestBucket(t *testing.T) {
 		t.Fatalf("n: got %d, want %d", got, want)
 	}
 
-	n, err = b.Fill(func(left int64) (int64, error) {
-		if want := int64(5); left != want {
-			t.Errorf("left: got %d, want %d", left, want)
+	n, err = b.Fill(func(remaining int64) (int64, error) {
+		if want := int64(5); remaining != want {
+			t.Errorf("remaining: got %d, want %d", remaining, want)
 		}
 		return 5, nil
 	})
@@ -57,7 +57,7 @@ func TestBucket(t *testing.T) {
 	if got, want := n, int64(5); got != want {
 		t.Fatalf("n: got %d, want %d", got, want)
 	}
-	n, err = b.Fill(func(left int64) (int64, error) {
+	n, err = b.Fill(func(remaining int64) (int64, error) {
 		t.Fatal("Fill: executed func when full, want skipped")
 		return 0, nil
 	})
@@ -75,9 +75,9 @@ func TestBucket(t *testing.T) {
 	}
 
 	wanterr := errors.New("fill function error")
-	n, err = b.Fill(func(left int64) (int64, error) {
-		if want := int64(10); left != want {
-			t.Errorf("left: got %d, want %d", left, want)
+	n, err = b.Fill(func(remaining int64) (int64, error) {
+		if want := int64(10); remaining != want {
+			t.Errorf("remaining: got %d, want %d", remaining, want)
 		}
 		return 0, wanterr
 	})
@@ -109,7 +109,7 @@ func TestBucketOverflow(t *testing.T) {
 	b := NewBucket(10, 10*time.Millisecond)
 	defer b.Close()
 
-	n, err := b.Fill(func(left int64) (int64, error) {
+	n, err := b.Fill(func(remaining int64) (int64, error) {
 		return 11, nil
 	})
 	if err != nil {
@@ -143,9 +143,9 @@ func TestBucketThrottle(t *testing.T) {
 			case <-closec:
 				return
 			default:
-				if _, err := b.FillThrottle(func(left int64) (int64, error) {
-					if left < 10 {
-						return left, nil
+				if _, err := b.FillThrottle(func(remaining int64) (int64, error) {
+					if remaining < 10 {
+						return remaining, nil
 					}
 					return 10, nil
 				}); err != nil {
