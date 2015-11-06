@@ -153,7 +153,7 @@ func TestRequestHeaderAdd(t *testing.T) {
 			t.Errorf("%d. h.Add(%q, %q): got %v, want no error", i, tc.name, tc.values[0], err)
 		}
 		if err := h.Add(tc.name, tc.values[1]); err != nil && !tc.errOnSecondValue {
-			t.Errorf("%d. h.Add(%q, %q): got %v, want no error", err)
+			t.Errorf("%d. h.Add(%q, %q): got %v, want no error", i, tc.name, tc.values[1], err)
 		}
 	}
 
@@ -282,7 +282,7 @@ func TestResponseHeaderAdd(t *testing.T) {
 			t.Errorf("%d. h.Add(%q, %q): got %v, want no error", i, tc.name, tc.values[0], err)
 		}
 		if err := h.Add(tc.name, tc.values[1]); err != nil && !tc.errOnSecondValue {
-			t.Errorf("%d. h.Add(%q, %q): got %v, want no error", err)
+			t.Errorf("%d. h.Add(%q, %q): got %v, want no error", i, tc.name, tc.values[1], err)
 		}
 	}
 
