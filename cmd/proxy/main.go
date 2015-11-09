@@ -188,9 +188,8 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/cors"
-	"github.com/google/martian/fifo"
 	"github.com/google/martian/har"
-	"github.com/google/martian/header"
+	"github.com/google/martian/httpspec"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/verify"
@@ -224,7 +223,7 @@ func main() {
 	p := martian.NewProxy()
 
 	// Respond with 404 to any unknown proxy path.
-	http.Handle(*api+"/", http.HandlerFunc(http.NotFound))
+	http.HandleFunc(*api+"/", http.NotFound)
 
 	var x509c *x509.Certificate
 	var priv interface{}
@@ -264,34 +263,22 @@ func main() {
 		configure("/authority.cer", ah)
 	}
 
-	fg := fifo.NewGroup()
-
-	hbhm := header.NewHopByHopModifier()
-	fg.AddRequestModifier(hbhm)
-	fg.AddRequestModifier(header.NewForwardedModifier())
-	fg.AddRequestModifier(header.NewBadFramingModifier())
-
-	vm := header.NewViaModifier("martian")
-	fg.AddRequestModifier(vm)
+	stack, fg := httpspec.NewStack("martian")
+	p.SetRequestModifier(stack)
+	p.SetResponseModifier(stack)
 
 	m := martianhttp.NewModifier()
 	fg.AddRequestModifier(m)
 	fg.AddResponseModifier(m)
 
-	fg.AddResponseModifier(hbhm)
-	fg.AddResponseModifier(vm)
-
 	if *harLogging {
 		hl := har.NewLogger("martian", "2.0.0")
-		fg.AddRequestModifier(hl)
-		fg.AddResponseModifier(hl)
+		stack.AddRequestModifier(hl)
+		stack.AddResponseModifier(hl)
 
 		configure("/logs", har.NewExportHandler(hl))
 		configure("/logs/reset", har.NewResetHandler(hl))
 	}
-
-	p.SetRequestModifier(fg)
-	p.SetResponseModifier(fg)
 
 	// Proxy specific handlers.
 	// These handlers take precendence over proxy traffic and will not be
