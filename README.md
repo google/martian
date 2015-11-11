@@ -38,7 +38,7 @@ flag:
 By default, Martian will be running on port 8080. The port can be specified via
 a flag:
 
-    $GOPATH/bin/proxy -port=9999
+    $GOPATH/bin/proxy -addr=:9999
 
 ### Logging
 For logging of requests and responses a [logging
