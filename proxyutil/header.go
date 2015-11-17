@@ -62,7 +62,7 @@ func ResponseHeader(res *http.Response) *Header {
 
 // Set sets value at header name for the request or response.
 func (h *Header) Set(name, value string) error {
-	switch name {
+	switch http.CanonicalHeaderKey(name) {
 	case "Host":
 		h.setHost(value)
 	case "Content-Length":
@@ -84,7 +84,7 @@ func (h *Header) Set(name, value string) error {
 // Add appends the value to the existing header at name for the request or
 // response.
 func (h *Header) Add(name, value string) error {
-	switch name {
+	switch http.CanonicalHeaderKey(name) {
 	case "Host":
 		if h.host() != "" {
 			return fmt.Errorf("proxyutil: illegal header multiple: %s", "Host")
@@ -108,7 +108,7 @@ func (h *Header) Add(name, value string) error {
 
 // Get returns the first value at header name for the request or response.
 func (h *Header) Get(name string) string {
-	switch name {
+	switch http.CanonicalHeaderKey(name) {
 	case "Host":
 		return h.host()
 	case "Content-Length":
@@ -131,7 +131,7 @@ func (h *Header) Get(name string) string {
 // All returns all the values for header name. If the header does not exist it
 // returns nil, false.
 func (h *Header) All(name string) ([]string, bool) {
-	switch name {
+	switch http.CanonicalHeaderKey(name) {
 	case "Host":
 		if h.host() == "" {
 			return nil, false
@@ -151,14 +151,14 @@ func (h *Header) All(name string) ([]string, bool) {
 
 		return h.te(), true
 	default:
-		vs, ok := h.h[name]
+		vs, ok := h.h[http.CanonicalHeaderKey(name)]
 		return vs, ok
 	}
 }
 
 // Del deletes the header at name for the request or response.
 func (h *Header) Del(name string) {
-	switch name {
+	switch http.CanonicalHeaderKey(name) {
 	case "Host":
 		h.setHost("")
 	case "Content-Length":
