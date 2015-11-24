@@ -197,6 +197,7 @@ import (
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
 	"github.com/google/martian/martianhttp"
+	"github.com/google/martian/martianlog"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/trafficshape"
 	"github.com/google/martian/verify"
@@ -204,7 +205,6 @@ import (
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
 	mlog "github.com/google/martian/log"
-	_ "github.com/google/martian/martianlog"
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"
@@ -291,6 +291,12 @@ func main() {
 		configure("/logs", har.NewExportHandler(hl))
 		configure("/logs/reset", har.NewResetHandler(hl))
 	}
+
+	logger := martianlog.NewLogger()
+	logger.SetDecode(true)
+
+	stack.AddRequestModifier(logger)
+	stack.AddResponseModifier(logger)
 
 	// Proxy specific handlers.
 	// These handlers take precendence over proxy traffic and will not be

@@ -15,6 +15,10 @@
 package martian
 
 import (
+	"bufio"
+	"bytes"
+	"io/ioutil"
+	"net"
 	"net/http"
 	"testing"
 )
@@ -25,7 +29,7 @@ func TestContexts(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := TestContext(req)
+	ctx, remove, err := TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("TestContext(): got %v, want no error", err)
 	}
@@ -69,7 +73,7 @@ func TestContexts(t *testing.T) {
 		t.Errorf("s.Get(%q): got %q, want %q", "key", got, want)
 	}
 
-	ctx2, remove, err := TestContext(req)
+	ctx2, remove, err := TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("TestContext(): got %v, want no error", err)
 	}
@@ -77,5 +81,53 @@ func TestContexts(t *testing.T) {
 
 	if ctx != ctx2 {
 		t.Error("TestContext(): got new context, want existing context")
+	}
+}
+
+func TestContextHijack(t *testing.T) {
+	rc, wc := net.Pipe()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	ctx, remove, err := TestContext(req, rc, bufio.NewReadWriter(bufio.NewReader(rc), bufio.NewWriter(rc)))
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	session := ctx.Session()
+	if session.Hijacked() {
+		t.Fatal("session.Hijacked(): got true, want false")
+	}
+
+	conn, brw, err := session.Hijack()
+	if err != nil {
+		t.Fatalf("session.Hijack(): got %v, want no error", err)
+	}
+
+	if !session.Hijacked() {
+		t.Fatal("session.Hijacked(): got false, want true")
+	}
+
+	if _, _, err := session.Hijack(); err == nil {
+		t.Fatal("session.Hijack(): got nil, want rehijack error")
+	}
+
+	go func() {
+		brw.Write([]byte("test message"))
+		brw.Flush()
+		conn.Close()
+	}()
+
+	got, err := ioutil.ReadAll(wc)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
+	}
+
+	if want := []byte("test message"); !bytes.Equal(got, want) {
+		t.Errorf("connection: got %q, want %q", got, want)
 	}
 }

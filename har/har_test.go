@@ -40,7 +40,7 @@ func TestModifyRequest(t *testing.T) {
 	}
 	req.AddCookie(cookie)
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -144,7 +144,7 @@ func TestModifyResponse(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -260,7 +260,7 @@ func TestModifyRequestBodyURLEncoded(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -311,7 +311,7 @@ func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -362,7 +362,7 @@ func TestModifyRequestBodyMultipart(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", mpw.FormDataContentType())
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -426,7 +426,7 @@ func TestHARExportsTime(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -465,7 +465,7 @@ func TestReset(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -498,7 +498,7 @@ func TestExportSortsEntries(t *testing.T) {
 			t.Fatalf("NewRequest(): got %v, want no error", err)
 		}
 
-		_, remove, err := martian.TestContext(req)
+		_, remove, err := martian.TestContext(req, nil, nil)
 		if err != nil {
 			t.Fatalf("martian.TestContext(): got %v, want no error", err)
 		}
@@ -529,7 +529,7 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}

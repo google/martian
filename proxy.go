@@ -179,7 +179,9 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	defer p.conns.Done()
 	defer conn.Close()
 
-	s, err := newSession()
+	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+
+	s, err := newSession(conn, brw)
 	if err != nil {
 		log.Errorf("martian: failed to create session: %v", err)
 		return
@@ -190,8 +192,6 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 		log.Errorf("martian: failed to create context: %v", err)
 		return
 	}
-
-	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
 	for {
 		deadline := time.Now().Add(p.timeout)
@@ -243,7 +243,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		return nil
 	}
 
-	ctx, err = withSession(ctx.Session())
+	session := ctx.Session()
+
+	ctx, err = withSession(session)
 	if err != nil {
 		log.Errorf("martian: failed to build new context: %v", err)
 		return err
@@ -253,14 +255,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	defer unlink(req)
 
 	if tconn, ok := conn.(*tls.Conn); ok {
-		ctx.Session().MarkSecure()
+		session.MarkSecure()
 
 		cs := tconn.ConnectionState()
 		req.TLS = &cs
 	}
 
 	req.URL.Scheme = "http"
-	if ctx.Session().IsSecure() {
+	if session.IsSecure() {
 		log.Debugf("martian: forcing HTTPS inside secure session")
 		req.URL.Scheme = "https"
 	}
@@ -277,6 +279,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			log.Errorf("martian: error modifying CONNECT request: %v", err)
 			proxyutil.Warning(req.Header, err)
 		}
+		if session.Hijacked() {
+			log.Infof("martian: connection hijacked by request modifier")
+			return nil
+		}
 
 		if p.mitm != nil {
 			log.Debugf("martian: attempting MITM for connection: %s", req.Host)
@@ -285,6 +291,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			if err := p.resmod.ModifyResponse(res); err != nil {
 				log.Errorf("martian: error modifying CONNECT response: %v", err)
 				proxyutil.Warning(res.Header, err)
+			}
+			if session.Hijacked() {
+				log.Infof("martian: connection hijacked by response modifier")
+				return nil
 			}
 
 			res.Write(brw)
@@ -295,6 +305,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			tlsconn := tls.Server(conn, p.mitm.TLSForHost(req.Host))
 			brw.Writer.Reset(tlsconn)
 			brw.Reader.Reset(tlsconn)
+
+			session.setConn(tlsconn, brw)
 
 			return p.handle(ctx, tlsconn, brw)
 		}
@@ -310,6 +322,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				log.Errorf("martian: error modifying CONNECT response: %v", err)
 				proxyutil.Warning(res.Header, err)
 			}
+			if session.Hijacked() {
+				log.Infof("martian: connection hijacked by response modifier")
+				return nil
+			}
 
 			res.Write(brw)
 			return brw.Flush()
@@ -320,6 +336,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		if err := p.resmod.ModifyResponse(res); err != nil {
 			log.Errorf("martian: error modifying CONNECT response: %v", err)
 			proxyutil.Warning(res.Header, err)
+		}
+		if session.Hijacked() {
+			log.Infof("martian: connection hijacked by response modifier")
+			return nil
 		}
 
 		res.Write(brw)
@@ -354,6 +374,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		log.Errorf("martian: error modifying request: %v", err)
 		proxyutil.Warning(req.Header, err)
 	}
+	if session.Hijacked() {
+		log.Infof("martian: connection hijacked by request modifier")
+		return nil
+	}
 
 	res, err := p.roundTrip(ctx, req)
 	if err != nil {
@@ -366,6 +390,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	if err := p.resmod.ModifyResponse(res); err != nil {
 		log.Errorf("martian: error modifying response: %v", err)
 		proxyutil.Warning(res.Header, err)
+	}
+	if session.Hijacked() {
+		log.Infof("martian: connection hijacked by response modifier")
+		return nil
 	}
 
 	var closing error
