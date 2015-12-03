@@ -196,6 +196,7 @@ import (
 	"github.com/google/martian/cors"
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
+	"github.com/google/martian/marbl"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/martianlog"
 	"github.com/google/martian/mitm"
@@ -297,6 +298,13 @@ func main() {
 
 	stack.AddRequestModifier(logger)
 	stack.AddResponseModifier(logger)
+
+	lsh := marbl.NewHandler()
+	http.Handle("/binlogs", lsh)
+
+	lsm := marbl.NewModifier(lsh)
+	stack.AddRequestModifier(lsm)
+	stack.AddResponseModifier(lsm)
 
 	// Proxy specific handlers.
 	// These handlers take precendence over proxy traffic and will not be
