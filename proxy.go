@@ -227,16 +227,19 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		closing := req.Close || p.Closing()
 
 		log.Infof("martian: intercepted configuration request: %s", req.URL)
-		rw := newResponseWriter(brw, closing)
-		defer rw.Close()
+		rw := newResponseWriter(conn, brw, closing)
 
 		h.ServeHTTP(rw, req)
 
-		// Call WriteHeader to ensure a response is sent, since the handler isn't
-		// required to call WriteHeader/Write.
-		rw.WriteHeader(200)
+		if !rw.hijacked {
+			defer rw.Close()
 
-		if closing {
+			// Call WriteHeader to ensure a response is sent, since the handler isn't
+			// required to call WriteHeader/Write.
+			rw.WriteHeader(200)
+		}
+
+		if rw.hijacked || closing {
 			return errClose
 		}
 

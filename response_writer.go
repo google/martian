@@ -15,11 +15,15 @@
 package martian
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
-	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 )
+
+var errHijacked = errors.New("martian: connection has already been hijacked")
 
 // responseWriter is a lightweight http.ResponseWriter designed to allow
 // Martian to support in-proxy endpoints.
@@ -27,37 +31,20 @@ import (
 // responseWriter does not support all of the functionality of the net/http
 // ResponseWriter; in particular, it does not sniff Content-Types.
 type responseWriter struct {
-	ow          io.WriteCloser // original writer
-	cw          io.WriteCloser // current writer
+	conn        net.Conn
+	bw          *bufio.ReadWriter
 	hdr         http.Header
+	hijacked    bool
 	chunked     bool
 	wroteHeader bool
 	closing     bool
 }
 
-type writeCloser interface {
-	io.Writer
-	io.Closer
-}
-
-type nopWriteCloser struct {
-	io.Writer
-}
-
-func (wc *nopWriteCloser) Close() error {
-	return nil
-}
-
 // newResponseWriter returns a new http.ResponseWriter.
-func newResponseWriter(w io.Writer, closing bool) *responseWriter {
-	wc, ok := w.(writeCloser)
-	if !ok {
-		wc = &nopWriteCloser{w}
-	}
-
+func newResponseWriter(conn net.Conn, bw *bufio.ReadWriter, closing bool) *responseWriter {
 	return &responseWriter{
-		ow:      wc,
-		cw:      wc,
+		conn:    conn,
+		bw:      bw,
 		hdr:     http.Header{},
 		closing: closing,
 	}
@@ -71,21 +58,25 @@ func (rw *responseWriter) Header() http.Header {
 // Write writes b to the response body; if the header has yet to be written it
 // will write that before the body.
 func (rw *responseWriter) Write(b []byte) (int, error) {
+	if rw.hijacked {
+		return 0, errHijacked
+	}
+
 	if !rw.wroteHeader {
 		rw.WriteHeader(200)
 	}
 
-	return rw.cw.Write(b)
+	return rw.bw.Write(b)
 }
 
 // WriteHeader writes the status line and headers.
 func (rw *responseWriter) WriteHeader(status int) {
-	if rw.wroteHeader {
+	if rw.wroteHeader || rw.hijacked {
 		return
 	}
 	rw.wroteHeader = true
 
-	fmt.Fprintf(rw.ow, "HTTP/1.1 %d %s\r\n", status, http.StatusText(status))
+	fmt.Fprintf(rw.bw, "HTTP/1.1 %d %s\r\n", status, http.StatusText(status))
 
 	if rw.closing {
 		rw.hdr.Set("Connection", "close")
@@ -94,22 +85,36 @@ func (rw *responseWriter) WriteHeader(status int) {
 	if rw.hdr.Get("Content-Length") == "" {
 		rw.hdr.Set("Transfer-Encoding", "chunked")
 		rw.chunked = true
-		rw.cw = httputil.NewChunkedWriter(rw.ow)
+
+		rw.bw.Flush()
+		rw.bw.Writer.Reset(httputil.NewChunkedWriter(rw.conn))
 	}
 
-	rw.hdr.Write(rw.ow)
-	rw.ow.Write([]byte("\r\n"))
+	rw.hdr.Write(rw.conn)
+	rw.conn.Write([]byte("\r\n"))
 }
 
-// Close closes the underlying writer if it is also an io.Closer.
+// Close writes the trailing newline for chunked responses.
 func (rw *responseWriter) Close() error {
-	if err := rw.cw.Close(); err != nil {
-		return err
+	if rw.hijacked {
+		return errHijacked
 	}
 
 	if rw.chunked {
-		rw.ow.Write([]byte("\r\n"))
+		rw.bw.Flush()
+		rw.conn.Write([]byte("\r\n"))
 	}
 
 	return nil
+}
+
+// Hijack disconnects the underlying connection from the ResponseWriter and
+// returns it to the handler.
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if rw.hijacked {
+		return nil, nil, errHijacked
+	}
+	rw.hijacked = true
+
+	return rw.conn, rw.bw, nil
 }

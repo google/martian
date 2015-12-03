@@ -156,6 +156,31 @@ func (h *Header) All(name string) ([]string, bool) {
 	}
 }
 
+// Map returns a map of header names to values for use in for range loops,
+// similar to http.Header.
+func (h *Header) Map() map[string][]string {
+	hm := make(map[string][]string)
+
+	for k, vs := range h.h {
+		hm[k] = vs
+	}
+
+	for _, k := range []string{
+		"Host",
+		"Content-Length",
+		"Transfer-Encoding",
+	} {
+		vs, ok := h.All(k)
+		if !ok {
+			continue
+		}
+
+		hm[k] = vs
+	}
+
+	return hm
+}
+
 // Del deletes the header at name for the request or response.
 func (h *Header) Del(name string) {
 	switch http.CanonicalHeaderKey(name) {

@@ -26,7 +26,7 @@ import (
 func TestResponseWriter(t *testing.T) {
 	buf := &bytes.Buffer{}
 
-	rw := newResponseWriter(buf, true)
+	rw := newResponseWriter(nil, buf, true)
 	rw.Header().Set("Martian-Response", "true")
 	rw.Header().Set("Content-Length", "12")
 
@@ -71,7 +71,7 @@ func TestResponseWriter(t *testing.T) {
 func TestResponseWriterChunkedEncoding(t *testing.T) {
 	buf := &bytes.Buffer{}
 
-	rw := newResponseWriter(buf, true)
+	rw := newResponseWriter(nil, buf, true)
 	rw.Header().Set("Martian-Response", "true")
 
 	rw.Write([]byte("test "))
