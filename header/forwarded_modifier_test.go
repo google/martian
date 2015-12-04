@@ -22,6 +22,7 @@ import (
 func TestSetForwardHeaders(t *testing.T) {
 	xfp := "X-Forwarded-Proto"
 	xff := "X-Forwarded-For"
+	xfh := "X-Forwarded-Host"
 
 	m := NewForwardedModifier()
 	req, err := http.NewRequest("GET", "http://martian.local", nil)
@@ -39,6 +40,9 @@ func TestSetForwardHeaders(t *testing.T) {
 	}
 	if got, want := req.Header.Get(xff), "10.0.0.1"; got != want {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", xff, got, want)
+	}
+	if got, want := req.Header.Get(xfh), "martian.local"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", xfh, got, want)
 	}
 
 	// Test with existing X-Forwarded-For.
