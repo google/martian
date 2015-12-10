@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 )
 
@@ -65,15 +64,6 @@ func (m *FileModifier) ModifyResponse(res *http.Response) error {
 	res.Header.Set("Content-Type", m.contentType)
 	res.ContentLength = int64(len(m.body))
 	res.Body = ioutil.NopCloser(bytes.NewReader(m.body))
-
-	return nil
-}
-
-// ModifyRequest signals to the proxy to skip the round trip, since the
-// resource returned is local to the proxy.
-func (m *FileModifier) ModifyRequest(req *http.Request) error {
-	ctx := martian.NewContext(req)
-	ctx.SkipRoundTrip()
 
 	return nil
 }
