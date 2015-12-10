@@ -15,15 +15,15 @@ func init() {
 	parse.Register("body.FromFile", fileModifierFromJSON)
 }
 
-// FileModifier substitutes the body on an HTTP response with bytes read from
-// a file local to the proxy.
+// FileModifier substitutes the body on an HTTP response with bytes read from a
+// file local to the proxy.
 type FileModifier struct {
 	contentType string
 	body        []byte
 }
 
-// NewFileModifier reads a local file and constructs a modifier that replaces the
-// body of an HTTP message with the contents of the file.
+// NewFileModifier reads a local file and constructs a modifier that replaces
+// the body of an HTTP message with the contents of the file.
 func NewFileModifier(path string) (*FileModifier, error) {
 	ext := filepath.Ext(path)
 	ct := mime.TypeByExtension(ext)
@@ -56,8 +56,8 @@ func fileModifierFromJSON(b []byte) (*parse.Result, error) {
 	return parse.NewResult(mod, msg.Scope)
 }
 
-// ModifyResponse replaces the the body of an HTTP response with the bytes
-// read from the file at the provided path.
+// ModifyResponse replaces the the body of an HTTP response with the bytes read
+// from the file at the provided path.
 func (m *FileModifier) ModifyResponse(res *http.Response) error {
 	res.Body.Close()
 	res.Header.Del("Content-Encoding")
