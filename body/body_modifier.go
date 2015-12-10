@@ -37,7 +37,7 @@ type Modifier struct {
 
 type modifierJSON struct {
 	ContentType string               `json:"contentType"`
-	Path        string               `json:"path"`
+	Path        string               `json:"path"` // Path is a path local to the proxy.
 	Body        []byte               `json:"body"` // Body is expected to be a Base64 encoded string.
 	Scope       []parse.ModifierType `json:"scope"`
 }
@@ -67,11 +67,18 @@ func NewModifierFromFile(path string, contentType string) (*Modifier, error) {
 // modifierFromJSON takes a JSON message as a byte slice and returns a
 // body.Modifier and an error.
 //
-// Example JSON Configuration message:
+// Example JSON Configuration message providing Base64 encoded body:
 // {
 //   "scope": ["request", "response"],
 //   "contentType": "text/plain",
 //   "body": "c29tZSBkYXRhIHdpdGggACBhbmQg77u/" // Base64 encoded body
+// }
+//
+// Example JSON Configuration message providing a local file:
+// {
+//   "scope": ["request", "response"],
+//   "contentType": "text/plain",
+//   "path": "some/local/path/to/a/file.json/" // Path local to the proxy
 // }
 func modifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &modifierJSON{}
