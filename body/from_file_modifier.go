@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"path/filepath"
 
@@ -11,16 +12,15 @@ import (
 )
 
 // FileModifier substitutes the body on an HTTP response with bytes read from
-// a file.
+// a file local to the proxy.
 type FileModifier struct {
 	contentType string
 	body        []byte
 }
 
 type fileModifierJSON struct {
-	ContentType string               `json:"contentType"`
-	Path        string               `json:"path"`
-	Scope       []parse.ModifierType `json:"scope"`
+	Path  string               `json:"path"`
+	Scope []parse.ModifierType `json:"scope"`
 }
 
 func init() {
@@ -29,15 +29,16 @@ func init() {
 
 // NewFileModifier reads a file and constructs a modifier that will replace the
 // body of an HTTP message with the contents of the file.
-func NewFileModifier(path string, contentType string) (*FileModifier, error) {
-	p := filepath.Clean("/" + path)
-	b, err := ioutil.ReadFile(p)
+func NewFileModifier(path string) (*FileModifier, error) {
+	ext := filepath.Ext(path)
+	ct := mime.TypeByExtension(ext)
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
 	return &FileModifier{
-		contentType: contentType,
+		contentType: ct,
 		body:        b,
 	}, nil
 }
@@ -48,7 +49,7 @@ func fileModifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	mod, err := NewFileModifier(msg.Path, msg.ContentType)
+	mod, err := NewFileModifier(msg.Path)
 	if err != nil {
 		return nil, err
 	}
