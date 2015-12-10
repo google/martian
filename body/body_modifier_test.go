@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -126,5 +127,48 @@ func TestModifierFromJSON(t *testing.T) {
 
 	if want := []byte("data"); !bytes.Equal(got, want) {
 		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+}
+
+func TestBodyFromFileModifierOnRequest(t *testing.T) {
+	req, err := http.NewRequest("GET", "test.json", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+
+	tf, err := ioutil.TempFile("", "TestBodyFromFileModifierOnRequest")
+	if err != nil {
+		t.Fatalf("ioutil.TempFile: got %v, want no error", err)
+	}
+	defer os.Remove(tf.Name())
+
+	testJSON := "{\"foo\": \"bar\"}"
+	if err := ioutil.WriteFile(tf.Name(), []byte(testJSON), 0777); err != nil {
+		t.Fatalf("ioutil.WriteFile: got %v, want no error", err)
+	}
+
+	mod, err := NewModifierFromFile(tf.Name(), "application/json")
+	if err != nil {
+		t.Fatalf("NewFileModifier: got %v, want no error", err)
+	}
+
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	gotBytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
+	}
+
+	wantBytes := []byte(testJSON)
+	if !bytes.Equal(gotBytes, wantBytes) {
+		t.Errorf("res.Body: got %v, want %v", gotBytes, wantBytes)
+	}
+
+	if got, want := res.ContentLength, int64(len(wantBytes)); got != want {
+		t.Errorf("res.Header.Get(%q): got %v, want %v", "Content-Length", got, want)
 	}
 }

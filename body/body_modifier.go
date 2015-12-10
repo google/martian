@@ -18,6 +18,7 @@ package body
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 
@@ -36,6 +37,7 @@ type Modifier struct {
 
 type modifierJSON struct {
 	ContentType string               `json:"contentType"`
+	Path        string               `json:"path"`
 	Body        []byte               `json:"body"` // Body is expected to be a Base64 encoded string.
 	Scope       []parse.ModifierType `json:"scope"`
 }
@@ -46,6 +48,20 @@ func NewModifier(b []byte, contentType string) *Modifier {
 		contentType: contentType,
 		body:        b,
 	}
+}
+
+// NewModifierFromFile returns a body.Modifier that substitutes the body on an
+// HTTP response with bytes read from a file local to the proxy.
+func NewModifierFromFile(path string, contentType string) (*Modifier, error) {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Modifier{
+		contentType: contentType,
+		body:        b,
+	}, nil
 }
 
 // modifierFromJSON takes a JSON message as a byte slice and returns a
@@ -63,8 +79,26 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	mod := NewModifier(msg.Body, msg.ContentType)
-	return parse.NewResult(mod, msg.Scope)
+	if msg.Body != nil && msg.Path != "" {
+		return nil, errors.New("body.modifierFromJSON: Body and Path both supplied. These fields are mutually exclusive")
+	}
+
+	if msg.Body != nil {
+		mod := NewModifier(msg.Body, msg.ContentType)
+
+		return parse.NewResult(mod, msg.Scope)
+	}
+
+	if msg.Path != "" {
+		mod, err := NewModifierFromFile(msg.Path, msg.ContentType)
+		if err != nil {
+			return nil, err
+		}
+
+		return parse.NewResult(mod, msg.Scope)
+	}
+
+	return nil, errors.New("body.modifierFromJSON: Neither Body nor Path supplied.")
 }
 
 // ModifyRequest sets the Content-Type header and overrides the request body.
