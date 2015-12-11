@@ -18,7 +18,6 @@ package body
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 
@@ -27,6 +26,7 @@ import (
 
 func init() {
 	parse.Register("body.Modifier", modifierFromJSON)
+	parse.Register("body.FromFileModifier", fromFileModifierFromJSON)
 }
 
 // Modifier substitutes the body on an HTTP response.
@@ -37,8 +37,13 @@ type Modifier struct {
 
 type modifierJSON struct {
 	ContentType string               `json:"contentType"`
-	Path        string               `json:"path"` // Path is a path local to the proxy.
 	Body        []byte               `json:"body"` // Body is expected to be a Base64 encoded string.
+	Scope       []parse.ModifierType `json:"scope"`
+}
+
+type fromFileModifierJSON struct {
+	ContentType string               `json:"contentType"`
+	Path        string               `json:"path"` // Path is a path local to the proxy.
 	Scope       []parse.ModifierType `json:"scope"`
 }
 
@@ -50,9 +55,20 @@ func NewModifier(b []byte, contentType string) *Modifier {
 	}
 }
 
-// NewModifierFromFile returns a body.Modifier that substitutes the body on an
+// NewFromFileModifier returns a body.Modifier that substitutes the body on an
 // HTTP response with bytes read from a file local to the proxy.
-func NewModifierFromFile(path string, contentType string) (*Modifier, error) {
+func NewFromFileModifier(path string, contentType string) (*Modifier, error) {
+	p, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+
+	public := filepath.Join("martian", "public")
+
+	if !p.Contains(filepath.Join("public", "martian")) {
+		return nil, errors.New("file must be inside a directory named %q", pub)
+	}
+
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -67,18 +83,34 @@ func NewModifierFromFile(path string, contentType string) (*Modifier, error) {
 // modifierFromJSON takes a JSON message as a byte slice and returns a
 // body.Modifier and an error.
 //
-// Example JSON Configuration message providing Base64 encoded body:
-// {
-//   "scope": ["request", "response"],
-//   "contentType": "text/plain",
-//   "body": "c29tZSBkYXRhIHdpdGggACBhbmQg77u/" // Base64 encoded body
-// }
-//
 // Example JSON Configuration message providing a local file:
 // {
 //   "scope": ["request", "response"],
 //   "contentType": "text/plain",
 //   "path": "some/local/path/to/a/file.json/" // Path local to the proxy
+// }
+func fromFileModifierFromJSON(b []byte) (*parse.Result, error) {
+	msg := &fromFileModifierJSON{}
+	if err := json.Unmarshal(b, msg); err != nil {
+		return nil, err
+	}
+
+	mod, err := NewFromFileModifier(msg.Path, msg.ContentType)
+	if err != nil {
+		return nil, err
+	}
+
+	return parse.NewResult(mod, msg.Scope)
+}
+
+// modifierFromJSON takes a JSON message as a byte slice and returns a
+// body.Modifier and an error.
+//
+// Example JSON Configuration message providing Base64 encoded body:
+// {
+//   "scope": ["request", "response"],
+//   "contentType": "text/plain",
+//   "body": "c29tZSBkYXRhIHdpdGggACBhbmQg77u/" // Base64 encoded body
 // }
 func modifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &modifierJSON{}
@@ -86,26 +118,9 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	if msg.Body != nil && msg.Path != "" {
-		return nil, errors.New("body.modifierFromJSON: Body and Path both supplied. These fields are mutually exclusive")
-	}
+	mod := NewModifier(msg.Body, msg.ContentType)
 
-	if msg.Body != nil {
-		mod := NewModifier(msg.Body, msg.ContentType)
-
-		return parse.NewResult(mod, msg.Scope)
-	}
-
-	if msg.Path != "" {
-		mod, err := NewModifierFromFile(msg.Path, msg.ContentType)
-		if err != nil {
-			return nil, err
-		}
-
-		return parse.NewResult(mod, msg.Scope)
-	}
-
-	return nil, errors.New("body.modifierFromJSON: Neither Body nor Path supplied.")
+	return parse.NewResult(mod, msg.Scope)
 }
 
 // ModifyRequest sets the Content-Type header and overrides the request body.

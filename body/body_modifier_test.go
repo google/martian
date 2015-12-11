@@ -149,7 +149,7 @@ func TestBodyFromFileModifierOnRequest(t *testing.T) {
 		t.Fatalf("ioutil.WriteFile: got %v, want no error", err)
 	}
 
-	mod, err := NewModifierFromFile(tf.Name(), "application/json")
+	mod, err := NewFromFileModifier(tf.Name(), "application/json")
 	if err != nil {
 		t.Fatalf("NewFileModifier: got %v, want no error", err)
 	}
