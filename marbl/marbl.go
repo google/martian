@@ -124,9 +124,13 @@ func (s *Stream) loop() {
 }
 
 func (s *Stream) LogRequest(id string, req *http.Request) error {
-	s.sendHeader(id, Request, ":method:", req.Method)
-	s.sendHeader(id, Request, ":url:", req.URL.String())
-	s.sendHeader(id, Request, ":proto:", req.Proto)
+	s.sendHeader(id, Request, ":method", req.Method)
+	s.sendHeader(id, Request, ":scheme", req.URL.Scheme)
+	s.sendHeader(id, Request, ":authority", req.URL.Host)
+	s.sendHeader(id, Request, ":path", req.URL.Path)
+	s.sendHeader(id, Request, ":query", req.URL.RawQuery)
+	s.sendHeader(id, Request, ":proto", req.Proto)
+	s.sendHeader(id, Request, ":remote-addr", req.RemoteAddr)
 
 	h := proxyutil.RequestHeader(req)
 
@@ -147,9 +151,9 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 }
 
 func (s *Stream) LogResponse(id string, res *http.Response) error {
-	s.sendHeader(id, Response, ":proto:", res.Proto)
-	s.sendHeader(id, Response, ":status:", strconv.Itoa(res.StatusCode))
-	s.sendHeader(id, Response, ":status-text:", res.Status)
+	s.sendHeader(id, Response, ":proto", res.Proto)
+	s.sendHeader(id, Response, ":status", strconv.Itoa(res.StatusCode))
+	s.sendHeader(id, Response, ":reason", res.Status)
 
 	h := proxyutil.ResponseHeader(res)
 
