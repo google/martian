@@ -17,12 +17,15 @@ package header
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/google/martian"
 )
 
 const viaLoopKey = "via.LoopDetection"
+
+var whitespace = regexp.MustCompile("[\t ]+")
 
 type viaModifier struct {
 	requestedBy string
@@ -45,7 +48,7 @@ func (m *viaModifier) ModifyRequest(req *http.Request) error {
 	via := fmt.Sprintf("%d.%d %s", req.ProtoMajor, req.ProtoMinor, m.requestedBy)
 
 	if v := req.Header.Get("Via"); v != "" {
-		if strings.Contains(v, m.requestedBy) {
+		if m.hasLoop(v) {
 			err := fmt.Errorf("via: detected request loop, header contains %s", m.requestedBy)
 
 			ctx := martian.NewContext(req)
@@ -76,4 +79,23 @@ func (m *viaModifier) ModifyResponse(res *http.Response) error {
 	}
 
 	return nil
+}
+
+// hasLoop parses via and attempts to match requestedBy against the contained
+// pseudonyms/host:port pairs.
+func (m *viaModifier) hasLoop(via string) bool {
+	for _, v := range strings.Split(via, ",") {
+		parts := whitespace.Split(strings.TrimSpace(v), 3)
+
+		// No pseudonym or host:port, assume there is no loop.
+		if len(parts) < 2 {
+			continue
+		}
+
+		if m.requestedBy == parts[1] {
+			return true
+		}
+	}
+
+	return false
 }
