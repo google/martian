@@ -23,6 +23,7 @@ Go 1.5
 ### Installation
 Martian Proxy can be installed using `go install`
 
+    go get github.com/google/martian/ && \
     go install github.com/google/martian/cmd/proxy
 
 ### Start the Proxy
