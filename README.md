@@ -34,7 +34,7 @@ Assuming you've installed Martian, running the proxy is as simple as
 If you want to see system logs as Martian is running, pass in the verbosity
 flag:
 
-    $GOPATH/bin/proxy -v
+    $GOPATH/bin/proxy -v=2
 
 By default, Martian will be running on port 8080. The port can be specified via
 a flag:
