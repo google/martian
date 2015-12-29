@@ -60,6 +60,20 @@ func NewStream(w io.Writer) *Stream {
 	return s
 }
 
+func (s *Stream) loop() {
+	for {
+		select {
+		case f := <-s.framec:
+			_, err := s.w.Write(f)
+			if err != nil {
+				// log the error.
+			}
+		case <-s.closec:
+			return
+		}
+	}
+}
+
 func (s *Stream) Close() error {
 	close(s.closec)
 
@@ -107,20 +121,6 @@ func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b 
 	f = append(f, b...)
 
 	s.framec <- f
-}
-
-func (s *Stream) loop() {
-	for {
-		select {
-		case f := <-s.framec:
-			_, err := s.w.Write(f)
-			if err != nil {
-				// log the error.
-			}
-		case <-s.closec:
-			return
-		}
-	}
 }
 
 func (s *Stream) LogRequest(id string, req *http.Request) error {
