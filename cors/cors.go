@@ -19,29 +19,48 @@ import (
 	"net/http"
 )
 
-type handler struct {
-	handler http.Handler
+// Handler is an http.Handler that wraps other http.Handlers and provides CORS
+// support.
+type Handler struct {
+	handler          http.Handler
+	origin           string
+	allowCredentials bool
 }
 
 // NewHandler wraps an existing http.Handler allowing it to be requested via CORS.
-func NewHandler(h http.Handler) http.Handler {
-	return &handler{
+func NewHandler(h http.Handler) *Handler {
+	return &Handler{
 		handler: h,
+		origin:  "*",
 	}
+}
+
+// SetOrigin sets the origin(s) to allow when requested with CORS.
+func (h *Handler) SetOrigin(origin string) {
+	h.origin = origin
+}
+
+// AllowCredentials allows cookies to be read by the CORS request.
+func (h *Handler) AllowCredentials(allow bool) {
+	h.allowCredentials = allow
 }
 
 // ServeHTTP determines if a request is a CORS request (normal or preflight)
 // and sets the appropriate Access-Control-Allow-* headers. It will send the
 // request to the underlying handler in all cases, except for a preflight
 // (OPTIONS) request.
-func (h *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Definitely not a CORS request, send it directly to handler.
 	if req.Header.Get("Origin") == "" {
 		h.handler.ServeHTTP(rw, req)
 		return
 	}
 
-	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Access-Control-Allow-Origin", h.origin)
+
+	if h.allowCredentials {
+		rw.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
 
 	acrm := req.Header.Get("Access-Control-Request-Method")
 	rw.Header().Set("Access-Control-Allow-Methods", acrm)
