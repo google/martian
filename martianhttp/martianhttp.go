@@ -16,6 +16,8 @@
 package martianhttp
 
 import (
+	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"sync"
@@ -31,6 +33,7 @@ var noop = martian.Noop("martianhttp.Modifier")
 // Modifier is a locking modifier that is configured via http.Handler.
 type Modifier struct {
 	mu     sync.RWMutex
+	config []byte
 	reqmod martian.RequestModifier
 	resmod martian.ResponseModifier
 }
@@ -48,6 +51,10 @@ func (m *Modifier) SetRequestModifier(reqmod martian.RequestModifier) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.setRequestModifier(reqmod)
+}
+
+func (m *Modifier) setRequestModifier(reqmod martian.RequestModifier) {
 	if reqmod == nil {
 		reqmod = noop
 	}
@@ -60,6 +67,10 @@ func (m *Modifier) SetResponseModifier(resmod martian.ResponseModifier) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.setResponseModifier(resmod)
+}
+
+func (m *Modifier) setResponseModifier(resmod martian.ResponseModifier) {
 	if resmod == nil {
 		resmod = noop
 	}
@@ -129,20 +140,30 @@ func (m *Modifier) ResetResponseVerifications() {
 	}
 }
 
-// ServeHTTP accepts a POST request with a body containing a modifier as a JSON
-// message and updates the contained reqmod and resmod with the parsed
-// modifier.
+// ServeHTTP sets or retrieves the JSON-encoded modifier configuration
+// depending on request method. POST requests are expected to provide a JSON
+// modifier message in the body which will be used to update the contained
+// request and response modifiers. GET requests will return the JSON
+// (pretty-printed) for the most recent configuration.
 func (m *Modifier) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if req.Method != "POST" {
-		rw.Header().Set("Allow", "POST")
-		rw.WriteHeader(405)
+	switch req.Method {
+	case "POST":
+		m.servePOST(rw, req)
 		return
+	case "GET":
+		m.serveGET(rw, req)
+		return
+	default:
+		rw.Header().Set("Allow", "GET, POST")
+		rw.WriteHeader(405)
 	}
+}
 
+func (m *Modifier) servePOST(rw http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		http.Error(rw, err.Error(), 500)
-		log.Errorf("error reading request body: %v", err)
+		log.Errorf("martianhttp: error reading request body: %v", err)
 		return
 	}
 	req.Body.Close()
@@ -150,10 +171,29 @@ func (m *Modifier) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	r, err := parse.FromJSON(body)
 	if err != nil {
 		http.Error(rw, err.Error(), 400)
-		log.Errorf("error parsing JSON: %v", err)
+		log.Errorf("martianhttp: error parsing JSON: %v", err)
 		return
 	}
 
-	m.SetRequestModifier(r.RequestModifier())
-	m.SetResponseModifier(r.ResponseModifier())
+	buf := new(bytes.Buffer)
+	if err := json.Indent(buf, body, "", "  "); err != nil {
+		http.Error(rw, err.Error(), 400)
+		log.Errorf("martianhttp: error formatting JSON: %v", err)
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.config = buf.Bytes()
+	m.setRequestModifier(r.RequestModifier())
+	m.setResponseModifier(r.ResponseModifier())
+}
+
+func (m *Modifier) serveGET(rw http.ResponseWriter, req *http.Request) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write(m.config)
 }

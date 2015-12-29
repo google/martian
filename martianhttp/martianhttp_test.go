@@ -15,10 +15,11 @@
 package martianhttp
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/google/martian/martiantest"
@@ -144,7 +145,7 @@ func TestVerifyResponses(t *testing.T) {
 func TestServeHTTPInvalidMethod(t *testing.T) {
 	m := NewModifier()
 
-	req, err := http.NewRequest("GET", "/martian/modifiers", nil)
+	req, err := http.NewRequest("PATCH", "/configure", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(%q, ...): got %v, want no error", "GET", err)
 	}
@@ -154,7 +155,7 @@ func TestServeHTTPInvalidMethod(t *testing.T) {
 	if got, want := rw.Code, 405; got != want {
 		t.Errorf("rw.Code: got %d, want %d", got, want)
 	}
-	if got, want := rw.Header().Get("Allow"), "POST"; got != want {
+	if got, want := rw.Header().Get("Allow"), "GET, POST"; got != want {
 		t.Errorf("rw.Header().Get(%q): got %q, want %q", "Allow", got, want)
 	}
 }
@@ -162,9 +163,9 @@ func TestServeHTTPInvalidMethod(t *testing.T) {
 func TestServeHTTPInvalidJSON(t *testing.T) {
 	m := NewModifier()
 
-	req, err := http.NewRequest("POST", "/martian/modifiers", strings.NewReader("not-json"))
+	req, err := http.NewRequest("POST", "/configure", bytes.NewReader([]byte("not-json")))
 	if err != nil {
-		t.Fatalf("http.NewRequest(%q, %q, ...): got %v, want no error", "POST", "/martian/modifiers", err)
+		t.Fatalf("http.NewRequest(%q, %q, ...): got %v, want no error", "POST", "/configure", err)
 	}
 	rw := httptest.NewRecorder()
 
@@ -177,7 +178,7 @@ func TestServeHTTPInvalidJSON(t *testing.T) {
 func TestServeHTTP(t *testing.T) {
 	m := NewModifier()
 
-	body := strings.NewReader(`{
+	body := []byte(`{
     "header.Modifier": {
       "scope": ["request", "response"],
 			"name": "Martian-Test",
@@ -185,7 +186,7 @@ func TestServeHTTP(t *testing.T) {
 		}
 	}`)
 
-	req, err := http.NewRequest("POST", "/martian/modifiers?id=id", body)
+	req, err := http.NewRequest("POST", "/configure", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
@@ -215,5 +216,31 @@ func TestServeHTTP(t *testing.T) {
 	}
 	if got, want := res.Header.Get("Martian-Test"), "true"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Martian-Test", got, want)
+	}
+
+	req, err = http.NewRequest("GET", "/configure", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	rw = httptest.NewRecorder()
+
+	m.ServeHTTP(rw, req)
+	if got, want := rw.Code, 200; got != want {
+		t.Errorf("rw.Code: got %d, want %d", got, want)
+	}
+
+	got := new(bytes.Buffer)
+	want := new(bytes.Buffer)
+
+	if err := json.Compact(got, body); err != nil {
+		t.Fatalf("json.Compact(body): got %v, want no error", err)
+	}
+
+	if err := json.Compact(want, rw.Body.Bytes()); err != nil {
+		t.Fatalf("json.Compact(rw.Body): got %v, want no error", err)
+	}
+
+	if !bytes.Equal(got.Bytes(), want.Bytes()) {
+		t.Errorf("rw.Body: got %q, want %q", got.Bytes(), want.Bytes())
 	}
 }
