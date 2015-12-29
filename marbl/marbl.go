@@ -130,7 +130,7 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 	s.sendHeader(id, Request, ":path", req.URL.Path)
 	s.sendHeader(id, Request, ":query", req.URL.RawQuery)
 	s.sendHeader(id, Request, ":proto", req.Proto)
-	s.sendHeader(id, Request, ":remote-addr", req.RemoteAddr)
+	s.sendHeader(id, Request, ":remote", req.RemoteAddr)
 
 	h := proxyutil.RequestHeader(req)
 
