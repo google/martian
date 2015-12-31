@@ -22,20 +22,20 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 )
 
 const (
-	headerErrFormat = "%s(%s) header verify failure: got no header, want %s header"
-	valueErrFormat  = "%s(%s) header verify failure: got %s with value %s, want value %s"
+	missingHeaderFormat = "got no header, want %s header"
+	missingValueFormat  = "got %s with value %%s, want value %%s"
 )
 
-type verifier struct {
+// Verifier is a header verifier.
+type Verifier struct {
 	name, value string
-	reqerr      *verify.MultiError
-	reserr      *verify.MultiError
 }
 
 type verifierJSON struct {
@@ -49,52 +49,42 @@ func init() {
 }
 
 // NewVerifier creates a new header verifier for the given name and value.
-func NewVerifier(name, value string) verify.RequestResponseVerifier {
+func NewVerifier(name, value string) *Verifier {
 	return &verifier{
-		name:   name,
-		value:  value,
-		reqerr: verify.NewMultiError(),
-		reserr: verify.NewMultiError(),
+		name:  name,
+		value: value,
 	}
 }
 
 // ModifyRequest verifies that the header for name is present in all modified
 // requests. If value is non-empty the value must be present in at least one
-// header for name. An error will be added to the contained *MultiError for
-// every unmatched request.
+// header for name. An error will be added for every unmatched request.
 func (v *verifier) ModifyRequest(req *http.Request) error {
 	h := proxyutil.RequestHeader(req)
+	ctx := martian.NewContext(req)
+	err := verify.RequestError("header.Verifier", req)
 
-	vs, ok := h.All(v.name)
-	if !ok {
-		v.reqerr.Add(fmt.Errorf(headerErrFormat, "request", req.URL, v.name))
-		return nil
-	}
-
-	for _, value := range vs {
-		switch v.value {
-		case "", value:
-			return nil
-		}
-	}
-
-	v.reqerr.Add(fmt.Errorf(valueErrFormat, "request", req.URL, v.name,
-		strings.Join(vs, ", "), v.value))
-
-	return nil
+	return v.verify(ctx, h, err)
 }
 
 // ModifyResponse verifies that the header for name is present in all modified
 // responses. If value is non-empty the value must be present in at least one
-// header for name. An error will be added to the contained *MultiError for
-// every unmatched response.
+// header for name. An error will be added for every unmatched response.
 func (v *verifier) ModifyResponse(res *http.Response) error {
 	h := proxyutil.ResponseHeader(res)
+	ctx := martian.NewContext(res.Request)
+	err := verify.ResponseError("header.Verifier", res)
 
+	return v.verify(ctx, h, err)
+}
+
+func (v *Verifier) verify(ctx *martian.Context, h *proxyutil.Header, ev *verify.ErrorValue) error {
 	vs, ok := h.All(v.name)
 	if !ok {
-		v.reserr.Add(fmt.Errorf(headerErrFormat, "response", res.Request.URL, v.name))
-		return nil
+		ev.Expected = v.name
+		ev.MessageFormat = missingHeaderFormat
+
+		return verify.ForContext(ctx, ev)
 	}
 
 	for _, value := range vs {
@@ -104,40 +94,11 @@ func (v *verifier) ModifyResponse(res *http.Response) error {
 		}
 	}
 
-	v.reserr.Add(fmt.Errorf(valueErrFormat, "response", res.Request.URL, v.name,
-		strings.Join(vs, ", "), v.value))
+	ev.Actual = strings.Join(vs, ", ")
+	ev.Expected = v.value
+	ev.MessageFormat = fmt.Sprintf(missingValueFormat, v.name)
 
-	return nil
-}
-
-// VerifyRequests returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
-func (v *verifier) VerifyRequests() error {
-	if v.reqerr.Empty() {
-		return nil
-	}
-
-	return v.reqerr
-}
-
-// VerifyResponses returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
-func (v *verifier) VerifyResponses() error {
-	if v.reserr.Empty() {
-		return nil
-	}
-
-	return v.reserr
-}
-
-// ResetRequestVerifications clears all failed request verifications.
-func (v *verifier) ResetRequestVerifications() {
-	v.reqerr = verify.NewMultiError()
-}
-
-// ResetResponseVerifications clears all failed response verifications.
-func (v *verifier) ResetResponseVerifications() {
-	v.reserr = verify.NewMultiError()
+	return verify.ForContext(ctx, ev)
 }
 
 // verifierFromJSON builds a header.Verifier from JSON.

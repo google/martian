@@ -16,18 +16,12 @@ package martianurl
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
-)
-
-const (
-	errFormat     = "request(%s) url verify failure:\n%s"
-	errPartFormat = "\t%s: got %q, want %q"
 )
 
 func init() {
@@ -37,7 +31,6 @@ func init() {
 // Verifier verifies the structure of URLs.
 type Verifier struct {
 	url *url.URL
-	err *verify.MultiError
 }
 
 type verifierJSON struct {
@@ -49,69 +42,63 @@ type verifierJSON struct {
 }
 
 // NewVerifier returns a new URL verifier.
-func NewVerifier(url *url.URL) verify.RequestVerifier {
+func NewVerifier(url *url.URL) *Verifier {
 	return &Verifier{
 		url: url,
-		err: verify.NewMultiError(),
 	}
 }
 
 // ModifyRequest verifies that the request URL matches all parts of url. If the
-// value in url is non-empty it must be an exact match.
+// value in url is non-empty it must be an exact match. Each unmatched URL part
+// will be treated as a distinct error.
 func (v *Verifier) ModifyRequest(req *http.Request) error {
-	var failures []string
+	ctx := martian.NewContext(req)
 
-	u := req.URL
+	if v.url.Scheme != "" && v.url.Scheme != req.URL.Scheme {
+		ev := verify.RequestError("url.Verifier", req)
 
-	if v.url.Scheme != "" && v.url.Scheme != u.Scheme {
-		f := fmt.Sprintf(errPartFormat, "Scheme", u.Scheme, v.url.Scheme)
-		failures = append(failures, f)
-	}
-	if v.url.Host != "" && v.url.Host != u.Host {
-		f := fmt.Sprintf(errPartFormat, "Host", u.Host, v.url.Host)
-		failures = append(failures, f)
-	}
-	if v.url.Path != "" && v.url.Path != u.Path {
-		f := fmt.Sprintf(errPartFormat, "Path", u.Path, v.url.Path)
-		failures = append(failures, f)
-	}
-	if v.url.RawQuery != "" && v.url.RawQuery != u.RawQuery {
-		f := fmt.Sprintf(errPartFormat, "Query", u.RawQuery, v.url.RawQuery)
-		failures = append(failures, f)
-	}
-	if v.url.Fragment != "" && v.url.Fragment != u.Fragment {
-		f := fmt.Sprintf(errPartFormat, "Fragment", u.Fragment, v.url.Fragment)
-		failures = append(failures, f)
-	}
+		ev.Actual = req.URL.Scheme
+		ev.Expected = v.url.Scheme
+		ev.MessageFormat = "scheme: got %s, want %s"
 
-	if len(failures) > 0 {
-		err := fmt.Errorf(errFormat, u, strings.Join(failures, "\n"))
-		v.err.Add(err)
+		verify.ForContext(ctx, ev)
+	}
+	if v.url.Host != "" && v.url.Host != req.URL.Host {
+		ev := verify.RequestError("url.Verifier", req)
+
+		ev.Actual = req.URL.Host
+		ev.Expected = v.url.Host
+		ev.MessageFormat = "host: got %s, want %s"
+
+		verify.ForContext(ctx, ev)
+	}
+	if v.url.Path != "" && v.url.Path != req.URL.Path {
+		ev := verify.RequestError("url.Verifier", req)
+
+		ev.Actual = req.URL.Path
+		ev.Expected = v.url.Path
+		ev.MessageFormat = "path: got %s, want %s"
+
+		verify.ForContext(ctx, ev)
+	}
+	if v.url.RawQuery != "" && v.url.RawQuery != req.URL.RawQuery {
+		ev := verify.RequestError("url.Verifier", req)
+
+		ev.Actual = req.URL.RawQuery
+		ev.Expected = v.url.RawQuery
+		ev.MessageFormat = "query: got %s, want %s"
+
+		verify.ForContext(ctx, ev)
 	}
 
 	return nil
-}
-
-// VerifyRequests returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
-func (v *Verifier) VerifyRequests() error {
-	if v.err.Empty() {
-		return nil
-	}
-
-	return v.err
-}
-
-// ResetRequestVerifications clears all failed request verifications.
-func (v *Verifier) ResetRequestVerifications() {
-	v.err = verify.NewMultiError()
 }
 
 // verifierFromJSON builds a martianurl.Verifier from JSON.
 //
 // Example modifier JSON:
 // {
-//   "martianurl.Verifier": {
+//   "url.Verifier": {
 //     "scope": ["request"],
 //     "scheme": "https",
 //     "host": "www.google.com",

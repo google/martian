@@ -16,69 +16,13 @@
 // response verifications.
 package verify
 
-import (
-	"net/http"
-
-	"github.com/google/martian"
-)
-
-// RequestVerifier is a RequestModifier that maintains a verification state.
-// RequestVerifiers should only return an error from ModifyRequest for errors
-// unrelated to the expectation.
-type RequestVerifier interface {
-	martian.RequestModifier
-	VerifyRequests() error
-	ResetRequestVerifications()
+// Error represents a verification error.
+type Error interface {
+	Get() *ErrorValue
 }
 
-// ResponseVerifier is a ResponseModifier that maintains a verification state.
-// ResponseVerifiers should only return an error from ModifyResponse for errors
-// unrelated to the expectation.
-type ResponseVerifier interface {
-	martian.ResponseModifier
-	VerifyResponses() error
-	ResetResponseVerifications()
-}
-
-// RequestResponseVerifier is a RequestVerifier and a ResponseVerifier.
-type RequestResponseVerifier interface {
-	RequestVerifier
-	ResponseVerifier
-}
-
-// TestVerifier is a request and response verifier with overridable errors for
-// verification.
-type TestVerifier struct {
-	RequestError  error
-	ResponseError error
-}
-
-// ModifyRequest is a no-op.
-func (tv *TestVerifier) ModifyRequest(*http.Request) error {
-	return nil
-}
-
-// ModifyResponse is a no-op.
-func (tv *TestVerifier) ModifyResponse(*http.Response) error {
-	return nil
-}
-
-// VerifyRequests returns the set request error.
-func (tv *TestVerifier) VerifyRequests() error {
-	return tv.RequestError
-}
-
-// VerifyResponses returns the set response error.
-func (tv *TestVerifier) VerifyResponses() error {
-	return tv.ResponseError
-}
-
-// ResetRequestVerifications clears out the set request error.
-func (tv *TestVerifier) ResetRequestVerifications() {
-	tv.RequestError = nil
-}
-
-// ResetResponseVerifications clears out the set response error.
-func (tv *TestVerifier) ResetResponseVerifications() {
-	tv.ResponseError = nil
+// Resetter represents a verification error that has additional behavior in
+// order to be reset.
+type Resetter interface {
+	Reset()
 }

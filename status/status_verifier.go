@@ -16,19 +16,17 @@ package status
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"strconv"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
 
-const errFormat = "response(%s) status code verify failure: got %d, want %d"
-
 // Verifier verifies the status codes of all responses.
 type Verifier struct {
 	statusCode int
-	err        *verify.MultiError
 }
 
 type verifierJSON struct {
@@ -41,37 +39,27 @@ func init() {
 }
 
 // NewVerifier returns a new status.Verifier for statusCode.
-func NewVerifier(statusCode int) verify.ResponseVerifier {
+func NewVerifier(statusCode int) *Verifier {
 	return &Verifier{
 		statusCode: statusCode,
-		err:        verify.NewMultiError(),
 	}
 }
 
 // ModifyResponse verifies that the status code for all requests
 // matches statusCode.
 func (v *Verifier) ModifyResponse(res *http.Response) error {
+	ctx := martian.NewContext(res.Request)
+
 	if res.StatusCode != v.statusCode {
-		v.err.Add(fmt.Errorf(errFormat, res.Request.URL, res.StatusCode, v.statusCode))
+		ev := verify.ResponseError("status.Verifier", res)
+
+		ev.Actual = strconv.Itoa(res.StatusCode)
+		ev.Expected = strconv.Itoa(v.statusCode)
+
+		return verify.ForContext(ctx, ev)
 	}
 
 	return nil
-}
-
-// VerifyResponses returns an error if verification for any
-// request failed.
-// If an error is returned it will be of type *verify.MultiError.
-func (v *Verifier) VerifyResponses() error {
-	if v.err.Empty() {
-		return nil
-	}
-
-	return v.err
-}
-
-// ResetResponseVerifications clears all failed response verifications.
-func (v *Verifier) ResetResponseVerifications() {
-	v.err = verify.NewMultiError()
 }
 
 // verifierFromJSON builds a status.Verifier from JSON.

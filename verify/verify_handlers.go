@@ -21,52 +21,38 @@ import (
 	"github.com/google/martian/log"
 )
 
-// Handler is an http.Handler that returns the request and response
-// verifications of reqv and resv as JSON.
+// Handler is an http.Handler that returns the request and response errors of
+// the verification.
 type Handler struct {
-	reqv RequestVerifier
-	resv ResponseVerifier
+	v *Verification
 }
 
-// ResetHandler is an http.Handler that resets the request and response
-// verifications of reqv and resv.
+// ResetHandler is an http.Handler that resets the request and response errors
+// of the verification.
 type ResetHandler struct {
-	reqv RequestVerifier
-	resv ResponseVerifier
+	v *Verification
 }
 
-type verifyResponse struct {
-	Errors []verifyError `json:"errors"`
+type errorsJSON struct {
+	Errors []*ErrorValue `json:"errors"`
 }
 
-type verifyError struct {
-	Message string `json:"message"`
+// NewHandler returns an http.Handler for requesting verification errors.
+func NewHandler(v *Verification) *Handler {
+	return &Handler{
+		v: v,
+	}
 }
 
-// NewHandler returns an http.Handler for requesting the verification
-// error status.
-func NewHandler() *Handler {
-	return &Handler{}
+// NewResetHandler returns an http.Handler for resetting verification errors.
+func NewResetHandler(v *Verification) *ResetHandler {
+	return &ResetHandler{
+		v: v,
+	}
 }
 
-// NewResetHandler returns an http.Handler for reseting the verification error
-// status.
-func NewResetHandler() *ResetHandler {
-	return &ResetHandler{}
-}
-
-// SetRequestVerifier sets the RequestVerifier to verify.
-func (h *Handler) SetRequestVerifier(reqv RequestVerifier) {
-	h.reqv = reqv
-}
-
-// SetResponseVerifier sets the ResponseVerifier to verify.
-func (h *Handler) SetResponseVerifier(resv ResponseVerifier) {
-	h.resv = resv
-}
-
-// ServeHTTP writes out a JSON response containing a list of verification
-// errors that occurred during the requests and responses sent to the proxy.
+// ServeHTTP writes a JSON response containing a list of verification errors
+// that have occurred.
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 
@@ -77,48 +63,18 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	vres := &verifyResponse{
-		Errors: make([]verifyError, 0),
+	ej := &errorsJSON{
+		Errors: make([]*ErrorValue, 0, len(h.errs)),
 	}
 
-	if h.reqv != nil {
-		if err := h.reqv.VerifyRequests(); err != nil {
-			appendError(vres, err)
-		}
-	}
-	if h.resv != nil {
-		if err := h.resv.VerifyResponses(); err != nil {
-			appendError(vres, err)
-		}
+	for _, err := range h.v.Errors() {
+		ej.Errors = append(ej.Errors, err.Get())
 	}
 
-	json.NewEncoder(rw).Encode(vres)
+	json.NewEncoder(rw).Encode(ej)
 }
 
-func appendError(vres *verifyResponse, err error) {
-	merr, ok := err.(*MultiError)
-	if !ok {
-		vres.Errors = append(vres.Errors, verifyError{Message: err.Error()})
-		return
-	}
-
-	for _, err := range merr.Errors() {
-		vres.Errors = append(vres.Errors, verifyError{Message: err.Error()})
-	}
-}
-
-// SetRequestVerifier sets the RequestVerifier to reset.
-func (h *ResetHandler) SetRequestVerifier(reqv RequestVerifier) {
-	h.reqv = reqv
-}
-
-// SetResponseVerifier sets the ResponseVerifier to reset.
-func (h *ResetHandler) SetResponseVerifier(resv ResponseVerifier) {
-	h.resv = resv
-}
-
-// ServeHTTP resets the verifier for the given ID so that it may
-// be run again.
+// ServeHTTP resets the verification errors.
 func (h *ResetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != "POST" {
 		rw.Header().Set("Allow", "POST")
@@ -127,12 +83,7 @@ func (h *ResetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if h.reqv != nil {
-		h.reqv.ResetRequestVerifications()
-	}
-	if h.resv != nil {
-		h.resv.ResetResponseVerifications()
-	}
+	h.v.Reset()
 
 	rw.WriteHeader(204)
 }

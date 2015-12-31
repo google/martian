@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -28,9 +29,9 @@ func init() {
 	parse.Register("querystring.Verifier", verifierFromJSON)
 }
 
-type verifier struct {
+// Verifier is a verifier for query strings.
+type Verifier struct {
 	key, value string
-	err        *verify.MultiError
 }
 
 type verifierJSON struct {
@@ -39,60 +40,51 @@ type verifierJSON struct {
 	Scope []parse.ModifierType `json:"scope"`
 }
 
-// NewVerifier returns a new param verifier.
-func NewVerifier(key, value string) (verify.RequestVerifier, error) {
+// NewVerifier returns a new query string verifier.
+func NewVerifier(key, value string) (*Verifier, error) {
 	if key == "" {
-		return nil, fmt.Errorf("no key provided to param verifier")
+		return nil, fmt.Errorf("querystring: no key provided for verifier")
 	}
-	return &verifier{
+
+	return &Verifier{
 		key:   key,
 		value: value,
-		err:   verify.NewMultiError(),
 	}, nil
 }
 
-// ModifyRequest verifies that the request's URL params match the given params
-// in all modified requests. If no value is provided, the verifier will only
-// check if the given key is present. An error will be added to the contained
-// *MultiError if the param is unmatched.
+// ModifyRequest verifies that the request URL query string parameter matches
+// the given key and value in all modified requests. If no value is provided,
+// the verifier will only verifier the given key is present. An error will be
+// added if the query string parameter is unmatched.
 func (v *verifier) ModifyRequest(req *http.Request) error {
-	if err := req.ParseForm(); err != nil {
-		err := fmt.Errorf("request(%v) parsing failed; could not parse query parameters", req.URL)
-		v.err.Add(err)
-		return nil
-	}
-	vals, ok := req.Form[v.key]
+	ctx := martian.NewContext(req)
+	ev := verify.RequestError("querystring.Verifier", req)
+
+	vs, ok := req.URL.Query()[v.key]
 	if !ok {
-		err := fmt.Errorf("request(%v) param verification error: key %v not found", req.URL, v.key)
-		v.err.Add(err)
-		return nil
+		ev.Expected = v.key
+		ev.MessageFormat = "got no query string parameter, want %s parameter"
+
+		return verify.ForContext(ctx, err)
 	}
+
+	// No value verification required, pass.
 	if v.value == "" {
 		return nil
 	}
-	for _, val := range vals {
-		if v.value == val {
+
+	for _, vl := range vs {
+		// Value found, pass.
+		if v.value == vl {
 			return nil
 		}
 	}
-	err := fmt.Errorf("request(%v) param verification error: got %v for key %v, want %v", req.URL, strings.Join(vals, ", "), v.key, v.value)
-	v.err.Add(err)
-	return nil
-}
 
-// VerifyRequests returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
-func (v *verifier) VerifyRequests() error {
-	if v.err.Empty() {
-		return nil
-	}
+	ev.Actual = strings.Join(vs, ", ")
+	ev.Expected = v.value
+	ev.MessageFormat = fmt.Sprintf("key %s: got %%s, want to contain %%s", v.name)
 
-	return v.err
-}
-
-// ResetRequestVerifications clears all failed request verifications.
-func (v *verifier) ResetRequestVerifications() {
-	v.err = verify.NewMultiError()
+	return verify.ForContext(ctx, ev)
 }
 
 // verifierFromJSON builds a querystring.Verifier from JSON.

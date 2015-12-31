@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
 
-type verifier struct {
+// Verifier is a method verifier.
+type Verifier struct {
 	method string
-	err    *verify.MultiError
 }
 
 type verifierJSON struct {
@@ -39,44 +40,30 @@ func init() {
 }
 
 // NewVerifier returns a new method verifier.
-func NewVerifier(method string) (verify.RequestVerifier, error) {
+func NewVerifier(method string) (*Verifier, error) {
 	if method == "" {
-		return nil, fmt.Errorf("%s is not a valid HTTP method", method)
+		return nil, fmt.Errorf("method: method cannot be blank")
 	}
-	return &verifier{
+	return &Verifier{
 		method: method,
-		err:    verify.NewMultiError(),
 	}, nil
 }
 
-// ModifyRequest verifies that the request's method matches the given method
-// in all modified requests. An error will be added to the contained *MultiError
-// if a method is unmatched.
-func (v *verifier) ModifyRequest(req *http.Request) error {
-	m := req.Method
+// ModifyRequest verifies that the request method matches the given method in
+// all modified requests. An error will be added if the method does not match.
+func (v *Verifier) ModifyRequest(req *http.Request) error {
+	ctx := martian.NewContext(req)
 
-	if v.method != "" && v.method != m {
-		err := fmt.Errorf("request(%v) method verification error: got %v, want %v", req.URL,
-			v.method, m)
-		v.err.Add(err)
+	if v.method != req.Method {
+		ev := verify.RequestError("method.Verifier", req)
+
+		ev.Actual = req.Method
+		ev.Expected = v.method
+
+		return verify.ForContext(ctx, ev)
 	}
 
 	return nil
-}
-
-// VerifyRequests returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
-func (v *verifier) VerifyRequests() error {
-	if v.err.Empty() {
-		return nil
-	}
-
-	return v.err
-}
-
-// ResetRequestVerifications clears all failed request verifications.
-func (v *verifier) ResetRequestVerifications() {
-	v.err = verify.NewMultiError()
 }
 
 // verifierFromJSON builds a method.Verifier from JSON.

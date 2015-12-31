@@ -18,16 +18,17 @@ package pingback
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
 
 const (
-	errFormat = "request(%s): pingback never occurred"
+	errFormat = "never received request for %s"
 )
 
 func init() {
@@ -36,8 +37,11 @@ func init() {
 
 // Verifier verifies that the specific URL has been seen.
 type Verifier struct {
-	url *url.URL
-	err error
+	url  *url.URL
+	once sync.Once
+
+	mu   sync.RWMutex
+	seen bool
 }
 
 type verifierJSON struct {
@@ -49,10 +53,9 @@ type verifierJSON struct {
 }
 
 // NewVerifier returns a new pingback verifier.
-func NewVerifier(url *url.URL) verify.RequestVerifier {
+func NewVerifier(url *url.URL) *Verifier {
 	return &Verifier{
 		url: url,
-		err: fmt.Errorf(errFormat, url.String()),
 	}
 }
 
@@ -63,28 +66,42 @@ func NewVerifier(url *url.URL) verify.RequestVerifier {
 // will continue to be nil until the verifier has been reset, regardless of
 // subsequent requests matching.
 func (v *Verifier) ModifyRequest(req *http.Request) error {
-	u := req.URL
+	v.once.Do(func() {
+		ctx := martian.NewContext(req)
+
+		ev := verify.RequestError("pingback.Verifier", req)
+		ev.URL = v.url.String()
+
+		verify.ForContext(ctx, verify.Defer(ev, v.seen()))
+	})
 
 	switch {
-	case v.url.Scheme != "" && v.url.Scheme != u.Scheme:
-	case v.url.Host != "" && v.url.Host != u.Host:
-	case v.url.Path != "" && v.url.Path != u.Path:
-	case v.url.RawQuery != "" && v.url.RawQuery != u.RawQuery:
+	case v.url.Scheme != "" && v.url.Scheme != req.URL.Scheme:
+	case v.url.Host != "" && v.url.Host != req.URL.Host:
+	case v.url.Path != "" && v.url.Path != req.URL.Path:
+	case v.url.RawQuery != "" && v.url.RawQuery != req.URL.RawQuery:
 	default:
-		v.err = nil
+		v.mu.Lock()
+		v.seen = true
+		v.mu.Unlock()
 	}
 
 	return nil
 }
 
-// VerifyRequests returns an error if pingback never occurred.
-func (v *Verifier) VerifyRequests() error {
-	return v.err
+// Reset resets the verifier to the original unseen state.
+func (v *Verifier) Reset() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	v.seen = false
 }
 
-// ResetRequestVerifications clears the failed request verification.
-func (v *Verifier) ResetRequestVerifications() {
-	v.err = fmt.Errorf(errFormat, v.url.String())
+func (v *Verifier) seen() bool {
+	v.mu.RLock()
+	v.mu.RUnlock()
+
+	return v.seen
 }
 
 // verifierFromJSON builds a pingback.Verifier from JSON.
