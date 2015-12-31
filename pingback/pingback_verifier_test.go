@@ -23,6 +23,20 @@ import (
 	"github.com/google/martian/verify"
 )
 
+func TestVerifier(t *testing.T) {
+	v := NewVerifier(&url.URL{
+		Scheme:   "https",
+		Host:     "example.com",
+		Path:     "/test",
+		RawQuery: "testing=true",
+	})
+
+	req, err := http.NewRequest("GET", "", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+}
+
 func TestVerifyRequests(t *testing.T) {
 	v := NewVerifier(&url.URL{
 		Scheme:   "https",

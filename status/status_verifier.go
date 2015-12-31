@@ -51,12 +51,12 @@ func (v *Verifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
 
 	if res.StatusCode != v.statusCode {
-		ev := verify.ResponseError("status.Verifier", res)
+		eb := verify.NewError("status.Verifier").
+			Response(res).
+			Actual(strconv.Itoa(res.StatusCode)).
+			Expected(strconv.Itoa(v.statusCode))
 
-		ev.Actual = strconv.Itoa(res.StatusCode)
-		ev.Expected = strconv.Itoa(v.statusCode)
-
-		return verify.ForContext(ctx, ev)
+		verify.Verify(ctx, eb)
 	}
 
 	return nil

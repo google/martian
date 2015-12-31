@@ -1,100 +1,155 @@
 package verify
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
-// MessageType describes whether the verification error corresponds to a
+// Scope describes whether the verification error corresponds to a
 // request or a response.
-type MessageType uint8
-
-// ErrorValue is a concrete verification error.
-type ErrorValue struct {
-	Kind          string
-	Scope         MessageType
-	URL           string
-	Actual        string
-	Expected      string
-	MessageFormat string
-}
+type Scope uint8
 
 const (
 	// Unknown signifies the error occurred on an unknown message type (default).
-	Unknown MessageType = iota
+	Unknown Scope = iota
 	// Request signifies the error occurred on a request.
-	Request MessageType = iota
+	Request Scope = iota
 	// Response signifies the error occurred on a response.
-	Response MessageType = iota
+	Response Scope = iota
 )
 
-// RequestError returns a verification error for the given request.
-func RequestError(kind string, req *http.Request) *ErrorValue {
-	return &ErrorValue{
-		Kind:          kind,
-		Scope:         Request,
-		URL:           req.URL.String(),
-		MessageFormat: "got %s, want %s",
+// ErrorFormat is the format that will be used for verify.Error message
+// strings. The order of the four string format verbs is: Kind, Scope, URL,
+// MessageFormat.
+//
+// MessageFormat is expected to be a format string containing two string format
+// verbs in the following order: Actual, Expected.
+var ErrorFormat = "%s: %s(%s): %s"
+
+// Error is a concrete verification error.
+type Error struct {
+	Kind     string
+	Scope    Scope
+	URL      string
+	Actual   string
+	Expected string
+	Message  string
+}
+
+type ErrorBuilder struct {
+	kind      string
+	scope     Scope
+	url       string
+	actual    string
+	expected  string
+	formatted bool
+	message   string
+	cond      func() bool
+	reset     func()
+}
+
+func NewError(kind string) *ErrorBuilder {
+	return &ErrorBuilder{
+		kind:  kind,
+		cond:  func() bool { return true },
+		reset: func() {},
 	}
 }
 
-// ResponseError returns a verification error for the given response.
-func ResponseError(kind string, res *http.Response) *ErrorValue {
-	return &ErrorValue{
-		Kind:          kind,
-		Scope:         Response,
-		URL:           res.Request.URL.String(),
-		MessageFormat: "got %s, want %s",
-	}
+func (eb *ErrorBuilder) Request(req *http.Request) *ErrorBuilder {
+	eb.scope = Request
+	eb.url = req.URL.String()
+
+	return eb
 }
 
-// MarshalJSON builds a JSON representation of a verification error.
-func (ev *ErrorValue) MarshalJSON() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	m := map[string]string{
-		"kind":    ev.Kind,
-		"scope":   ev.Scope.String(),
-		"url":     ev.URL,
-		"message": ev.Error(),
-	}
+func (eb *ErrorBuilder) Response(res *http.Response) *ErrorBuilder {
+	eb.scope = Response
+	eb.url = res.Request.URL.String()
 
-	if ev.Actual != "" {
-		m["actual"] = ev.Actual
-	}
-
-	if ev.Expected != "" {
-		m["expected"] = ev.Expected
-	}
-
-	json.NewEncoder(buf).Encode(m)
-
-	return buf.Bytes(), nil
+	return eb
 }
 
-// Get returns itself so it can be used to satisfy the verify.Error interface.
-func (ev *ErrorValue) Get() *ErrorValue {
-	return ev
+func (eb *ErrorBuilder) For(scope Scope, u *url.URL) *ErrorBuilder {
+	eb.scope = scope
+	eb.url = u.String()
+
+	return eb
 }
 
-// Error returns the error string.
-func (ev *ErrorValue) Error() string {
-	msg := fmt.Sprintf("%s: %s(%s): %s", ev.Kind, ev.Scope, ev.URL, ev.MessageFormat)
+func (eb *ErrorBuilder) Conditionally(cond func() bool) *ErrorBuilder {
+	eb.cond = cond
 
+	return eb
+}
+
+func (eb *ErrorBuilder) Resets(reset func()) *ErrorBuilder {
+	eb.reset = reset
+
+	return eb
+}
+
+func (eb *ErrorBuilder) Message(message string) *ErrorBuilder {
+	eb.message = message
+
+	return eb
+}
+
+func (eb *ErrorBuilder) Format(format string) *ErrorBuilder {
+	eb.formatted = true
+	eb.message = format
+
+	return eb
+}
+
+func (eb *ErrorBuilder) Actual(actual string) *ErrorBuilder {
+	eb.actual = actual
+
+	return eb
+}
+
+func (eb *ErrorBuilder) Expected(expected string) *ErrorBuilder {
+	eb.expected = expected
+
+	return eb
+}
+
+func (eb *ErrorBuilder) Error() (Error, bool) {
+	if !eb.cond() {
+		return Error{}, false
+	}
+
+	return Error{
+		Kind:     eb.kind,
+		Scope:    eb.scope,
+		URL:      eb.url,
+		Actual:   eb.actual,
+		Expected: eb.expected,
+		Message:  eb.formattedMessage(),
+	}, true
+}
+
+func (eb *ErrorBuilder) formattedMessage() string {
 	switch {
-	case ev.Actual == "" && ev.Expected == "":
-		return fmt.Sprintf(msg, "failure", "success")
-	case ev.Actual == "":
-		return fmt.Sprintf(msg, ev.Expected)
+	case !eb.formatted:
+		return eb.message
+	case eb.actual == "" && eb.expected == "":
+		return "failed verification"
+	case eb.actual == "":
+		return fmt.Sprintf(eb.message, eb.expected)
 	}
 
-	return fmt.Sprintf(msg, ev.Actual, ev.Expected)
+	return fmt.Sprintf(eb.message, eb.actual, eb.expected)
 }
 
-// String returns the string represenation of the message type.
-func (mt MessageType) String() string {
-	switch mt {
+func (eb *ErrorBuilder) Reset() {
+	eb.reset()
+}
+
+// String returns the string represenation of the scope.
+func (s Scope) String() string {
+	switch s {
 	case Request:
 		return "request"
 	case Response:
@@ -102,4 +157,21 @@ func (mt MessageType) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+func (s Scope) MarshalJSON() ([]byte, error) {
+	return []byte(s.String()), nil
+}
+
+func (s *Scope) UnmarshalJSON(b []byte) error {
+	switch string(b) {
+	case "request":
+		*s = Request
+	case "response":
+		*s = Response
+	default:
+		*s = Unknown
+	}
+
+	return nil
 }

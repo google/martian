@@ -55,12 +55,12 @@ func (v *Verifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 
 	if v.method != req.Method {
-		ev := verify.RequestError("method.Verifier", req)
+		eb := verify.NewError("method.Verifier").
+			Request(req).
+			Actual(req.Method).
+			Expected(v.method)
 
-		ev.Actual = req.Method
-		ev.Expected = v.method
-
-		return verify.ForContext(ctx, ev)
+		verify.Verify(ctx, eb)
 	}
 
 	return nil

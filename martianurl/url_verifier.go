@@ -55,40 +55,40 @@ func (v *Verifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 
 	if v.url.Scheme != "" && v.url.Scheme != req.URL.Scheme {
-		ev := verify.RequestError("url.Verifier", req)
+		eb := verify.NewError("url.Verifier").
+			Request(req).
+			Actual(req.URL.Scheme).
+			Expected(v.url.Scheme).
+			Format("scheme: got %s, want %s")
 
-		ev.Actual = req.URL.Scheme
-		ev.Expected = v.url.Scheme
-		ev.MessageFormat = "scheme: got %s, want %s"
-
-		verify.ForContext(ctx, ev)
+		verify.Verify(ctx, eb)
 	}
 	if v.url.Host != "" && v.url.Host != req.URL.Host {
-		ev := verify.RequestError("url.Verifier", req)
+		eb := verify.NewError("url.Verifier").
+			Request(req).
+			Actual(req.URL.Host).
+			Expected(v.url.Host).
+			Format("host: got %s, want %s")
 
-		ev.Actual = req.URL.Host
-		ev.Expected = v.url.Host
-		ev.MessageFormat = "host: got %s, want %s"
-
-		verify.ForContext(ctx, ev)
+		verify.Verify(ctx, eb)
 	}
 	if v.url.Path != "" && v.url.Path != req.URL.Path {
-		ev := verify.RequestError("url.Verifier", req)
+		eb := verify.NewError("url.Verifier").
+			Request(req).
+			Actual(req.URL.Path).
+			Expected(v.url.Path).
+			Format("path: got %s, want %s")
 
-		ev.Actual = req.URL.Path
-		ev.Expected = v.url.Path
-		ev.MessageFormat = "path: got %s, want %s"
-
-		verify.ForContext(ctx, ev)
+		verify.Verify(ctx, eb)
 	}
 	if v.url.RawQuery != "" && v.url.RawQuery != req.URL.RawQuery {
-		ev := verify.RequestError("url.Verifier", req)
+		eb := verify.NewError("url.Verifier").
+			Request(req).
+			Actual(req.URL.RawQuery).
+			Expected(v.url.RawQuery).
+			Format("query: got %s, want %s")
 
-		ev.Actual = req.URL.RawQuery
-		ev.Expected = v.url.RawQuery
-		ev.MessageFormat = "query: got %s, want %s"
-
-		verify.ForContext(ctx, ev)
+		verify.Verify(ctx, eb)
 	}
 
 	return nil

@@ -276,8 +276,12 @@ func main() {
 	}
 
 	stack, fg := httpspec.NewStack("martian")
-	p.SetRequestModifier(stack)
-	p.SetResponseModifier(stack)
+	v := verify.NewVerification()
+	v.SetRequestModifier(stack)
+	v.SetResponseModifier(stack)
+
+	p.SetRequestModifier(v)
+	p.SetResponseModifier(v)
 
 	m := martianhttp.NewModifier()
 	fg.AddRequestModifier(m)
@@ -300,15 +304,11 @@ func main() {
 	configure("/configure", m)
 
 	// Verify assertions.
-	vh := verify.NewHandler()
-	vh.SetRequestVerifier(m)
-	vh.SetResponseVerifier(m)
+	vh := verify.NewHandler(v)
 	configure("/verify", vh)
 
 	// Reset verifications.
-	rh := verify.NewResetHandler()
-	rh.SetRequestVerifier(m)
-	rh.SetResponseVerifier(m)
+	rh := verify.NewResetHandler(v)
 	configure("/verify/reset", rh)
 
 	l, err := net.Listen("tcp", *addr)

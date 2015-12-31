@@ -17,14 +17,12 @@ package martianhttp
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/verify"
 
 	_ "github.com/google/martian/header"
 )
@@ -92,53 +90,6 @@ func TestModifyResponse(t *testing.T) {
 
 	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
-	}
-}
-
-func TestVerifyRequests(t *testing.T) {
-	m := NewModifier()
-
-	if err := m.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
-	}
-
-	verr := fmt.Errorf("request verification failure")
-
-	m.SetRequestModifier(&verify.TestVerifier{
-		RequestError: verr,
-	})
-
-	if err := m.VerifyRequests(); err != verr {
-		t.Errorf("VerifyRequests(): got %v, want %v", err, verr)
-	}
-
-	m.ResetRequestVerifications()
-
-	if err := m.VerifyRequests(); err != nil {
-		t.Errorf("m.VerifyRequests(): got %v, want no error", err)
-	}
-}
-
-func TestVerifyResponses(t *testing.T) {
-	m := NewModifier()
-
-	if err := m.VerifyResponses(); err != nil {
-		t.Errorf("VerifyResponses(): got %v, want no error", err)
-	}
-
-	verr := fmt.Errorf("response verification failure")
-	m.SetResponseModifier(&verify.TestVerifier{
-		ResponseError: verr,
-	})
-
-	if err := m.VerifyResponses(); err != verr {
-		t.Errorf("VerifyResponses(): got %v, want %v", err, verr)
-	}
-
-	m.ResetResponseVerifications()
-
-	if err := m.VerifyResponses(); err != nil {
-		t.Errorf("m.VerifyResponses(): got %v, want no error", err)
 	}
 }
 

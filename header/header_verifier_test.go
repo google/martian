@@ -39,8 +39,6 @@ func TestVerifier(t *testing.T) {
 	}
 	defer remove()
 
-	verify.NewContext(ctx)
-
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -61,21 +59,25 @@ func TestVerifier(t *testing.T) {
 		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
 	}
 
-	ev := errs[0].Get()
-	if got, want := ev.Kind, "header.Verifier"; got != want {
-		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	verr, ok := errs[0].Error()
+	if !ok {
+		t.Fatal("errs[0].Error(): got !ok, want ok")
 	}
-	if got, want := ev.URL, "http://www.example.com"; got != want {
-		t.Errorf("ev.URL: got %q, want %q", got, want)
+
+	if got, want := verr.Kind, "header.Verifier"; got != want {
+		t.Errorf("verr.Kind: got %q, want %q", got, want)
 	}
-	if got, want := ev.Scope, verify.Request; got != want {
-		t.Errorf("ev.URL: got %s, want %s", got, want)
+	if got, want := verr.URL, "http://www.example.com"; got != want {
+		t.Errorf("verr.URL: got %q, want %q", got, want)
 	}
-	if got, want := ev.Actual, "false"; got != want {
-		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	if got, want := verr.Scope, verify.Request; got != want {
+		t.Errorf("verr.URL: got %s, want %s", got, want)
 	}
-	if got, want := ev.Expected, "true"; got != want {
-		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	if got, want := verr.Actual, "false"; got != want {
+		t.Errorf("verr.Actual: got %q, want %q", got, want)
+	}
+	if got, want := verr.Expected, "true"; got != want {
+		t.Errorf("verr.Expected: got %q, want %q", got, want)
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
@@ -101,21 +103,25 @@ func TestVerifier(t *testing.T) {
 		t.Errorf("verify.FromContext(): got %d errors, want 2", len(errs))
 	}
 
-	ev = errs[1].Get()
-	if got, want := ev.Kind, "header.Verifier"; got != want {
-		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	verr, ok = errs[1].Error()
+	if !ok {
+		t.Fatal("errs[1].Error(): got !ok, want ok")
 	}
-	if got, want := ev.URL, "http://www.example.com"; got != want {
-		t.Errorf("ev.URL: got %q, want %q", got, want)
+
+	if got, want := verr.Kind, "header.Verifier"; got != want {
+		t.Errorf("verr.Kind: got %q, want %q", got, want)
 	}
-	if got, want := ev.Scope, verify.Response; got != want {
-		t.Errorf("ev.URL: got %s, want %s", got, want)
+	if got, want := verr.URL, "http://www.example.com"; got != want {
+		t.Errorf("verr.URL: got %q, want %q", got, want)
 	}
-	if got, want := ev.Actual, "false"; got != want {
-		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	if got, want := verr.Scope, verify.Response; got != want {
+		t.Errorf("verr.URL: got %s, want %s", got, want)
 	}
-	if got, want := ev.Expected, "true"; got != want {
-		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	if got, want := verr.Actual, "false"; got != want {
+		t.Errorf("verr.Actual: got %q, want %q", got, want)
+	}
+	if got, want := verr.Expected, "true"; got != want {
+		t.Errorf("verr.Expected: got %q, want %q", got, want)
 	}
 }
 
@@ -133,8 +139,6 @@ func TestVerifierBlankValue(t *testing.T) {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
 	defer remove()
-
-	verify.NewContext(ctx)
 
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -156,21 +160,25 @@ func TestVerifierBlankValue(t *testing.T) {
 		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
 	}
 
-	ev := errs[0].Get()
-	if got, want := ev.Kind, "header.Verifier"; got != want {
-		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	verr, ok := errs[0].Error()
+	if !ok {
+		t.Fatal("errs[0].Error(): got !ok, want ok")
 	}
-	if got, want := ev.URL, "http://www.example.com"; got != want {
-		t.Errorf("ev.URL: got %q, want %q", got, want)
+
+	if got, want := verr.Kind, "header.Verifier"; got != want {
+		t.Errorf("verr.Kind: got %q, want %q", got, want)
 	}
-	if got, want := ev.Scope, verify.Request; got != want {
-		t.Errorf("ev.URL: got %s, want %s", got, want)
+	if got, want := verr.URL, "http://www.example.com"; got != want {
+		t.Errorf("verr.URL: got %q, want %q", got, want)
 	}
-	if got, want := ev.Actual, ""; got != want {
-		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	if got, want := verr.Scope, verify.Request; got != want {
+		t.Errorf("verr.URL: got %s, want %s", got, want)
 	}
-	if got, want := ev.Expected, "Martian-Test"; got != want {
-		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	if got, want := verr.Actual, ""; got != want {
+		t.Errorf("verr.Actual: got %q, want %q", got, want)
+	}
+	if got, want := verr.Expected, "Martian-Test"; got != want {
+		t.Errorf("verr.Expected: got %q, want %q", got, want)
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
@@ -196,21 +204,25 @@ func TestVerifierBlankValue(t *testing.T) {
 		t.Errorf("verify.FromContext(): got %d errors, want 2", len(errs))
 	}
 
-	ev = errs[1].Get()
-	if got, want := ev.Kind, "header.Verifier"; got != want {
-		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	verr, ok = errs[1].Error()
+	if !ok {
+		t.Fatal("errs[1].Error(): got !ok, want ok")
 	}
-	if got, want := ev.URL, "http://www.example.com"; got != want {
-		t.Errorf("ev.URL: got %q, want %q", got, want)
+
+	if got, want := verr.Kind, "header.Verifier"; got != want {
+		t.Errorf("verr.Kind: got %q, want %q", got, want)
 	}
-	if got, want := ev.Scope, verify.Response; got != want {
-		t.Errorf("ev.URL: got %s, want %s", got, want)
+	if got, want := verr.URL, "http://www.example.com"; got != want {
+		t.Errorf("verr.URL: got %q, want %q", got, want)
 	}
-	if got, want := ev.Actual, ""; got != want {
-		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	if got, want := verr.Scope, verify.Response; got != want {
+		t.Errorf("verr.URL: got %s, want %s", got, want)
 	}
-	if got, want := ev.Expected, "Martian-Test"; got != want {
-		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	if got, want := verr.Actual, ""; got != want {
+		t.Errorf("verr.Actual: got %q, want %q", got, want)
+	}
+	if got, want := verr.Expected, "Martian-Test"; got != want {
+		t.Errorf("verr.Expected: got %q, want %q", got, want)
 	}
 }
 
@@ -242,8 +254,6 @@ func TestVerifierFromJSON(t *testing.T) {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
 	defer remove()
-
-	verify.NewContext(ctx)
 
 	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

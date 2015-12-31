@@ -19,99 +19,97 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
 
-func TestVerifyRequests(t *testing.T) {
-	u := &url.URL{
+func TestVerifier(t *testing.T) {
+	match := &url.URL{
 		Scheme:   "https",
 		Host:     "www.example.com",
 		Path:     "/test",
 		RawQuery: "testing=true",
-		Fragment: "test",
 	}
-	v := NewVerifier(u)
+	v := NewVerifier(match)
 
-	tt := []struct {
-		got, want string
-	}{
-		{
-			got: "http://www.example.com/test?testing=true#test",
-			want: `request(http://www.example.com/test?testing=true#test) url verify failure:
-	Scheme: got "http", want "https"`,
-		},
-		{
-			got: "http://www.martian.test/test?testing=true#test",
-			want: `request(http://www.martian.test/test?testing=true#test) url verify failure:
-	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"`,
-		},
-		{
-			got: "http://www.martian.test/prod?testing=true#test",
-			want: `request(http://www.martian.test/prod?testing=true#test) url verify failure:
-	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"
-	Path: got "/prod", want "/test"`,
-		},
-		{
-			got: "http://www.martian.test/prod#test",
-			want: `request(http://www.martian.test/prod#test) url verify failure:
-	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"
-	Path: got "/prod", want "/test"
-	Query: got "", want "testing=true"`,
-		},
-		{
-			got: "http://www.martian.test/prod#fake",
-			want: `request(http://www.martian.test/prod#fake) url verify failure:
-	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"
-	Path: got "/prod", want "/test"
-	Query: got "", want "testing=true"
-	Fragment: got "fake", want "test"`,
-		},
+	nomatch := &url.URL{
+		Scheme:   "http",
+		Host:     "martian.local",
+		Path:     "/prod",
+		RawQuery: "testing=false",
 	}
 
-	for i, tc := range tt {
-		req, err := http.NewRequest("GET", tc.got, nil)
-		if err != nil {
-			t.Fatalf("%d. http.NewRequest(..., %s, ...): got %v, want no error", i, tc.got, err)
-		}
-
-		if err := v.ModifyRequest(req); err != nil {
-			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
-		}
-	}
-
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyRequests(): got nil, want *verify.MultiError")
-	}
-
-	errs := merr.Errors()
-	if got, want := len(errs), len(tt); got != want {
-		t.Fatalf("len(merr.Errors()): got %d, want %d", got, want)
-	}
-
-	for i, tc := range tt {
-		if got, want := errs[i].Error(), tc.want; got != want {
-			t.Errorf("%d. err.Error(): mismatched error output\ngot: %s\nwant: %s", i, got, want)
-		}
-	}
-
-	v.ResetRequestVerifications()
-
-	// A valid request.
-	req, err := http.NewRequest("GET", "https://www.example.com/test?testing=true#test", nil)
+	req, err := http.NewRequest("GET", match.String(), nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
+
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if err := v.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
+
+	errs := verify.FromContext(ctx)
+	if len(errs) != 0 {
+		t.Errorf("verify.FromContext(): got %d errors, want 0", len(errs))
+	}
+
+	req.URL = nomatch
+
+	if err := v.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	errs = verify.FromContext(ctx)
+	if len(errs) != 4 {
+		t.Errorf("verify.FromContext(): got %d errors, want 4", len(errs))
+	}
+
+	for i, err := range errs {
+		verr, ok := err.Error()
+		if !ok {
+			t.Fatalf("%d. err.Error(): got !ok, want ok", i)
+		}
+
+		if got, want := verr.Kind, "url.Verifier"; got != want {
+			t.Errorf("%d. verr.Kind: got %q, want %q", i, got, want)
+		}
+		if got, want := verr.URL, nomatch.String(); got != want {
+			t.Errorf("%d. verr.URL: got %q, want %q", i, got, want)
+		}
+		if got, want := verr.Scope, verify.Request; got != want {
+			t.Errorf("%d. verr.URL: got %s, want %s", i, got, want)
+		}
+
+		var actual, expected string
+		switch i {
+		case 0:
+			actual = nomatch.Scheme
+			expected = match.Scheme
+		case 1:
+			actual = nomatch.Host
+			expected = match.Host
+		case 2:
+			actual = nomatch.Path
+			expected = match.Path
+		case 3:
+			actual = nomatch.RawQuery
+			expected = match.RawQuery
+		default:
+			t.Fatalf("errs: unexpected error at index %d, max 4", i)
+		}
+		if got, want := verr.Actual, actual; got != want {
+			t.Errorf("%d. ev.Actual: got %q, want %q", i, got, want)
+		}
+		if got, want := verr.Expected, expected; got != want {
+			t.Errorf("%d. ev.Expected: got %q, want %q", i, got, want)
+		}
 	}
 }
 
@@ -134,19 +132,24 @@ func TestVerifierFromJSON(t *testing.T) {
 	if reqmod == nil {
 		t.Fatal("reqmod: got nil, want not nil")
 	}
-	reqv, ok := reqmod.(verify.RequestVerifier)
-	if !ok {
-		t.Fatal("reqmod.(verify.RequestVerifier): got !ok, want ok")
-	}
 
-	req, err := http.NewRequest("GET", "https://www.martian.proxy/testing?test=false", nil)
+	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := reqv.ModifyRequest(req); err != nil {
+
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if err := reqv.VerifyRequests(); err == nil {
-		t.Error("VerifyRequests(): got nil, want not nil")
+
+	errs := verify.FromContext(ctx)
+	if len(errs) != 4 {
+		t.Errorf("verify.FromContext(): got %d errors, want 4", len(errs))
 	}
 }

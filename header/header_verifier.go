@@ -62,7 +62,8 @@ func NewVerifier(name, value string) *Verifier {
 func (v *Verifier) ModifyRequest(req *http.Request) error {
 	h := proxyutil.RequestHeader(req)
 	ctx := martian.NewContext(req)
-	err := verify.RequestError("header.Verifier", req)
+
+	err := verify.NewError("header.Verifier").Request(req)
 
 	return v.verify(ctx, h, err)
 }
@@ -73,18 +74,19 @@ func (v *Verifier) ModifyRequest(req *http.Request) error {
 func (v *Verifier) ModifyResponse(res *http.Response) error {
 	h := proxyutil.ResponseHeader(res)
 	ctx := martian.NewContext(res.Request)
-	err := verify.ResponseError("header.Verifier", res)
+
+	err := verify.NewError("header.Verifier").Response(res)
 
 	return v.verify(ctx, h, err)
 }
 
-func (v *Verifier) verify(ctx *martian.Context, h *proxyutil.Header, ev *verify.ErrorValue) error {
+func (v *Verifier) verify(ctx *martian.Context, h *proxyutil.Header, eb *verify.ErrorBuilder) error {
 	vs, ok := h.All(v.name)
 	if !ok {
-		ev.Expected = v.name
-		ev.MessageFormat = missingHeaderFormat
+		eb.Expected(v.name).Format("got no header, want %s header")
+		verify.Verify(ctx, eb)
 
-		return verify.ForContext(ctx, ev)
+		return nil
 	}
 
 	for _, value := range vs {
@@ -94,11 +96,13 @@ func (v *Verifier) verify(ctx *martian.Context, h *proxyutil.Header, ev *verify.
 		}
 	}
 
-	ev.Actual = strings.Join(vs, ", ")
-	ev.Expected = v.value
-	ev.MessageFormat = fmt.Sprintf(missingValueFormat, v.name)
+	eb.Actual(strings.Join(vs, ", ")).
+		Expected(v.value).
+		Format(fmt.Sprintf("got %s with value %%s, want value %%s", v.name))
 
-	return verify.ForContext(ctx, ev)
+	verify.Verify(ctx, eb)
+
+	return nil
 }
 
 // verifierFromJSON builds a header.Verifier from JSON.

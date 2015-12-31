@@ -31,7 +31,8 @@ func init() {
 
 // Verifier is a verifier for query strings.
 type Verifier struct {
-	key, value string
+	name  string
+	value string
 }
 
 type verifierJSON struct {
@@ -41,31 +42,32 @@ type verifierJSON struct {
 }
 
 // NewVerifier returns a new query string verifier.
-func NewVerifier(key, value string) (*Verifier, error) {
-	if key == "" {
-		return nil, fmt.Errorf("querystring: no key provided for verifier")
+func NewVerifier(name, value string) (*Verifier, error) {
+	if name == "" {
+		return nil, fmt.Errorf("querystring: parameter name cannot be blank")
 	}
 
 	return &Verifier{
-		key:   key,
+		name:  name,
 		value: value,
 	}, nil
 }
 
 // ModifyRequest verifies that the request URL query string parameter matches
-// the given key and value in all modified requests. If no value is provided,
-// the verifier will only verifier the given key is present. An error will be
+// the given name and value in all modified requests. If no value is provided,
+// the verifier will only verifier the given name is present. An error will be
 // added if the query string parameter is unmatched.
-func (v *verifier) ModifyRequest(req *http.Request) error {
+func (v *Verifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
-	ev := verify.RequestError("querystring.Verifier", req)
+	eb := verify.NewError("querystring.Verifier").Request(req)
 
-	vs, ok := req.URL.Query()[v.key]
+	vs, ok := req.URL.Query()[v.name]
 	if !ok {
-		ev.Expected = v.key
-		ev.MessageFormat = "got no query string parameter, want %s parameter"
+		eb.Expected(v.name).Format("got no query string parameter, want %s parameter")
 
-		return verify.ForContext(ctx, err)
+		verify.Verify(ctx, eb)
+
+		return nil
 	}
 
 	// No value verification required, pass.
@@ -80,11 +82,13 @@ func (v *verifier) ModifyRequest(req *http.Request) error {
 		}
 	}
 
-	ev.Actual = strings.Join(vs, ", ")
-	ev.Expected = v.value
-	ev.MessageFormat = fmt.Sprintf("key %s: got %%s, want to contain %%s", v.name)
+	eb.Actual(strings.Join(vs, ", ")).
+		Expected(v.value).
+		Format(fmt.Sprintf("%s: got %%s, want to contain %%s", v.name))
 
-	return verify.ForContext(ctx, ev)
+	verify.Verify(ctx, eb)
+
+	return nil
 }
 
 // verifierFromJSON builds a querystring.Verifier from JSON.

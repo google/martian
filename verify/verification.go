@@ -7,14 +7,15 @@ import (
 	"github.com/google/martian"
 )
 
-// Verification collects all errors from the contained request and response
-// verifiers.
+// Verification keeps an ordered set of all errors from the contained request
+// and response verifiers.
 type Verification struct {
 	reqmod martian.RequestModifier
 	resmod martian.ResponseModifier
 
-	mu   sync.RWMutex
-	errs []Error
+	mu  sync.RWMutex
+	set map[*ErrorBuilder]struct{}
+	ebs []*ErrorBuilder
 }
 
 var noop = martian.Noop("verify.Group")
@@ -24,7 +25,8 @@ func NewVerification() *Verification {
 	return &Verification{
 		reqmod: noop,
 		resmod: noop,
-		errs:   make([]Error, 0),
+		set:    make(map[*ErrorBuilder]struct{}),
+		ebs:    make([]*ErrorBuilder, 0),
 	}
 }
 
@@ -46,24 +48,39 @@ func (v *Verification) SetResponseModifier(resmod martian.ResponseModifier) {
 	v.resmod = resmod
 }
 
-// ModifyRequest sets up the error context for later verifiers.
+// ModifyRequest runs request modifiers and collects any verification errors.
 func (v *Verification) ModifyRequest(req *http.Request) error {
-	NewContext(martian.NewContext(req))
+	err := v.reqmod.ModifyRequest(req)
+	ctx := martian.NewContext(req)
 
-	return nil
+	v.saveErrors(ctx)
+
+	return err
 }
 
-// ModifyResponse collects the verification errors from the error context.
+// ModifyResponse runs response modifiers and collects any verification errors.
 func (v *Verification) ModifyResponse(res *http.Response) error {
+	err := v.resmod.ModifyResponse(res)
 	ctx := martian.NewContext(res.Request)
-	errs := FromContext(ctx)
 
+	v.saveErrors(ctx)
+
+	return err
+}
+
+// saveErrors loops through the error builders from the context and saves any
+// new error builders. Existing error builders will be skipped.
+func (v *Verification) saveErrors(ctx *martian.Context) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	v.errs = append(v.errs, errs...)
+	for _, eb := range FromContext(ctx) {
+		if _, ok := v.set[eb]; ok {
+			continue
+		}
 
-	return nil
+		v.ebs = append(v.ebs, eb)
+	}
 }
 
 // Errors returns the list of verification errors.
@@ -71,20 +88,29 @@ func (v *Verification) Errors() []Error {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 
-	return v.errs
+	verrs := make([]Error, len(v.ebs))
+
+	for _, eb := range v.ebs {
+		verr, ok := eb.Error()
+		if !ok {
+			continue
+		}
+
+		verrs = append(verrs, verr)
+	}
+
+	return verrs
 }
 
-// Reset resets the verification errors and calls Reset() for any errors that
-// implement verify.Resetter.
+// Reset resets the verification errors and any error builders.
 func (v *Verification) Reset() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	for _, err := range v.errs {
-		if r, ok := err.(Resetter); ok {
-			r.Reset()
-		}
+	for _, eb := range v.ebs {
+		eb.Reset()
 	}
 
-	v.errs = make([]Error, 0)
+	v.set = make(map[*ErrorBuilder]struct{})
+	v.ebs = make([]*ErrorBuilder, 0)
 }

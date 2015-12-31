@@ -18,6 +18,7 @@ package pingback
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sync"
@@ -27,9 +28,7 @@ import (
 	"github.com/google/martian/verify"
 )
 
-const (
-	errFormat = "never received request for %s"
-)
+const ()
 
 func init() {
 	parse.Register("pingback.Verifier", verifierFromJSON)
@@ -37,11 +36,11 @@ func init() {
 
 // Verifier verifies that the specific URL has been seen.
 type Verifier struct {
-	url  *url.URL
-	once sync.Once
+	url *url.URL
+	eb  *verify.ErrorBuilder
 
-	mu   sync.RWMutex
-	seen bool
+	mu     sync.RWMutex
+	pinged bool
 }
 
 type verifierJSON struct {
@@ -54,9 +53,19 @@ type verifierJSON struct {
 
 // NewVerifier returns a new pingback verifier.
 func NewVerifier(url *url.URL) *Verifier {
-	return &Verifier{
+	v := &Verifier{
 		url: url,
 	}
+
+	eb := verify.NewError("pingback.Verifier").
+		For(verify.Request, url).
+		Message(fmt.Sprintf("received no requests matching %s", url)).
+		Conditionally(v.Pinged).
+		Resets(v.Reset)
+
+	v.eb = eb
+
+	return v
 }
 
 // ModifyRequest verifies that the request URL matches all parts of url.
@@ -66,14 +75,12 @@ func NewVerifier(url *url.URL) *Verifier {
 // will continue to be nil until the verifier has been reset, regardless of
 // subsequent requests matching.
 func (v *Verifier) ModifyRequest(req *http.Request) error {
-	v.once.Do(func() {
-		ctx := martian.NewContext(req)
+	if v.Pinged() {
+		return nil
+	}
 
-		ev := verify.RequestError("pingback.Verifier", req)
-		ev.URL = v.url.String()
-
-		verify.ForContext(ctx, verify.Defer(ev, v.seen()))
-	})
+	ctx := martian.NewContext(req)
+	verify.Verify(ctx, v.eb)
 
 	switch {
 	case v.url.Scheme != "" && v.url.Scheme != req.URL.Scheme:
@@ -82,26 +89,27 @@ func (v *Verifier) ModifyRequest(req *http.Request) error {
 	case v.url.RawQuery != "" && v.url.RawQuery != req.URL.RawQuery:
 	default:
 		v.mu.Lock()
-		v.seen = true
+		v.pinged = true
 		v.mu.Unlock()
 	}
 
 	return nil
 }
 
-// Reset resets the verifier to the original unseen state.
+// Reset resets the verifier to the original unpinged state.
 func (v *Verifier) Reset() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	v.seen = false
+	v.pinged = false
 }
 
-func (v *Verifier) seen() bool {
+// Pinged returns whether the verifier has seen the expected URL.
+func (v *Verifier) Pinged() bool {
 	v.mu.RLock()
 	v.mu.RUnlock()
 
-	return v.seen
+	return v.pinged
 }
 
 // verifierFromJSON builds a pingback.Verifier from JSON.

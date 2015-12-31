@@ -38,8 +38,6 @@ func TestVerifier(t *testing.T) {
 	}
 	defer remove()
 
-	verify.NewContext(ctx)
-
 	res := proxyutil.NewResponse(301, nil, req)
 
 	if err := v.ModifyResponse(res); err != nil {
@@ -62,21 +60,25 @@ func TestVerifier(t *testing.T) {
 		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
 	}
 
-	ev := errs[0].Get()
-	if got, want := ev.Kind, "status.Verifier"; got != want {
-		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	verr, ok := errs[0].Error()
+	if !ok {
+		t.Fatal("errs[0].Error(): got !ok, want ok")
 	}
-	if got, want := ev.URL, "http://www.example.com"; got != want {
-		t.Errorf("ev.URL: got %q, want %q", got, want)
+
+	if got, want := verr.Kind, "status.Verifier"; got != want {
+		t.Errorf("verr.Kind: got %q, want %q", got, want)
 	}
-	if got, want := ev.Scope, verify.Response; got != want {
-		t.Errorf("ev.URL: got %s, want %s", got, want)
+	if got, want := verr.URL, "http://www.example.com"; got != want {
+		t.Errorf("verr.URL: got %q, want %q", got, want)
 	}
-	if got, want := ev.Actual, "200"; got != want {
-		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	if got, want := verr.Scope, verify.Response; got != want {
+		t.Errorf("verr.URL: got %s, want %s", got, want)
 	}
-	if got, want := ev.Expected, "301"; got != want {
-		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	if got, want := verr.Actual, "200"; got != want {
+		t.Errorf("verr.Actual: got %q, want %q", got, want)
+	}
+	if got, want := verr.Expected, "301"; got != want {
+		t.Errorf("verr.Expected: got %q, want %q", got, want)
 	}
 }
 
@@ -107,8 +109,6 @@ func TestVerifierFromJSON(t *testing.T) {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
 	defer remove()
-
-	verify.NewContext(ctx)
 
 	res := proxyutil.NewResponse(200, nil, req)
 

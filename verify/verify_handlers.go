@@ -34,7 +34,7 @@ type ResetHandler struct {
 }
 
 type errorsJSON struct {
-	Errors []*ErrorValue `json:"errors"`
+	Errors []Error `json:"errors"`
 }
 
 // NewHandler returns an http.Handler for requesting verification errors.
@@ -63,16 +63,9 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	errs := h.v.Errors()
-	ej := &errorsJSON{
-		Errors: make([]*ErrorValue, 0, len(errs)),
-	}
-
-	for _, err := range errs {
-		ej.Errors = append(ej.Errors, err.Get())
-	}
-
-	json.NewEncoder(rw).Encode(ej)
+	json.NewEncoder(rw).Encode(&errorsJSON{
+		Errors: h.v.Errors(),
+	})
 }
 
 // ServeHTTP resets the verification errors.

@@ -1,49 +1,50 @@
 package verify
 
-import (
-	"fmt"
-
-	"github.com/google/martian"
-)
+import "github.com/google/martian"
 
 const key = "verify.Context"
 
-// Context contains a list of functions that may or may not produce
-// verification errors related to a given request/response pair.
-type Context struct {
-	errs []Error
+// Context contains an ordered set of error builders that may or may not
+// produce verification errors depending on the conditions at retrieval time.
+type context struct {
+	set map[*ErrorBuilder]struct{}
+	ebs []*ErrorBuilder
 }
 
-// ForContext adds the verification error to the context.
-func ForContext(ctx *martian.Context, err Error) error {
+// Verify adds the error builder to the context.
+func Verify(ctx *martian.Context, eb *ErrorBuilder) {
 	v, ok := ctx.Get(key)
 	if !ok {
-		return fmt.Errorf("verify: missing error context")
+		vctx := newContext()
+		vctx.add(eb)
+
+		ctx.Set(key, vctx)
 	}
 
-	vctx := v.(*Context)
-	vctx.errs = append(vctx.errs, err)
-
-	return nil
+	v.(*context).add(eb)
 }
 
-// FromContext retrieves the verification errors from the context.
-func FromContext(ctx *martian.Context) []Error {
+// FromContext retrieves the error builders from the context.
+func FromContext(ctx *martian.Context) []*ErrorBuilder {
 	v, ok := ctx.Get(key)
 	if !ok {
 		return nil
 	}
 
-	return v.(*Context).errs
+	return v.(*context).ebs
 }
 
-// NewContext puts a new verify.Context into ctx and returns the new context.
-func NewContext(ctx *martian.Context) *Context {
-	vctx := &Context{
-		errs: make([]Error, 0),
+func newContext() *context {
+	return &context{
+		set: make(map[*ErrorBuilder]struct{}),
+	}
+}
+
+func (ctx *context) add(eb *ErrorBuilder) {
+	if _, ok := ctx.set[eb]; ok {
+		return
 	}
 
-	ctx.Set(key, vctx)
-
-	return vctx
+	ctx.set[eb] = struct{}{}
+	ctx.ebs = append(ctx.ebs, eb)
 }

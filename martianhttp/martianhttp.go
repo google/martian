@@ -25,7 +25,6 @@ import (
 	"github.com/google/martian"
 	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
-	"github.com/google/martian/verify"
 )
 
 var noop = martian.Noop("martianhttp.Modifier")
@@ -92,52 +91,6 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 	defer m.mu.RUnlock()
 
 	return m.resmod.ModifyResponse(res)
-}
-
-// VerifyRequests verifies reqmod, iff reqmod is a RequestVerifier.
-func (m *Modifier) VerifyRequests() error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if reqv, ok := m.reqmod.(verify.RequestVerifier); ok {
-		return reqv.VerifyRequests()
-	}
-
-	return nil
-}
-
-// VerifyResponses verifies resmod, iff resmod is a ResponseVerifier.
-func (m *Modifier) VerifyResponses() error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if resv, ok := m.resmod.(verify.ResponseVerifier); ok {
-		return resv.VerifyResponses()
-	}
-
-	return nil
-}
-
-// ResetRequestVerifications resets verifications on reqmod, iff reqmod is a
-// RequestVerifier.
-func (m *Modifier) ResetRequestVerifications() {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if reqv, ok := m.reqmod.(verify.RequestVerifier); ok {
-		reqv.ResetRequestVerifications()
-	}
-}
-
-// ResetResponseVerifications resets verifications on resmod, iff resmod is a
-// ResponseVerifier.
-func (m *Modifier) ResetResponseVerifications() {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if resv, ok := m.resmod.(verify.ResponseVerifier); ok {
-		resv.ResetResponseVerifications()
-	}
 }
 
 // ServeHTTP sets or retrieves the JSON-encoded modifier configuration

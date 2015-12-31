@@ -15,16 +15,18 @@
 package verify
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/google/martian"
+	"github.com/google/martian/proxyutil"
 )
 
 func TestHandlerServeHTTPUnsupportedMethod(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(NewVerification())
 
 	for i, m := range []string{"POST", "PUT", "DELETE"} {
 		req, err := http.NewRequest(m, "http://example.com", nil)
@@ -43,38 +45,44 @@ func TestHandlerServeHTTPUnsupportedMethod(t *testing.T) {
 	}
 }
 
-func TestHandlerServeHTTPNoVerifiers(t *testing.T) {
-	h := NewHandler()
-	req, err := http.NewRequest("GET", "http://example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-	rw := httptest.NewRecorder()
-
-	h.ServeHTTP(rw, req)
-	if got, want := rw.Code, 200; got != want {
-		t.Errorf("rw.Code: got %d, want %d", got, want)
-	}
-}
-
 func TestHandlerServeHTTP(t *testing.T) {
-	merr := NewMultiError()
-	merr.Add(fmt.Errorf("first response verification failure"))
-	merr.Add(fmt.Errorf("second response verification failure"))
-
-	v := &TestVerifier{
-		RequestError:  fmt.Errorf("request verification failure"),
-		ResponseError: merr,
-	}
-
-	h := NewHandler()
-	h.SetRequestVerifier(v)
-	h.SetResponseVerifier(v)
+	v := NewVerification()
+	h := NewHandler(v)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
+
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := v.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	ebs := make([]*ErrorBuilder, 3)
+	for i := 0; i < len(ebs); i++ {
+		kind := fmt.Sprintf("verifier.%d", i)
+
+		eb := NewError(kind).
+			Request(req).
+			Actual(fmt.Sprintf("actual %d", i)).
+			Expected(fmt.Sprintf("expected %d", i))
+
+		Verify(ctx, eb)
+
+		ebs[i] = eb
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	rw := httptest.NewRecorder()
 
 	h.ServeHTTP(rw, req)
@@ -82,27 +90,38 @@ func TestHandlerServeHTTP(t *testing.T) {
 		t.Errorf("rw.Code: got %d, want %d", got, want)
 	}
 
-	buf := new(bytes.Buffer)
-	if err := json.Compact(buf, []byte(`{
-    "errors": [
-      { "message": "request verification failure" },
-      { "message": "first response verification failure" },
-      { "message": "second response verification failure" }
-    ]
-  }`)); err != nil {
-		t.Fatalf("json.Compact(): got %v, want no error", err)
+	ejs := &errorsJSON{}
+	if err := json.Unmarshal(rw.Body.Bytes(), ejs); err != nil {
+		t.Fatalf("json.Unmarshal(): got %v, want no error", err)
 	}
-	// json.(*Encoder).Encode writes a trailing newline, so we will too.
-	// see: https://golang.org/src/encoding/json/stream.go
-	buf.WriteByte('\n')
 
-	if got, want := rw.Body.Bytes(), buf.Bytes(); !bytes.Equal(got, want) {
-		t.Errorf("rw.Body: got %q, want %q", got, want)
+	if got, want := len(ejs.Errors), 3; got != want {
+		t.Fatalf("json.Errors: got %d errors, want %d errors", got, want)
+	}
+
+	for i, ej := range ejs.Errors {
+		verr, ok := ebs[i].Error()
+		if !ok {
+			t.Fatalf("ebs[%d].Error(): got !ok, want ok", i)
+		}
+
+		if got, want := ej.Kind, verr.Kind; got != want {
+			t.Errorf("json.Kind: got %q, want %q", got, want)
+		}
+		if got, want := ej.URL, verr.URL; got != want {
+			t.Errorf("json.URL: got %q, want %q", got, want)
+		}
+		if got, want := ej.Actual, verr.Actual; got != want {
+			t.Errorf("json.Actual: got %q, want %q", got, want)
+		}
+		if got, want := ej.Expected, verr.Expected; got != want {
+			t.Errorf("json.Expected: got %q, want %q", got, want)
+		}
 	}
 }
 
 func TestResetHandlerServeHTTPUnsupportedMethod(t *testing.T) {
-	h := NewResetHandler()
+	h := NewResetHandler(NewVerification())
 
 	for i, m := range []string{"GET", "PUT", "DELETE"} {
 		req, err := http.NewRequest(m, "http://example.com", nil)
@@ -121,34 +140,37 @@ func TestResetHandlerServeHTTPUnsupportedMethod(t *testing.T) {
 	}
 }
 
-func TestResetHandlerServeHTTPNoVerifiers(t *testing.T) {
-	h := NewResetHandler()
-	req, err := http.NewRequest("POST", "http://example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-	rw := httptest.NewRecorder()
-
-	h.ServeHTTP(rw, req)
-	if got, want := rw.Code, 204; got != want {
-		t.Errorf("rw.Code: got %d, want %d", got, want)
-	}
-}
-
 func TestResetHandlerServeHTTP(t *testing.T) {
-	v := &TestVerifier{
-		RequestError:  fmt.Errorf("request verification failure"),
-		ResponseError: fmt.Errorf("response verification failure"),
-	}
-
-	h := NewResetHandler()
-	h.SetRequestVerifier(v)
-	h.SetResponseVerifier(v)
+	v := NewVerification()
+	h := NewResetHandler(v)
 
 	req, err := http.NewRequest("POST", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
+
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := v.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	var reset bool
+	eb := NewError("reset.Verifier").
+		Request(req).
+		Resets(func() { reset = true })
+
+	Verify(ctx, eb)
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
 	rw := httptest.NewRecorder()
 
 	h.ServeHTTP(rw, req)
@@ -156,10 +178,7 @@ func TestResetHandlerServeHTTP(t *testing.T) {
 		t.Errorf("rw.Code: got %d, want %d", got, want)
 	}
 
-	if err := v.VerifyRequests(); err != nil {
-		t.Errorf("v.VerifyRequests(): got %v, want no error", err)
-	}
-	if err := v.VerifyResponses(); err != nil {
-		t.Errorf("v.VerifyResponses(): got %v, want no error", err)
+	if !reset {
+		t.Error("reset: got false, want true")
 	}
 }
