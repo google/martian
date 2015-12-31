@@ -14,7 +14,7 @@ type Verification struct {
 	resmod martian.ResponseModifier
 
 	mu   sync.RWMutex
-	errs []*Error
+	errs []Error
 }
 
 var noop = martian.Noop("verify.Group")
@@ -48,11 +48,7 @@ func (v *Verification) SetResponseModifier(resmod martian.ResponseModifier) {
 
 // ModifyRequest sets up the error context for later verifiers.
 func (v *Verification) ModifyRequest(req *http.Request) error {
-	ctx := martian.NewContext(req)
-
-	ctx.Set(key, &Context{
-		Errors: make([]Error, 0),
-	})
+	NewContext(martian.NewContext(req))
 
 	return nil
 }

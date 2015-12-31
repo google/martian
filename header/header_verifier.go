@@ -50,7 +50,7 @@ func init() {
 
 // NewVerifier creates a new header verifier for the given name and value.
 func NewVerifier(name, value string) *Verifier {
-	return &verifier{
+	return &Verifier{
 		name:  name,
 		value: value,
 	}
@@ -59,7 +59,7 @@ func NewVerifier(name, value string) *Verifier {
 // ModifyRequest verifies that the header for name is present in all modified
 // requests. If value is non-empty the value must be present in at least one
 // header for name. An error will be added for every unmatched request.
-func (v *verifier) ModifyRequest(req *http.Request) error {
+func (v *Verifier) ModifyRequest(req *http.Request) error {
 	h := proxyutil.RequestHeader(req)
 	ctx := martian.NewContext(req)
 	err := verify.RequestError("header.Verifier", req)
@@ -70,7 +70,7 @@ func (v *verifier) ModifyRequest(req *http.Request) error {
 // ModifyResponse verifies that the header for name is present in all modified
 // responses. If value is non-empty the value must be present in at least one
 // header for name. An error will be added for every unmatched response.
-func (v *verifier) ModifyResponse(res *http.Response) error {
+func (v *Verifier) ModifyResponse(res *http.Response) error {
 	h := proxyutil.ResponseHeader(res)
 	ctx := martian.NewContext(res.Request)
 	err := verify.ResponseError("header.Verifier", res)

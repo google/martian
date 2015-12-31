@@ -36,3 +36,14 @@ func FromContext(ctx *martian.Context) []Error {
 
 	return v.(*Context).errs
 }
+
+// NewContext puts a new verify.Context into ctx and returns the new context.
+func NewContext(ctx *martian.Context) *Context {
+	vctx := &Context{
+		errs: make([]Error, 0),
+	}
+
+	ctx.Set(key, vctx)
+
+	return vctx
+}

@@ -18,54 +18,65 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 )
 
-func TestVerifyResponses(t *testing.T) {
+func TestVerifier(t *testing.T) {
 	v := NewVerifier(301)
 
-	tt := []struct {
-		got  int
-		want string
-	}{
-		{200, "response(http://www.example.com) status code verify failure: got 200, want 301"},
-		{302, "response(http://www.example.com) status code verify failure: got 302, want 301"},
-		{400, "response(http://www.example.com) status code verify failure: got 400, want 301"},
+	req, err := http.NewRequest("GET", "http://www.example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	for i, tc := range tt {
-		req, err := http.NewRequest("GET", "http://www.example.com", nil)
-		if err != nil {
-			t.Fatalf("%d. http.NewRequest(): got %v, want no error", i, err)
-		}
-		res := proxyutil.NewResponse(tc.got, nil, req)
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
 
-		if err := v.ModifyResponse(res); err != nil {
-			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
-		}
+	verify.NewContext(ctx)
+
+	res := proxyutil.NewResponse(301, nil, req)
+
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
-	merr, ok := v.VerifyResponses().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyResponses(): got nil, want *verify.MultiError")
-	}
-	errs := merr.Errors()
-	if got, want := len(errs), len(tt); got != want {
-		t.Fatalf("len(merr.Errors(): got %d, want %d", got, want)
+	errs := verify.FromContext(ctx)
+	if len(errs) != 0 {
+		t.Errorf("verify.FromContext(): got %d errors, want 0", len(errs))
 	}
 
-	for i, tc := range tt {
-		if got, want := errs[i].Error(), tc.want; got != want {
-			t.Errorf("%d. merr.Errors(): got %q, want %q", i, got, want)
-		}
+	res.StatusCode = 200
+
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
-	v.ResetResponseVerifications()
+	errs = verify.FromContext(ctx)
+	if len(errs) != 1 {
+		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
+	}
 
-	if err := v.VerifyResponses(); err != nil {
-		t.Errorf("v.VerifyResponses(): got %v, want no error", err)
+	ev := errs[0].Get()
+	if got, want := ev.Kind, "status.Verifier"; got != want {
+		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	}
+	if got, want := ev.URL, "http://www.example.com"; got != want {
+		t.Errorf("ev.URL: got %q, want %q", got, want)
+	}
+	if got, want := ev.Scope, verify.Response; got != want {
+		t.Errorf("ev.URL: got %s, want %s", got, want)
+	}
+	if got, want := ev.Actual, "200"; got != want {
+		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	}
+	if got, want := ev.Expected, "301"; got != want {
+		t.Errorf("ev.Expected: got %q, want %q", got, want)
 	}
 }
 
@@ -85,21 +96,28 @@ func TestVerifierFromJSON(t *testing.T) {
 	if resmod == nil {
 		t.Fatal("resmod: got nil, want not nil")
 	}
-	resv, ok := resmod.(verify.ResponseVerifier)
-	if !ok {
-		t.Fatal("reqmod.(verify.RequestVerifier): got !ok, want ok")
-	}
 
 	req, err := http.NewRequest("GET", "http://www.example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	verify.NewContext(ctx)
+
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := resv.ModifyResponse(res); err != nil {
+
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if err := resv.VerifyResponses(); err == nil {
-		t.Error("VerifyResponses(): got nil, want not nil")
+
+	errs := verify.FromContext(ctx)
+	if len(errs) != 1 {
+		t.Errorf("verify.FromContext(): got %d errors, want 0", len(errs))
 	}
 }

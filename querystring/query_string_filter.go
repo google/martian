@@ -20,7 +20,6 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
-	"github.com/google/martian/verify"
 )
 
 var noop = martian.Noop("querystring.Filter")
@@ -139,38 +138,4 @@ func (f *Filter) matches(req *http.Request) bool {
 	}
 
 	return false
-}
-
-// VerifyRequests returns an error containing all the verification errors
-// returned by request verifiers.
-func (f *Filter) VerifyRequests() error {
-	if reqv, ok := f.reqmod.(verify.RequestVerifier); ok {
-		return reqv.VerifyRequests()
-	}
-
-	return nil
-}
-
-// VerifyResponses returns an error containing all the verification errors
-// returned by response verifiers.
-func (f *Filter) VerifyResponses() error {
-	if resv, ok := f.resmod.(verify.ResponseVerifier); ok {
-		return resv.VerifyResponses()
-	}
-
-	return nil
-}
-
-// ResetRequestVerifications resets the state of the contained request verifiers.
-func (f *Filter) ResetRequestVerifications() {
-	if reqv, ok := f.reqmod.(verify.RequestVerifier); ok {
-		reqv.ResetRequestVerifications()
-	}
-}
-
-// ResetResponseVerifications resets the state of the contained response verifiers.
-func (f *Filter) ResetResponseVerifications() {
-	if resv, ok := f.resmod.(verify.ResponseVerifier); ok {
-		resv.ResetResponseVerifications()
-	}
 }

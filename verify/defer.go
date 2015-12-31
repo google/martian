@@ -3,8 +3,8 @@ package verify
 // DeferredValue is a verify.Error that conditionally returns an error at a
 // later time.
 type DeferredValue struct {
-	ev *ErrorValue
-	fn func() bool
+	err Error
+	fn  func() bool
 }
 
 // Defer changes the behavior of the Get() method on a verify.Error such that
@@ -20,7 +20,7 @@ func Defer(err Error, fn func() bool) *DeferredValue {
 // the function returns true.
 func (dv *DeferredValue) Get() *ErrorValue {
 	if dv.fn() {
-		return dv.ev
+		return dv.err.Get()
 	}
 
 	return nil

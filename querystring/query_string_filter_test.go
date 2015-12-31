@@ -15,7 +15,6 @@
 package querystring
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -23,7 +22,6 @@ import (
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/verify"
 
 	// Import to register header.Modifier with JSON parser.
 	_ "github.com/google/martian/header"
@@ -220,53 +218,5 @@ func TestFilterFromJSON(t *testing.T) {
 
 	if got, want := res.Header.Get("Martian-Modified"), "true"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Martian-Modified", got, want)
-	}
-}
-
-func TestVerifyRequests(t *testing.T) {
-	f := NewFilter("", "")
-
-	if err := f.VerifyRequests(); err != nil {
-		t.Fatalf("VerifyRequest(): got %v, want no error", err)
-	}
-
-	tv := &verify.TestVerifier{
-		RequestError: errors.New("verify request failure"),
-	}
-
-	f.SetRequestModifier(tv)
-
-	if got, want := f.VerifyRequests(), tv.RequestError; got != want {
-		t.Fatalf("VerifyRequests(): got %v, want %v", got, want)
-	}
-
-	f.ResetRequestVerifications()
-
-	if err := f.VerifyRequests(); err != nil {
-		t.Fatalf("VerifyRequest(): got %v, want no error", err)
-	}
-}
-
-func TestVerifyResponses(t *testing.T) {
-	f := NewFilter("", "")
-
-	if err := f.VerifyResponses(); err != nil {
-		t.Fatalf("VerifyResponses(): got %v, want no error", err)
-	}
-
-	tv := &verify.TestVerifier{
-		ResponseError: errors.New("verify response failure"),
-	}
-
-	f.SetResponseModifier(tv)
-
-	if got, want := f.VerifyResponses(), tv.ResponseError; got != want {
-		t.Fatalf("VerifyResponses(): got %v, want %v", got, want)
-	}
-
-	f.ResetResponseVerifications()
-
-	if err := f.VerifyResponses(); err != nil {
-		t.Fatalf("VerifyResponses(): got %v, want no error", err)
 	}
 }

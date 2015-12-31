@@ -63,11 +63,12 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	errs := h.v.Errors()
 	ej := &errorsJSON{
-		Errors: make([]*ErrorValue, 0, len(h.errs)),
+		Errors: make([]*ErrorValue, 0, len(errs)),
 	}
 
-	for _, err := range h.v.Errors() {
+	for _, err := range errs {
 		ej.Errors = append(ej.Errors, err.Get())
 	}
 

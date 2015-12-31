@@ -16,15 +16,12 @@ package fifo
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/verify"
 
 	_ "github.com/google/martian/header"
 )
@@ -166,93 +163,5 @@ func TestModifyResponseHaltsOnError(t *testing.T) {
 
 	if tm2.ResponseModified() {
 		t.Error("tm2.ResponseModified(): got true, want false")
-	}
-}
-
-func TestVerifyRequests(t *testing.T) {
-	fg := NewGroup()
-
-	if err := fg.VerifyRequests(); err != nil {
-		t.Fatalf("VerifyRequest(): got %v, want no error", err)
-	}
-
-	errs := []error{}
-	for i := 0; i < 3; i++ {
-		err := fmt.Errorf("%d. verify request failure", i)
-
-		tv := &verify.TestVerifier{
-			RequestError: err,
-		}
-		fg.AddRequestModifier(tv)
-
-		errs = append(errs, err)
-	}
-
-	merr, ok := fg.VerifyRequests().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyRequests(): got nil, want *verify.MultiError")
-	}
-
-	if !reflect.DeepEqual(merr.Errors(), errs) {
-		t.Errorf("merr.Errors(): got %v, want %v", merr.Errors(), errs)
-	}
-}
-
-func TestVerifyResponses(t *testing.T) {
-	fg := NewGroup()
-
-	if err := fg.VerifyResponses(); err != nil {
-		t.Fatalf("VerifyResponses(): got %v, want no error", err)
-	}
-
-	errs := []error{}
-	for i := 0; i < 3; i++ {
-		err := fmt.Errorf("%d. verify responses failure", i)
-
-		tv := &verify.TestVerifier{
-			ResponseError: err,
-		}
-		fg.AddResponseModifier(tv)
-
-		errs = append(errs, err)
-	}
-
-	merr, ok := fg.VerifyResponses().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyResponses(): got nil, want *verify.MultiError")
-	}
-
-	if !reflect.DeepEqual(merr.Errors(), errs) {
-		t.Errorf("merr.Errors(): got %v, want %v", merr.Errors(), errs)
-	}
-}
-
-func TestResets(t *testing.T) {
-	fg := NewGroup()
-
-	for i := 0; i < 3; i++ {
-		tv := &verify.TestVerifier{
-			RequestError:  fmt.Errorf("%d. verify request error", i),
-			ResponseError: fmt.Errorf("%d. verify response error", i),
-		}
-		fg.AddRequestModifier(tv)
-		fg.AddResponseModifier(tv)
-	}
-
-	if err := fg.VerifyRequests(); err == nil {
-		t.Fatal("VerifyRequests(): got nil, want error")
-	}
-	if err := fg.VerifyResponses(); err == nil {
-		t.Fatal("VerifyResponses(): got nil, want error")
-	}
-
-	fg.ResetRequestVerifications()
-	fg.ResetResponseVerifications()
-
-	if err := fg.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
-	}
-	if err := fg.VerifyResponses(); err != nil {
-		t.Errorf("VerifyResponses(): got %v, want no error", err)
 	}
 }

@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
-	"github.com/google/martian/verify"
 )
 
 // Group is a martian.RequestResponseModifier that maintains lists of
@@ -92,80 +91,6 @@ func (g *Group) ModifyResponse(res *http.Response) error {
 	}
 
 	return nil
-}
-
-// VerifyRequests returns a MultiError containing all the
-// verification errors returned by request verifiers.
-func (g *Group) VerifyRequests() error {
-	g.reqmu.Lock()
-	defer g.reqmu.Unlock()
-
-	merr := verify.NewMultiError()
-	for _, reqmod := range g.reqmods {
-		reqv, ok := reqmod.(verify.RequestVerifier)
-		if !ok {
-			continue
-		}
-
-		if err := reqv.VerifyRequests(); err != nil {
-			merr.Add(err)
-		}
-	}
-
-	if merr.Empty() {
-		return nil
-	}
-
-	return merr
-}
-
-// VerifyResponses returns a MultiError containing all the
-// verification errors returned by response verifiers.
-func (g *Group) VerifyResponses() error {
-	g.resmu.Lock()
-	defer g.resmu.Unlock()
-
-	merr := verify.NewMultiError()
-	for _, resmod := range g.resmods {
-		resv, ok := resmod.(verify.ResponseVerifier)
-		if !ok {
-			continue
-		}
-
-		if err := resv.VerifyResponses(); err != nil {
-			merr.Add(err)
-		}
-	}
-
-	if merr.Empty() {
-		return nil
-	}
-
-	return merr
-}
-
-// ResetRequestVerifications resets the state of the contained request verifiers.
-func (g *Group) ResetRequestVerifications() {
-	g.reqmu.Lock()
-	defer g.reqmu.Unlock()
-
-	for _, reqmod := range g.reqmods {
-		if reqv, ok := reqmod.(verify.RequestVerifier); ok {
-			reqv.ResetRequestVerifications()
-		}
-	}
-}
-
-// ResetResponseVerifications resets the state of the contained request verifiers.
-func (g *Group) ResetResponseVerifications() {
-	g.resmu.Lock()
-	defer g.resmu.Unlock()
-
-	for _, resmod := range g.resmods {
-		if resv, ok := resmod.(verify.ResponseVerifier); ok {
-			resv.ResetResponseVerifications()
-		}
-	}
 }
 
 // groupFromJSON builds a fifo.Group from JSON.

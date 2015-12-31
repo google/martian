@@ -15,55 +15,202 @@
 package header
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 )
 
-func TestVerifyRequestsBlankValue(t *testing.T) {
+func TestVerifier(t *testing.T) {
+	v := NewVerifier("Martian-Test", "true")
+
+	req, err := http.NewRequest("GET", "http://www.example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Martian-Test", "true")
+
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	verify.NewContext(ctx)
+
+	if err := v.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	errs := verify.FromContext(ctx)
+	if len(errs) != 0 {
+		t.Errorf("verify.FromContext(): got %d errors, want 0", len(errs))
+	}
+
+	req.Header.Set("Martian-Test", "false")
+
+	if err := v.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	errs = verify.FromContext(ctx)
+	if len(errs) != 1 {
+		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
+	}
+
+	ev := errs[0].Get()
+	if got, want := ev.Kind, "header.Verifier"; got != want {
+		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	}
+	if got, want := ev.URL, "http://www.example.com"; got != want {
+		t.Errorf("ev.URL: got %q, want %q", got, want)
+	}
+	if got, want := ev.Scope, verify.Request; got != want {
+		t.Errorf("ev.URL: got %s, want %s", got, want)
+	}
+	if got, want := ev.Actual, "false"; got != want {
+		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	}
+	if got, want := ev.Expected, "true"; got != want {
+		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	res.Header.Set("Martian-Test", "true")
+
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	errs = verify.FromContext(ctx)
+	if len(errs) != 1 {
+		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
+	}
+
+	res.Header.Set("Martian-Test", "false")
+
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	errs = verify.FromContext(ctx)
+	if len(errs) != 2 {
+		t.Errorf("verify.FromContext(): got %d errors, want 2", len(errs))
+	}
+
+	ev = errs[1].Get()
+	if got, want := ev.Kind, "header.Verifier"; got != want {
+		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	}
+	if got, want := ev.URL, "http://www.example.com"; got != want {
+		t.Errorf("ev.URL: got %q, want %q", got, want)
+	}
+	if got, want := ev.Scope, verify.Response; got != want {
+		t.Errorf("ev.URL: got %s, want %s", got, want)
+	}
+	if got, want := ev.Actual, "false"; got != want {
+		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	}
+	if got, want := ev.Expected, "true"; got != want {
+		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	}
+}
+
+func TestVerifierBlankValue(t *testing.T) {
 	v := NewVerifier("Martian-Test", "")
 
-	for i := 0; i < 4; i++ {
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://www.example.com/%d", i), nil)
-		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
-		}
+	req, err := http.NewRequest("GET", "http://www.example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Martian-Test", "any-value")
 
-		// Request 1, 3 should fail verification.
-		if i%2 == 0 {
-			req.Header.Set("Martian-Test", "true")
-		}
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
 
-		if err := v.ModifyRequest(req); err != nil {
-			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
-		}
+	verify.NewContext(ctx)
+
+	if err := v.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyRequests(): got no error, want *verify.MultiError")
-	}
-	if got, want := len(merr.Errors()), 2; got != want {
-		t.Fatalf("len(merr.Errors()): got %d, want %d", got, want)
+	errs := verify.FromContext(ctx)
+	if len(errs) != 0 {
+		t.Errorf("verify.FromContext(): got %d errors, want 0", len(errs))
 	}
 
-	wants := []string{
-		`request(http://www.example.com/1) header verify failure: got no header, want Martian-Test header`,
-		`request(http://www.example.com/3) header verify failure: got no header, want Martian-Test header`,
-	}
-	for i, err := range merr.Errors() {
-		if got := err.Error(); got != wants[i] {
-			t.Errorf("Errors()[%d]: got %q, want %q", i, got, wants[i])
-		}
+	req.Header.Del("Martian-Test")
+
+	if err := v.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
-	v.ResetRequestVerifications()
-	if err := v.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
+	errs = verify.FromContext(ctx)
+	if len(errs) != 1 {
+		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
+	}
+
+	ev := errs[0].Get()
+	if got, want := ev.Kind, "header.Verifier"; got != want {
+		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	}
+	if got, want := ev.URL, "http://www.example.com"; got != want {
+		t.Errorf("ev.URL: got %q, want %q", got, want)
+	}
+	if got, want := ev.Scope, verify.Request; got != want {
+		t.Errorf("ev.URL: got %s, want %s", got, want)
+	}
+	if got, want := ev.Actual, ""; got != want {
+		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	}
+	if got, want := ev.Expected, "Martian-Test"; got != want {
+		t.Errorf("ev.Expected: got %q, want %q", got, want)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	res.Header.Set("Martian-Test", "true")
+
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	errs = verify.FromContext(ctx)
+	if len(errs) != 1 {
+		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
+	}
+
+	res.Header.Del("Martian-Test")
+
+	if err := v.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	errs = verify.FromContext(ctx)
+	if len(errs) != 2 {
+		t.Errorf("verify.FromContext(): got %d errors, want 2", len(errs))
+	}
+
+	ev = errs[1].Get()
+	if got, want := ev.Kind, "header.Verifier"; got != want {
+		t.Errorf("ev.Kind: got %q, want %q", got, want)
+	}
+	if got, want := ev.URL, "http://www.example.com"; got != want {
+		t.Errorf("ev.URL: got %q, want %q", got, want)
+	}
+	if got, want := ev.Scope, verify.Response; got != want {
+		t.Errorf("ev.URL: got %s, want %s", got, want)
+	}
+	if got, want := ev.Actual, ""; got != want {
+		t.Errorf("ev.Actual: got %q, want %q", got, want)
+	}
+	if got, want := ev.Expected, "Martian-Test"; got != want {
+		t.Errorf("ev.Expected: got %q, want %q", got, want)
 	}
 }
 
@@ -84,175 +231,42 @@ func TestVerifierFromJSON(t *testing.T) {
 	if reqmod == nil {
 		t.Fatal("reqmod: got nil, want not nil")
 	}
-	reqv, ok := reqmod.(verify.RequestVerifier)
-	if !ok {
-		t.Fatal("reqmod.(verify.RequestVerifier): got !ok, want ok")
-	}
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	if err := reqv.ModifyRequest(req); err != nil {
+
+	ctx, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	verify.NewContext(ctx)
+
+	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if err := reqv.VerifyRequests(); err == nil {
-		t.Error("VerifyRequests(): got nil, want not nil")
+
+	errs := verify.FromContext(ctx)
+	if len(errs) != 1 {
+		t.Errorf("verify.FromContext(): got %d errors, want 1", len(errs))
 	}
 
 	resmod := r.ResponseModifier()
 	if resmod == nil {
 		t.Fatal("resmod: got nil, want not nil")
 	}
-	resv, ok := resmod.(verify.ResponseVerifier)
-	if !ok {
-		t.Fatal("resmod.(verify.ResponseVerifier): got !ok, want ok")
-	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	if err := resv.ModifyResponse(res); err != nil {
+
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
-	if err := resv.VerifyResponses(); err == nil {
-		t.Error("VerifyResponses(): got nil, want not nil")
-	}
-}
 
-func TestVerifyRequests(t *testing.T) {
-	v := NewVerifier("Martian-Test", "testing-even")
-
-	for i := 0; i < 4; i++ {
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://www.example.com/%d", i), nil)
-		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
-		}
-
-		req.Header.Add("Martian-Test", fmt.Sprintf("test-%d", i))
-
-		// Request 1, 3 should fail verification.
-		if i%2 == 0 {
-			req.Header.Add("Martian-Test", "testing-even")
-		} else {
-			req.Header.Add("Martian-Test", "testing-odd")
-		}
-
-		if err := v.ModifyRequest(req); err != nil {
-			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
-		}
-	}
-
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyRequests(): got no error, want *verify.MultiError")
-	}
-	if got, want := len(merr.Errors()), 2; got != want {
-		t.Fatalf("len(merr.Errors()): got %d, want %d", got, want)
-	}
-
-	wants := []string{
-		`request(http://www.example.com/1) header verify failure: got Martian-Test with value test-1, testing-odd, want value testing-even`,
-		`request(http://www.example.com/3) header verify failure: got Martian-Test with value test-3, testing-odd, want value testing-even`,
-	}
-	for i, err := range merr.Errors() {
-		if got := err.Error(); got != wants[i] {
-			t.Errorf("Errors()[%d]: got %q, want %q", i, got, wants[i])
-		}
-	}
-
-	v.ResetRequestVerifications()
-	if err := v.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
-	}
-}
-
-func TestVerifyResponsesBlankValue(t *testing.T) {
-	v := NewVerifier("Martian-Test", "")
-
-	for i := 0; i < 4; i++ {
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://www.example.com/%d", i), nil)
-		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
-		}
-		res := proxyutil.NewResponse(200, nil, req)
-
-		// Response 1, 3 should fail verification.
-		if i%2 == 0 {
-			res.Header.Set("Martian-Test", "true")
-		}
-
-		if err := v.ModifyResponse(res); err != nil {
-			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
-		}
-	}
-
-	merr, ok := v.VerifyResponses().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyResponses(): got no error, want *verify.MultiError")
-	}
-	if got, want := len(merr.Errors()), 2; got != want {
-		t.Fatalf("len(merr.Errors()): got %d, want %d", got, want)
-	}
-
-	wants := []string{
-		`response(http://www.example.com/1) header verify failure: got no header, want Martian-Test header`,
-		`response(http://www.example.com/3) header verify failure: got no header, want Martian-Test header`,
-	}
-	for i, err := range merr.Errors() {
-		if got := err.Error(); got != wants[i] {
-			t.Errorf("Errors()[%d]: got %q, want %q", i, got, wants[i])
-		}
-	}
-
-	v.ResetResponseVerifications()
-	if err := v.VerifyResponses(); err != nil {
-		t.Errorf("VerifyResponses(): got %v, want no error", err)
-	}
-}
-
-func TestVerifyResponses(t *testing.T) {
-	v := NewVerifier("Martian-Test", "testing-even")
-
-	for i := 0; i < 4; i++ {
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://www.example.com/%d", i), nil)
-		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
-		}
-		res := proxyutil.NewResponse(200, nil, req)
-
-		res.Header.Add("Martian-Test", fmt.Sprintf("test-%d", i))
-
-		// Response 1, 3 should fail verification.
-		if i%2 == 0 {
-			res.Header.Add("Martian-Test", "testing-even")
-		} else {
-			res.Header.Add("Martian-Test", "testing-odd")
-		}
-
-		if err := v.ModifyResponse(res); err != nil {
-			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
-		}
-	}
-
-	merr, ok := v.VerifyResponses().(*verify.MultiError)
-	if !ok {
-		t.Fatal("VerifyResponses(): got no error, want *verify.MultiError")
-	}
-	if got, want := len(merr.Errors()), 2; got != want {
-		t.Fatalf("len(merr.Errors()): got %d, want %d", got, want)
-	}
-
-	wants := []string{
-		`response(http://www.example.com/1) header verify failure: got Martian-Test with value test-1, testing-odd, want value testing-even`,
-		`response(http://www.example.com/3) header verify failure: got Martian-Test with value test-3, testing-odd, want value testing-even`,
-	}
-	for i, err := range merr.Errors() {
-		if got := err.Error(); got != wants[i] {
-			t.Errorf("Errors()[%d]: got %q, want %q", i, got, wants[i])
-		}
-	}
-
-	v.ResetResponseVerifications()
-	if err := v.VerifyResponses(); err != nil {
-		t.Errorf("VerifyResponses(): got %v, want no error", err)
+	errs = verify.FromContext(ctx)
+	if len(errs) != 2 {
+		t.Errorf("verify.FromContext(): got %d errors, want 2", len(errs))
 	}
 }

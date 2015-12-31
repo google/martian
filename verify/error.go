@@ -21,13 +21,13 @@ type ErrorValue struct {
 	MessageFormat string
 }
 
-var (
+const (
 	// Unknown signifies the error occurred on an unknown message type (default).
 	Unknown MessageType = iota
 	// Request signifies the error occurred on a request.
-	Request MessageType
+	Request MessageType = iota
 	// Response signifies the error occurred on a response.
-	Response MessageType
+	Response MessageType = iota
 )
 
 // RequestError returns a verification error for the given request.

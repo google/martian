@@ -21,7 +21,6 @@ import (
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/verify"
 )
 
 var noop = martian.Noop("header.Filter")
@@ -108,42 +107,6 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 	}
 
 	return nil
-}
-
-// VerifyRequests returns an error containing all the verification errors
-// returned by request verifiers.
-func (f *Filter) VerifyRequests() error {
-	reqv, ok := f.reqmod.(verify.RequestVerifier)
-	if !ok {
-		return nil
-	}
-
-	return reqv.VerifyRequests()
-}
-
-// VerifyResponses returns an error containing all the verification errors
-// returned by response verifiers.
-func (f *Filter) VerifyResponses() error {
-	resv, ok := f.resmod.(verify.ResponseVerifier)
-	if !ok {
-		return nil
-	}
-
-	return resv.VerifyResponses()
-}
-
-// ResetRequestVerifications resets the state of the contained request verifiers.
-func (f *Filter) ResetRequestVerifications() {
-	if reqv, ok := f.reqmod.(verify.RequestVerifier); ok {
-		reqv.ResetRequestVerifications()
-	}
-}
-
-// ResetResponseVerifications resets the state of the contained request verifiers.
-func (f *Filter) ResetResponseVerifications() {
-	if resv, ok := f.resmod.(verify.ResponseVerifier); ok {
-		resv.ResetResponseVerifications()
-	}
 }
 
 // filterFromJSON builds a header.Filter from JSON.
