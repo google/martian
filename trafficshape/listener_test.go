@@ -110,7 +110,7 @@ func TestListenerRead(t *testing.T) {
 	//     interval in skew to account for this and ensure the test does not
 	//     flake.
 	//
-	// The test runtime should be negligable compared the latency simulation, so
+	// The test runtime should be negligible compared the latency simulation, so
 	// we assume the ~3s (> 2.95s) is accounted for by throttling and latency in
 	// the worst case (we read and a new tick happens immediately).
 	min := 2*time.Second + 950*time.Millisecond
@@ -198,7 +198,7 @@ func TestListenerWrite(t *testing.T) {
 	//     interval in skew to account for this and ensure the test does not
 	//     flake.
 	//
-	// The test runtime should be negligable compared the latency simulation, so
+	// The test runtime should be negligible compared the latency simulation, so
 	// we assume the ~3s (> 2.95s) is accounted for by throttling and latency in
 	// the worst case (we write and a new tick happens immediately).
 	min := 2*time.Second + 950*time.Millisecond
@@ -286,7 +286,7 @@ func TestListenerWriteTo(t *testing.T) {
 	//     interval in skew to account for this and ensure the test does not
 	//     flake.
 	//
-	// The test runtime should be negligable compared the latency simulation, so
+	// The test runtime should be negligible compared the latency simulation, so
 	// we assume the ~3s (> 2.95s) is accounted for by throttling and latency in
 	// the worst case (we read and a new tick happens immediately).
 	min := 2*time.Second + 950*time.Millisecond
@@ -380,7 +380,7 @@ func TestListenerReadFrom(t *testing.T) {
 	//     interval in skew to account for this and ensure the test does not
 	//     flake.
 	//
-	// The test runtime should be negligable compared the latency simulation, so
+	// The test runtime should be negligible compared the latency simulation, so
 	// we assume the ~3s (> 2.95s) is accounted for by throttling and latency in
 	// the worst case (we write and a new tick happens immediately).
 	min := 2*time.Second + 950*time.Millisecond
