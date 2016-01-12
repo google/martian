@@ -104,7 +104,7 @@ func TestModifyRequest(t *testing.T) {
 		t.Errorf("qs.Value: got %q, want %q", got, want)
 	}
 
-	if got, want := len(hreq.Headers), 2; got != want {
+	if got, want := len(hreq.Headers), 3; got != want {
 		t.Fatalf("len(hreq.Headers): got %d, want %d", got, want)
 	}
 
@@ -115,6 +115,8 @@ func TestModifyRequest(t *testing.T) {
 			want = "first, second"
 		case "Cookie":
 			want = cookie.String()
+		case "Host":
+			want = "example.com"
 		default:
 			t.Errorf("hreq.Headers: got %q, want header to not be present", h.Name)
 			continue
@@ -151,6 +153,7 @@ func TestModifyResponse(t *testing.T) {
 	defer remove()
 
 	res := proxyutil.NewResponse(301, strings.NewReader("response body"), req)
+	res.ContentLength = 13
 	res.Header.Add("Response-Header", "first")
 	res.Header.Add("Response-Header", "second")
 	res.Header.Set("Location", "google.com")
@@ -199,7 +202,7 @@ func TestModifyResponse(t *testing.T) {
 		t.Errorf("hres.Content.Text: got %q, want %q", got, want)
 	}
 
-	if got, want := len(hres.Headers), 3; got != want {
+	if got, want := len(hres.Headers), 4; got != want {
 		t.Fatalf("len(hreq.Headers): got %d, want %d", got, want)
 	}
 
@@ -212,6 +215,8 @@ func TestModifyResponse(t *testing.T) {
 			want = "google.com"
 		case "Set-Cookie":
 			want = cookie.String()
+		case "Content-Length":
+			want = "13"
 		default:
 			t.Errorf("hres.Headers: got %q, want header to not be present", h.Name)
 			continue
