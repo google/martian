@@ -172,6 +172,11 @@
 //   -har=false
 //     enable logging endpoints for retrieving full request/response logs in
 //     HAR format.
+//	 -marbl-binlog=""
+//		 file path to write request/response logs to in MARBL format.
+//   -marbl-streaming=false
+//     enable logging endpoints for retrieving full requests and responses in
+//     MARBL format.
 //   -traffic-shaping=false
 //     enable traffic shaping endpoints for simulating latency and constrained
 //     bandwidth conditions (e.g. mobile, exotic network infrastructure, the
@@ -181,9 +186,11 @@
 package main
 
 import (
+	"bufio"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -226,6 +233,8 @@ var (
 	allowCORS      = flag.Bool("cors", false, "allow CORS requests to configure the proxy")
 	harLogging     = flag.Bool("har", false, "enable HAR logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
+	marblFile      = flag.String("marbl-binlog", "", "file for writing MARBL logs")
+	marblStreaming = flag.Bool("marbl-streaming", false, "enable WebSocket API for MARBL logs")
 )
 
 func main() {
@@ -299,12 +308,45 @@ func main() {
 	stack.AddRequestModifier(logger)
 	stack.AddResponseModifier(logger)
 
-	lsh := marbl.NewHandler()
-	http.Handle("/binlogs", lsh)
+	switch {
+	case *marblStreaming && *marblFile != "":
+		lsh := marbl.NewHandler()
+		http.Handle("/binlogs", lsh)
 
-	lsm := marbl.NewModifier(lsh)
-	stack.AddRequestModifier(lsm)
-	stack.AddResponseModifier(lsm)
+		f, err := os.Create(*marblFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Sync()
+		defer f.Close()
+
+		lsm := marbl.NewModifier(io.MultiWriter(f, lsh))
+		stack.AddRequestModifier(lsm)
+		stack.AddResponseModifier(lsm)
+	case *marblStreaming:
+		lsh := marbl.NewHandler()
+		http.Handle("/binlogs", lsh)
+
+		lsm := marbl.NewModifier(lsh)
+		stack.AddRequestModifier(lsm)
+		stack.AddResponseModifier(lsm)
+	case *marblFile != "":
+		f, err := os.Create(*marblFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		defer f.Sync()
+
+		bw := bufio.NewWriter(f)
+		defer bw.Flush()
+
+		lsm := marbl.NewModifier(bw)
+		defer lsm.Close()
+
+		stack.AddRequestModifier(lsm)
+		stack.AddResponseModifier(lsm)
+	}
 
 	// Proxy specific handlers.
 	// These handlers take precendence over proxy traffic and will not be

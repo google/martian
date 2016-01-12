@@ -6,10 +6,12 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/google/martian/log"
 	"github.com/google/martian/proxyutil"
 )
 
 // Frame Header
+// Magic Number (0xA11E2D06)
 // FrameType	 uint8
 // MessageType uint8
 // ID					 [8]byte
@@ -66,7 +68,7 @@ func (s *Stream) loop() {
 		case f := <-s.framec:
 			_, err := s.w.Write(f)
 			if err != nil {
-				// log the error.
+				log.Errorf("marbl: error writing frame: %v", err)
 			}
 		case <-s.closec:
 			return
@@ -81,12 +83,14 @@ func (s *Stream) Close() error {
 }
 
 func newFrame(id string, ft FrameType, mt MessageType, plen uint32) []byte {
+	// Magic Number: 4 bytes
 	// FrameType:   1 byte
 	// MessageType: 1 byte
 	// ID:			    8 bytes
 	// Payload:     plen bytes
 
-	f := make([]byte, 0, 10+plen)
+	f := make([]byte, 0, 14+plen)
+	f = append(f, byte(0xA1), byte(0x1E), byte(0x2D), byte(0x06))
 	f = append(f, byte(ft), byte(mt))
 	f = append(f, id[:8]...)
 
@@ -116,7 +120,7 @@ func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b 
 
 	f := newFrame(id, DataFrame, mt, 40+bl)
 	f = append(f, byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
-	f = append(f, byte(ti>>8), byte(ti))
+	f = append(f, byte(ti))
 	f = append(f, byte(bl>>24), byte(bl>>16), byte(bl>>8), byte(bl))
 	f = append(f, b...)
 
@@ -153,7 +157,7 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 func (s *Stream) LogResponse(id string, res *http.Response) error {
 	s.sendHeader(id, Response, ":proto", res.Proto)
 	s.sendHeader(id, Response, ":status", strconv.Itoa(res.StatusCode))
-	s.sendHeader(id, Response, ":reason", res.Status)
+	s.sendHeader(id, Response, ":reason", res.Status[4:])
 
 	h := proxyutil.ResponseHeader(res)
 

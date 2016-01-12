@@ -26,3 +26,7 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
 	return m.s.LogResponse(ctx.ID(), res)
 }
+
+func (m *Modifier) Close() error {
+	return m.s.Close()
+}
