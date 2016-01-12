@@ -169,3 +169,28 @@ func (h *Header) Del(name string) {
 		h.h.Del(name)
 	}
 }
+
+// Map returns an http.Header that includes Host, Content-Length, and
+// Transfer-Encoding.
+func (h *Header) Map() http.Header {
+	hm := make(http.Header)
+
+	for k, vs := range h.h {
+		hm[k] = vs
+	}
+
+	for _, k := range []string{
+		"Host",
+		"Content-Length",
+		"Transfer-Encoding",
+	} {
+		vs, ok := h.All(k)
+		if !ok {
+			continue
+		}
+
+		hm[k] = vs
+	}
+
+	return hm
+}
