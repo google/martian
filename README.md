@@ -259,13 +259,15 @@ modifier is registered in the `init()` of `header_modifier.go`.
 
 Example of parser registration from `header_modifier.go`:
 
-    func init() {
-      parse.Register("header.Modifier", modifierFromJSON)
-    }
+```go
+func init() {
+  parse.Register("header.Modifier", modifierFromJSON)
+}
 
-    func modifierFromJSON(b []byte) (interface{}, error) {
-      ...
-    }
+func modifierFromJSON(b []byte) (interface{}, error) {
+  ...
+}
+```
 
 ### Adding Your Own Modifier
 If you have a use-case in mind that we have not developed modifiers, filters or
