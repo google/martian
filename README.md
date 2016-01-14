@@ -217,9 +217,11 @@ Modifiers, filters and groups all implement `RequestModifer`,
 `ResponseModifier` or `RequestResponseModifier` (defined in
 [`martian.go`](https://github.com/google/martian/martian.go)).
 
-    ModifyRequest(req *http.Request) error
+```go
+ModifyRequest(req *http.Request) error
 
-    ModifyResponse(res *http.Response) error
+ModifyResponse(res *http.Response) error
+```
 
 Throughout the code (and this documentation) you'll see the word "modifier"
 used as a term that encompasses modifiers, groups and filters. Even though a
@@ -239,7 +241,9 @@ call to `parse.Register` in `init()`.
 
 Signature of parse.Register:
 
-    Register(name string, parseFunc func(b []byte) (interface{}, error))
+```go
+Register(name string, parseFunc func(b []byte) (interface{}, error))
+```
 
 Register takes in the key as a string in the form `package.Type`. For
 instance, `cookie_modifier` registers itself with the key `cookie.Modifier` and
