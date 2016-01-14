@@ -146,6 +146,8 @@
 // The flags are:
 //   -addr=":8080"
 //     host:port of the proxy
+//   -tls-addr=":4443"
+//     host:port of the proxy over TLS
 //   -api="martian.proxy"
 //     hostname that can be used to reference the configuration API when
 //     configuring through the proxy
@@ -216,6 +218,7 @@ import (
 var (
 	level          = flag.Int("v", 0, "log level")
 	addr           = flag.String("addr", ":8080", "host:port of the proxy")
+	tlsAddr        = flag.String("tls-addr", ":4443", "host:port of the proxy over TLS")
 	api            = flag.String("api", "martian.proxy", "hostname for the API")
 	generateCA     = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
 	cert           = flag.String("cert", "", "CA certificate used to sign MITM certificates")
@@ -273,6 +276,14 @@ func main() {
 		// Expose certificate authority.
 		ah := martianhttp.NewAuthorityHandler(x509c)
 		configure("/authority.cer", ah)
+
+		// Start TLS listener for transparent MITM.
+		tl, err := net.Listen("tcp", *tlsAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		go p.Serve(tls.NewListener(tl, mc.TLS()))
 	}
 
 	stack, fg := httpspec.NewStack("martian")
