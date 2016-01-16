@@ -178,6 +178,8 @@
 //     enable traffic shaping endpoints for simulating latency and constrained
 //     bandwidth conditions (e.g. mobile, exotic network infrastructure, the
 //     90's)
+//   -skip-tls-verify=false
+//     skip TLS server verification; insecure and intended for testing only
 //   -v=0
 //     log level for console logs; defaults to error only.
 package main
@@ -228,6 +230,7 @@ var (
 	allowCORS      = flag.Bool("cors", false, "allow CORS requests to configure the proxy")
 	harLogging     = flag.Bool("har", false, "enable HAR logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
+	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
 )
 
 func main() {
@@ -270,6 +273,7 @@ func main() {
 
 		mc.SetValidity(*validity)
 		mc.SetOrganization(*organization)
+		mc.SkipTLSVerify(*skipTLSVerify)
 
 		p.SetMITM(mc)
 

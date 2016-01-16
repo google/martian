@@ -42,17 +42,15 @@ var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 // Config is a set of configuration values that are used to build TLS configs
 // capable of MITM.
 type Config struct {
-	ca     *x509.Certificate
-	capriv interface{}
-
-	priv  *rsa.PrivateKey
-	keyID []byte
-
-	validity time.Duration
-	org      string
-
+	ca             *x509.Certificate
+	capriv         interface{}
+	priv           *rsa.PrivateKey
+	keyID          []byte
+	validity       time.Duration
+	org            string
 	getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	roots          *x509.CertPool
+	skipVerify     bool
 
 	certmu sync.RWMutex
 	certs  map[string]*tls.Certificate
@@ -154,6 +152,11 @@ func (c *Config) SetValidity(validity time.Duration) {
 	c.validity = validity
 }
 
+// SkipTLSVerify skips the TLS certification verification check.
+func (c *Config) SkipTLSVerify(skip bool) {
+	c.skipVerify = skip
+}
+
 // SetOrganization sets the organization of the certificate.
 func (c *Config) SetOrganization(org string) {
 	c.org = org
@@ -163,6 +166,7 @@ func (c *Config) SetOrganization(org string) {
 // the SNI extension in the TLS ClientHello.
 func (c *Config) TLS() *tls.Config {
 	return &tls.Config{
+		InsecureSkipVerify: c.skipVerify,
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			if clientHello.ServerName == "" {
 				return nil, errors.New("mitm: SNI not provided, failed to build certificate")
@@ -178,6 +182,7 @@ func (c *Config) TLS() *tls.Config {
 // using SNI from the connection, or fall back to the provided hostname.
 func (c *Config) TLSForHost(hostname string) *tls.Config {
 	return &tls.Config{
+		InsecureSkipVerify: c.skipVerify,
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			host := clientHello.ServerName
 			if host == "" {
