@@ -93,7 +93,7 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 }
 
 // filterFromJSON takes a JSON message as a byte slice and returns a
-// parse.Result that contians a URLFilter and a bitmask that represents the
+// parse.Result that contains a URLFilter and a bitmask that represents the
 // type of modifier.
 //
 // Example JSON configuration message:

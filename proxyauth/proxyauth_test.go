@@ -114,20 +114,20 @@ func TestProxyAuth(t *testing.T) {
 
 func TestProxyAuthInvalidCredentials(t *testing.T) {
 	m := NewModifier()
-	autherr := errors.New("auth error")
+	authErr := errors.New("auth error")
 
 	tm := martiantest.NewModifier()
 	tm.RequestFunc(func(req *http.Request) {
 		ctx := martian.NewContext(req)
 		actx := auth.FromContext(ctx)
 
-		actx.SetError(autherr)
+		actx.SetError(authErr)
 	})
 	tm.ResponseFunc(func(res *http.Response) {
 		ctx := martian.NewContext(res.Request)
 		actx := auth.FromContext(ctx)
 
-		actx.SetError(autherr)
+		actx.SetError(authErr)
 	})
 
 	m.SetRequestModifier(tm)
@@ -154,8 +154,8 @@ func TestProxyAuthInvalidCredentials(t *testing.T) {
 	}
 
 	actx := auth.FromContext(ctx)
-	if actx.Error() != autherr {
-		t.Fatalf("auth.Error(): got %v, want %v", actx.Error(), autherr)
+	if actx.Error() != authErr {
+		t.Fatalf("auth.Error(): got %v, want %v", actx.Error(), authErr)
 	}
 	actx.SetError(nil)
 
@@ -169,8 +169,8 @@ func TestProxyAuthInvalidCredentials(t *testing.T) {
 		t.Error("tm.ResponseModified(): got false, want true")
 	}
 
-	if actx.Error() != autherr {
-		t.Fatalf("auth.Error(): got %v, want %v", actx.Error(), autherr)
+	if actx.Error() != authErr {
+		t.Fatalf("auth.Error(): got %v, want %v", actx.Error(), authErr)
 	}
 
 	if got, want := res.StatusCode, http.StatusProxyAuthRequired; got != want {
