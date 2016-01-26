@@ -144,7 +144,7 @@ func (f *Filter) matches(u *url.URL) bool {
 	switch {
 	case f.url.Scheme != "" && f.url.Scheme != u.Scheme:
 		return false
-	case f.url.Host != "" && f.url.Host != u.Host:
+	case f.url.Host != "" && !MatchHost(u.Host, f.url.Host):
 		return false
 	case f.url.Path != "" && f.url.Path != u.Path:
 		return false

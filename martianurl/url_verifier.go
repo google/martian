@@ -67,7 +67,7 @@ func (v *Verifier) ModifyRequest(req *http.Request) error {
 		f := fmt.Sprintf(errPartFormat, "Scheme", u.Scheme, v.url.Scheme)
 		failures = append(failures, f)
 	}
-	if v.url.Host != "" && v.url.Host != u.Host {
+	if v.url.Host != "" && !MatchHost(u.Host, v.url.Host) {
 		f := fmt.Sprintf(errPartFormat, "Host", u.Host, v.url.Host)
 		failures = append(failures, f)
 	}
