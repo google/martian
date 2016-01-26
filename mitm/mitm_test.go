@@ -79,7 +79,7 @@ func TestMITM(t *testing.T) {
 		t.Error("conf.InsecureSkipVerify: got false, want true")
 	}
 
-	// Set SNI, takes precendence over host.
+	// Set SNI, takes precedence over host.
 	clientHello.ServerName = "google.com"
 	tlsc, err = conf.GetCertificate(clientHello)
 	if err != nil {

@@ -308,7 +308,7 @@ func main() {
 	}
 
 	// Proxy specific handlers.
-	// These handlers take precendence over proxy traffic and will not be
+	// These handlers take precedence over proxy traffic and will not be
 	// intercepted.
 
 	// Configure modifiers.

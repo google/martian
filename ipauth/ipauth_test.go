@@ -69,13 +69,13 @@ func TestModifyRequest(t *testing.T) {
 	// IP without port and modifier with auth error.
 	req.RemoteAddr = "4.4.4.4"
 
-	autherr := errors.New("auth error")
+	authErr := errors.New("auth error")
 	tm.RequestError(nil)
 	tm.RequestFunc(func(req *http.Request) {
 		ctx := martian.NewContext(req)
 		actx := auth.FromContext(ctx)
 
-		actx.SetError(autherr)
+		actx.SetError(authErr)
 	})
 
 	if err := m.ModifyRequest(req); err != nil {
@@ -119,12 +119,12 @@ func TestModifyResponse(t *testing.T) {
 
 	// Modifier with auth error.
 	tm.ResponseError(nil)
-	autherr := errors.New("auth error")
+	authErr := errors.New("auth error")
 	tm.ResponseFunc(func(res *http.Response) {
 		ctx := martian.NewContext(res.Request)
 		actx := auth.FromContext(ctx)
 
-		actx.SetError(autherr)
+		actx.SetError(authErr)
 	})
 
 	actx := auth.FromContext(ctx)
@@ -137,7 +137,7 @@ func TestModifyResponse(t *testing.T) {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
 
-	if got, want := actx.Error(), autherr; got != want {
+	if got, want := actx.Error(), authErr; got != want {
 		t.Errorf("actx.Error(): got %v, want %v", got, want)
 	}
 }
