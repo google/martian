@@ -26,7 +26,7 @@ import (
 func TestVerifyRequests(t *testing.T) {
 	u := &url.URL{
 		Scheme:   "https",
-		Host:     "www.example.com",
+		Host:     "*.example.com",
 		Path:     "/test",
 		RawQuery: "testing=true",
 		Fragment: "test",
@@ -45,20 +45,20 @@ func TestVerifyRequests(t *testing.T) {
 			got: "http://www.martian.test/test?testing=true#test",
 			want: `request(http://www.martian.test/test?testing=true#test) url verify failure:
 	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"`,
+	Host: got "www.martian.test", want "*.example.com"`,
 		},
 		{
 			got: "http://www.martian.test/prod?testing=true#test",
 			want: `request(http://www.martian.test/prod?testing=true#test) url verify failure:
 	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"
+	Host: got "www.martian.test", want "*.example.com"
 	Path: got "/prod", want "/test"`,
 		},
 		{
 			got: "http://www.martian.test/prod#test",
 			want: `request(http://www.martian.test/prod#test) url verify failure:
 	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"
+	Host: got "www.martian.test", want "*.example.com"
 	Path: got "/prod", want "/test"
 	Query: got "", want "testing=true"`,
 		},
@@ -66,7 +66,7 @@ func TestVerifyRequests(t *testing.T) {
 			got: "http://www.martian.test/prod#fake",
 			want: `request(http://www.martian.test/prod#fake) url verify failure:
 	Scheme: got "http", want "https"
-	Host: got "www.martian.test", want "www.example.com"
+	Host: got "www.martian.test", want "*.example.com"
 	Path: got "/prod", want "/test"
 	Query: got "", want "testing=true"
 	Fragment: got "fake", want "test"`,
