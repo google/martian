@@ -86,8 +86,11 @@ func TestRequestView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	req.ContentLength = 12
 	req.Header.Set("Request-Header", "true")
+
+	// Force Content Length to be unset to simulate lack of Content-Length and
+	// Transfer-Encoding which is valid.
+	req.ContentLength = -1
 
 	mv := New()
 	if err := mv.SnapshotRequest(req); err != nil {
@@ -101,7 +104,6 @@ func TestRequestView(t *testing.T) {
 
 	hdrwant := "GET http://example.com/path?k=v HTTP/1.1\r\n" +
 		"Host: example.com\r\n" +
-		"Content-Length: 12\r\n" +
 		"Request-Header: true\r\n\r\n"
 
 	if !bytes.Equal(got, []byte(hdrwant)) {
