@@ -24,11 +24,12 @@ import (
 // Hop-by-hop headers as defined by RFC2616.
 //
 // http://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-7.1.3.1
-var HopByHopHeaders = []string{
+var hopByHopHeaders = []string{
 	"Connection",
 	"Keep-Alive",
 	"Proxy-Authenticate",
 	"Proxy-Authorization",
+	"Proxy-Connection", // Non-standard, but required for HTTP/2.
 	"Te",
 	"Trailer",
 	"Transfer-Encoding",
@@ -69,7 +70,7 @@ func removeHopByHopHeaders(header http.Header) {
 		}
 	}
 
-	for _, k := range HopByHopHeaders {
+	for _, k := range hopByHopHeaders {
 		header.Del(k)
 	}
 }
