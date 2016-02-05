@@ -27,7 +27,7 @@ func TestRemoveHopByHopHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	hs := http.Header{
+	req.Header = http.Header{
 		// Additional hop-by-hop headers are listed in the
 		// Connection header.
 		"Connection": []string{
@@ -43,6 +43,7 @@ func TestRemoveHopByHopHeaders(t *testing.T) {
 		"Trailer":           []string{},
 		"Transfer-Encoding": []string{},
 		"Upgrade":           []string{},
+		"Proxy-Connection":  []string{},
 
 		// Hop-by-hop headers listed in the Connection header.
 		"X-Connection": []string{},
@@ -52,7 +53,6 @@ func TestRemoveHopByHopHeaders(t *testing.T) {
 		"X-End-To-End": []string{},
 	}
 
-	req.Header = hs
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -65,7 +65,7 @@ func TestRemoveHopByHopHeaders(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
-	res.Header = hs
+	res.Header = req.Header
 	if err := m.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
