@@ -47,15 +47,15 @@ func TestViaModifier(t *testing.T) {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
-	req.Header.Set("Via", "1.0 alpha")
+	req.Header.Set("Via", "1.0\talpha\t(martian)")
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := req.Header.Get("Via"), "1.0 alpha, 1.1 martian"; got != want {
+	if got, want := req.Header.Get("Via"), "1.0\talpha\t(martian), 1.1 martian"; got != want {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", "Via", got, want)
 	}
 
-	req.Header.Set("Via", "1.0 alpha, 1.1 martian, 1.1 beta")
+	req.Header.Set("Via", "1.0\talpha\t(martian), 1.1 martian, 1.1 beta")
 	if err := m.ModifyRequest(req); err == nil {
 		t.Fatal("ModifyRequest(): got nil, want request loop error")
 	}

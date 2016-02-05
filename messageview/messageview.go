@@ -88,7 +88,7 @@ func (mv *MessageView) SnapshotRequest(req *http.Request) error {
 		mv.chunked = req.TransferEncoding[tec-1] == "chunked"
 		fmt.Fprintf(buf, "Transfer-Encoding: %s\r\n", strings.Join(req.TransferEncoding, ", "))
 	}
-	if !mv.chunked {
+	if !mv.chunked && req.ContentLength >= 0 {
 		fmt.Fprintf(buf, "Content-Length: %d\r\n", req.ContentLength)
 	}
 
@@ -152,7 +152,7 @@ func (mv *MessageView) SnapshotResponse(res *http.Response) error {
 		mv.chunked = res.TransferEncoding[tec-1] == "chunked"
 		fmt.Fprintf(buf, "Transfer-Encoding: %s\r\n", strings.Join(res.TransferEncoding, ", "))
 	}
-	if !mv.chunked {
+	if !mv.chunked && res.ContentLength >= 0 {
 		fmt.Fprintf(buf, "Content-Length: %d\r\n", res.ContentLength)
 	}
 

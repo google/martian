@@ -21,7 +21,8 @@ import (
 	"github.com/google/martian"
 )
 
-// NewForwardedModifier sets the X-Forwarded-For and X-Forwarded-Proto headers.
+// NewForwardedModifier sets the X-Forwarded-For, X-Forwarded-Proto, and
+// X-Forwarded-Host headers.
 //
 // If X-Forwarded-For is already present, the client IP is appended to
 // the existing value.
@@ -32,6 +33,7 @@ func NewForwardedModifier() martian.RequestModifier {
 	return martian.RequestModifierFunc(
 		func(req *http.Request) error {
 			req.Header.Set("X-Forwarded-Proto", req.URL.Scheme)
+			req.Header.Set("X-Forwarded-Host", req.Host)
 
 			xff, _, err := net.SplitHostPort(req.RemoteAddr)
 			if err != nil {

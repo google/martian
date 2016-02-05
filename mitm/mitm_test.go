@@ -43,6 +43,9 @@ func TestMITM(t *testing.T) {
 	if got := conf.NextProtos; !reflect.DeepEqual(got, protos) {
 		t.Errorf("conf.NextProtos: got %v, want %v", got, protos)
 	}
+	if conf.InsecureSkipVerify {
+		t.Error("conf.InsecureSkipVerify: got true, want false")
+	}
 
 	// Simulate a TLS connection without SNI.
 	clientHello := &tls.ClientHelloInfo{
@@ -66,12 +69,17 @@ func TestMITM(t *testing.T) {
 		t.Errorf("x509c.Subject.CommonName: got %q, want %q", got, want)
 	}
 
+	c.SkipTLSVerify(true)
+
 	conf = c.TLSForHost("example.com")
 	if got := conf.NextProtos; !reflect.DeepEqual(got, protos) {
 		t.Errorf("conf.NextProtos: got %v, want %v", got, protos)
 	}
+	if !conf.InsecureSkipVerify {
+		t.Error("conf.InsecureSkipVerify: got false, want true")
+	}
 
-	// Set SNI, takes precendence over host.
+	// Set SNI, takes precedence over host.
 	clientHello.ServerName = "google.com"
 	tlsc, err = conf.GetCertificate(clientHello)
 	if err != nil {

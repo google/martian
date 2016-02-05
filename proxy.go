@@ -136,6 +136,12 @@ func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
 func (p *Proxy) Serve(l net.Listener) error {
 	defer l.Close()
 
+	// TODO(adamtanner): This forces the http.Transport to not upgrade requests
+	// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
+	if tr, ok := p.roundTripper.(*http.Transport); ok {
+		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+	}
+
 	var delay time.Duration
 	for {
 		if p.Closing() {

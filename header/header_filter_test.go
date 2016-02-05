@@ -125,7 +125,7 @@ func TestFilterFromJSON(t *testing.T) {
 	msg := []byte(`{
     "header.Filter": {
       "scope": ["request", "response"],
-      "name": "Martian-Passthru",
+      "name": "Martian-Passthrough",
       "value": "true",
       "modifier": {
         "header.Modifier" : {
@@ -150,7 +150,7 @@ func TestFilterFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	req.Header.Set("Martian-Passthru", "true")
+	req.Header.Set("Martian-Passthrough", "true")
 	if err := reqmod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -164,7 +164,7 @@ func TestFilterFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, nil)
-	res.Header.Set("Martian-Passthru", "true")
+	res.Header.Set("Martian-Passthrough", "true")
 	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}

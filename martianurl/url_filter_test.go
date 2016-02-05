@@ -41,7 +41,7 @@ func TestFilterModifyRequest(t *testing.T) {
 		},
 		{
 			match: "http://www.martian.local",
-			url:   &url.URL{Host: "www.martian.local"},
+			url:   &url.URL{Host: "*.martian.local"},
 			want:  true,
 		},
 		{
@@ -112,7 +112,7 @@ func TestFilterModifyRequest(t *testing.T) {
 		}
 
 		if tm.RequestModified() != tc.want {
-			t.Errorf("tm.RequestModified(): got %t, want %t", tm.RequestModified(), tc.want)
+			t.Errorf("%d. tm.RequestModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
 		}
 	}
 }

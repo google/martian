@@ -48,6 +48,7 @@ func TestServeHTTPPreflight(t *testing.T) {
 		func(rw http.ResponseWriter, req *http.Request) {
 			handlerRun = true
 		}))
+	h.AllowCredentials(true)
 
 	req, err := http.NewRequest("OPTIONS", "http://example.com", nil)
 	if err != nil {
@@ -70,6 +71,9 @@ func TestServeHTTPPreflight(t *testing.T) {
 	if got, want := rw.Header().Get("Access-Control-Allow-Headers"), "Cors-Test"; got != want {
 		t.Errorf("rw.Header().Get(%q): got %q, want %q", "Access-Control-Allow-Headers", got, want)
 	}
+	if got, want := rw.Header().Get("Access-Control-Allow-Credentials"), "true"; got != want {
+		t.Errorf("rw.Header().Get(%q): got %q, want %q", "Access-Control-Allow-Credentials", got, want)
+	}
 
 	if handlerRun {
 		t.Error("handlerRun: got true, want false")
@@ -83,6 +87,7 @@ func TestServeHTTPSimple(t *testing.T) {
 		func(rw http.ResponseWriter, req *http.Request) {
 			handlerRun = true
 		}))
+	h.SetOrigin("http://martian.local")
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -96,7 +101,7 @@ func TestServeHTTPSimple(t *testing.T) {
 
 	h.ServeHTTP(rw, req)
 
-	if got, want := rw.Header().Get("Access-Control-Allow-Origin"), "*"; got != want {
+	if got, want := rw.Header().Get("Access-Control-Allow-Origin"), "http://martian.local"; got != want {
 		t.Errorf("rw.Header().Get(%q): got %q, want %q", "Access-Control-Allow-Origin", got, want)
 	}
 	if got, want := rw.Header().Get("Access-Control-Allow-Methods"), "GET"; got != want {

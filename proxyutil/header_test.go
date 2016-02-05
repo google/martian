@@ -69,6 +69,30 @@ func TestRequestHeader(t *testing.T) {
 		t.Errorf("req.TransferEncoding: got %v, want %v", got, want)
 	}
 
+	if got, want := len(h.Map()), 4; got != want {
+		t.Errorf("h.Map(): got %d entries, want %d entries", got, want)
+	}
+
+	for n, vs := range h.Map() {
+		var want string
+		switch n {
+		case "Host":
+			want = "example.com"
+		case "Content-Length":
+			want = "100"
+		case "Transfer-Encoding":
+			want = "chunked"
+		case "Test-Header":
+			want = "true"
+		default:
+			t.Errorf("h.Map(): got unexpected %s header", n)
+		}
+
+		if got := vs[0]; got != want {
+			t.Errorf("h.Map(): got %s header with value %s, want value %s", n, got, want)
+		}
+	}
+
 	for i, tc := range tt {
 		got, ok := h.All(tc.name)
 		if !ok {
@@ -208,6 +232,28 @@ func TestResponseHeader(t *testing.T) {
 	}
 	if got, want := res.TransferEncoding, []string{"chunked"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("res.TransferEncoding: got %v, want %v", got, want)
+	}
+
+	if got, want := len(h.Map()), 3; got != want {
+		t.Errorf("h.Map(): got %d entries, want %d entries", got, want)
+	}
+
+	for n, vs := range h.Map() {
+		var want string
+		switch n {
+		case "Content-Length":
+			want = "100"
+		case "Transfer-Encoding":
+			want = "chunked"
+		case "Test-Header":
+			want = "true"
+		default:
+			t.Errorf("h.Map(): got unexpected %s header", n)
+		}
+
+		if got := vs[0]; got != want {
+			t.Errorf("h.Map(): got %s header with value %s, want value %s", n, got, want)
+		}
 	}
 
 	for i, tc := range tt {

@@ -16,13 +16,14 @@ anywhere that Go can target.
 
 ## Requirements
 
-Go 1.5
+Go 1.6
 
 ## Getting Started
 
 ### Installation
 Martian Proxy can be installed using `go install`
 
+    go get github.com/google/martian/ && \
     go install github.com/google/martian/cmd/proxy
 
 ### Start the Proxy
@@ -33,7 +34,7 @@ Assuming you've installed Martian, running the proxy is as simple as
 If you want to see system logs as Martian is running, pass in the verbosity
 flag:
 
-    $GOPATH/bin/proxy -v
+    $GOPATH/bin/proxy -v=2
 
 By default, Martian will be running on port 8080. The port can be specified via
 a flag:
@@ -216,9 +217,11 @@ Modifiers, filters and groups all implement `RequestModifer`,
 `ResponseModifier` or `RequestResponseModifier` (defined in
 [`martian.go`](https://github.com/google/martian/martian.go)).
 
-    ModifyRequest(req *http.Request) error
+```go
+ModifyRequest(req *http.Request) error
 
-    ModifyResponse(res *http.Response) error
+ModifyResponse(res *http.Response) error
+```
 
 Throughout the code (and this documentation) you'll see the word "modifier"
 used as a term that encompasses modifiers, groups and filters. Even though a
@@ -238,7 +241,9 @@ call to `parse.Register` in `init()`.
 
 Signature of parse.Register:
 
-    Register(name string, parseFunc func(b []byte) (interface{}, error))
+```go
+Register(name string, parseFunc func(b []byte) (interface{}, error))
+```
 
 Register takes in the key as a string in the form `package.Type`. For
 instance, `cookie_modifier` registers itself with the key `cookie.Modifier` and
@@ -258,13 +263,15 @@ modifier is registered in the `init()` of `header_modifier.go`.
 
 Example of parser registration from `header_modifier.go`:
 
-    func init() {
-      parse.Register("header.Modifier", modifierFromJSON)
-    }
+```go
+func init() {
+  parse.Register("header.Modifier", modifierFromJSON)
+}
 
-    func modifierFromJSON(b []byte) (interface{}, error) {
-      ...
-    }
+func modifierFromJSON(b []byte) (interface{}, error) {
+  ...
+}
+```
 
 ### Adding Your Own Modifier
 If you have a use-case in mind that we have not developed modifiers, filters or

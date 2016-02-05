@@ -33,6 +33,7 @@ import (
 	"github.com/google/martian"
 	"github.com/google/martian/log"
 	"github.com/google/martian/messageview"
+	"github.com/google/martian/proxyutil"
 )
 
 // Logger maintains request and response log entries.
@@ -263,7 +264,7 @@ func (l *Logger) LogRequest(id string, req *http.Request) error {
 		QueryString: []QueryString{},
 	}
 
-	hreq.Headers = headers(req.Header)
+	hreq.Headers = headers(proxyutil.RequestHeader(req).Map())
 	hreq.Cookies = cookies(req.Cookies())
 
 	for n, vs := range req.URL.Query() {
@@ -318,7 +319,7 @@ func (l *Logger) LogResponse(id string, res *http.Response) error {
 		hres.RedirectURL = res.Header.Get("Location")
 	}
 
-	hres.Headers = headers(res.Header)
+	hres.Headers = headers(proxyutil.ResponseHeader(res).Map())
 	hres.Cookies = cookies(res.Cookies())
 
 	mv := messageview.New()

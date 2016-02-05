@@ -146,6 +146,8 @@
 // The flags are:
 //   -addr=":8080"
 //     host:port of the proxy
+//   -tls-addr=":4443"
+//     host:port of the proxy over TLS
 //   -api="martian.proxy"
 //     hostname that can be used to reference the configuration API when
 //     configuring through the proxy
@@ -181,6 +183,8 @@
 //     enable traffic shaping endpoints for simulating latency and constrained
 //     bandwidth conditions (e.g. mobile, exotic network infrastructure, the
 //     90's)
+//   -skip-tls-verify=false
+//     skip TLS server verification; insecure and intended for testing only
 //   -v=0
 //     log level for console logs; defaults to error only.
 package main
@@ -224,6 +228,7 @@ import (
 var (
 	level          = flag.Int("v", 0, "log level")
 	addr           = flag.String("addr", ":8080", "host:port of the proxy")
+	tlsAddr        = flag.String("tls-addr", ":4443", "host:port of the proxy over TLS")
 	api            = flag.String("api", "martian.proxy", "hostname for the API")
 	generateCA     = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
 	cert           = flag.String("cert", "", "CA certificate used to sign MITM certificates")
@@ -235,6 +240,7 @@ var (
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	marblFile      = flag.String("marbl-binlog", "", "file for writing MARBL logs")
 	marblStreaming = flag.Bool("marbl-streaming", false, "enable WebSocket API for MARBL logs")
+	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
 )
 
 func main() {
@@ -277,12 +283,21 @@ func main() {
 
 		mc.SetValidity(*validity)
 		mc.SetOrganization(*organization)
+		mc.SkipTLSVerify(*skipTLSVerify)
 
 		p.SetMITM(mc)
 
 		// Expose certificate authority.
 		ah := martianhttp.NewAuthorityHandler(x509c)
 		configure("/authority.cer", ah)
+
+		// Start TLS listener for transparent MITM.
+		tl, err := net.Listen("tcp", *tlsAddr)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		go p.Serve(tls.NewListener(tl, mc.TLS()))
 	}
 
 	stack, fg := httpspec.NewStack("martian")
@@ -349,7 +364,7 @@ func main() {
 	}
 
 	// Proxy specific handlers.
-	// These handlers take precendence over proxy traffic and will not be
+	// These handlers take precedence over proxy traffic and will not be
 	// intercepted.
 
 	// Configure modifiers.
