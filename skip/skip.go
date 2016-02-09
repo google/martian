@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/martian/martian"
-	"github.com/google/martian/parse/parse"
+	"github.com/google/martian"
+	"github.com/google/martian/parse"
 )
 
 // RoundTrip is a modifier that skips the request round-trip.

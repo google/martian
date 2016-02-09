@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian/martian"
-	"github.com/google/martian/parse/parse"
+	"github.com/google/martian"
+	"github.com/google/martian/parse"
 )
 
 func TestRoundTrip(t *testing.T) {
