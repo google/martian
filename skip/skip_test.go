@@ -36,8 +36,8 @@ func TestRoundTrip(t *testing.T) {
 
 func TestFromJSON(t *testing.T) {
 	msg := []byte(`{
-																																																																								    "skip.RoundTrip": {}
-																																																																									  }`)
+			  "skip.RoundTrip": {}
+	        }`)
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
