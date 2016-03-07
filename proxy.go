@@ -64,18 +64,44 @@ type Proxy struct {
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
 	return &Proxy{
-		roundTripper: http.DefaultTransport,
-		timeout:      5 * time.Minute,
-		conns:        &sync.WaitGroup{},
-		mux:          http.DefaultServeMux,
-		reqmod:       noop,
-		resmod:       noop,
+		roundTripper: &http.Transport{
+			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
+			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
+			TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
+			Proxy:        http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: time.Second,
+		},
+		timeout: 5 * time.Minute,
+		conns:   &sync.WaitGroup{},
+		mux:     http.DefaultServeMux,
+		reqmod:  noop,
+		resmod:  noop,
 	}
 }
 
 // SetRoundTripper sets the http.RoundTripper of the proxy.
 func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	p.roundTripper = rt
+
+	if tr, ok := p.roundTripper.(*http.Transport); ok {
+		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+		tr.Proxy = http.ProxyURL(p.proxyURL)
+	}
+}
+
+// SetDownstreamProxy sets the proxy that receives requests from the upstream
+// proxy.
+func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
+	p.proxyURL = proxyURL
+
+	if tr, ok := p.roundTripper.(*http.Transport); ok {
+		tr.Proxy = http.ProxyURL(p.proxyURL)
+	}
 }
 
 // SetTimeout sets the request timeout of the proxy.
@@ -86,12 +112,6 @@ func (p *Proxy) SetTimeout(timeout time.Duration) {
 // SetMITM sets the config to use for MITMing of CONNECT requests.
 func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
-}
-
-// SetDownstreamProxy sets the proxy that receives requests from the upstream
-// proxy.
-func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
-	p.proxyURL = proxyURL
 }
 
 // SetMux sets the http.ServeMux to use for internal proxy requests. Defaults
@@ -135,12 +155,6 @@ func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
 // Serve accepts connections from the listener and handles the requests.
 func (p *Proxy) Serve(l net.Listener) error {
 	defer l.Close()
-
-	// TODO(adamtanner): This forces the http.Transport to not upgrade requests
-	// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
-	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
-	}
 
 	var delay time.Duration
 	for {
@@ -392,10 +406,6 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 	if ctx.SkippingRoundTrip() {
 		log.Debugf("martian: skipping round trip")
 		return proxyutil.NewResponse(200, nil, req), nil
-	}
-
-	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.Proxy = http.ProxyURL(p.proxyURL)
 	}
 
 	return p.roundTripper.RoundTrip(req)
