@@ -90,13 +90,13 @@ Let's break down the parts of this message.
 * `[package.Type]`: The package.Type of the modifier that you want to use. In
   this case, it's "header.Modifier", which is the name of the modifier that
   sets headers (to learn more about the `header.Modifier`, please
-  refer to the [modifier reference](https://github.com/google/martian/wiki/Modifier-Reference).
+  refer to the [modifier reference](https://github.com/google/martian/wiki/Modifier-Reference)).
 
 * `[package.Type].scope`: Indicates whether to apply to the modifier to
   requests, responses or both. This can be an array containing "request",
   "response", or both.
 
-* `[package.Type].[key]: Modifier specific data. In the case of the header
+* `[package.Type].[key]`: Modifier specific data. In the case of the header
   modifier, we need the `name` and `value` of the header.
 
 This is a simple configuration, for more complex configurations, modifiers are
