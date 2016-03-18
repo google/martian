@@ -17,6 +17,7 @@ package status
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/google/martian"
@@ -40,7 +41,7 @@ func init() {
 // returns nil.
 func (s *statusModifier) ModifyResponse(res *http.Response) error {
 	res.StatusCode = s.statusCode
-	res.Status = http.StatusText(s.statusCode)
+	res.Status = fmt.Sprintf("%d %s", s.statusCode, http.StatusText(s.statusCode))
 
 	return nil
 }
