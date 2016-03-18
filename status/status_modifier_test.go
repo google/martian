@@ -71,7 +71,7 @@ func TestStatusModifierOnResponse(t *testing.T) {
 		if got, want := res.StatusCode, status; got != want {
 			t.Errorf("%d. res.StatusCode: got %v, want %v", i, got, want)
 		}
-		if got, want := res.Status, fmt.Sprintf("%v %v", res.StatusCode, http.StatusText(status)); got != want {
+		if got, want := res.Status, fmt.Sprintf("%d %s", res.StatusCode, http.StatusText(status)); got != want {
 			t.Errorf("%d. res.Status: got %q, want %q", i, got, want)
 		}
 	}

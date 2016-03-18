@@ -41,7 +41,7 @@ func init() {
 // returns nil.
 func (s *statusModifier) ModifyResponse(res *http.Response) error {
 	res.StatusCode = s.statusCode
-	res.Status = fmt.Sprintf("%v %v", s.statusCode, http.StatusText(s.statusCode))
+	res.Status = fmt.Sprintf("%d %s", s.statusCode, http.StatusText(s.statusCode))
 
 	return nil
 }
