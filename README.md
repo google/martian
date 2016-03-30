@@ -215,7 +215,7 @@ these different types of interactions:
 
 Modifiers, filters and groups all implement `RequestModifer`,
 `ResponseModifier` or `RequestResponseModifier` (defined in
-[`martian.go`](https://github.com/google/martian/martian.go)).
+[`martian.go`](https://github.com/google/martian/blob/master/martian.go)).
 
 ```go
 ModifyRequest(req *http.Request) error
