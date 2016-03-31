@@ -1,0 +1,14 @@
+{
+    "options": {
+        "columns": [
+            { "name": "one", "nowrap": true },
+            { "name": "two" }
+        ]
+    },
+    "data": [
+        {
+            "one": "one one one one one one one one one one one one one one one one one one one one",
+            "two": "two two two two two two two two two two"
+        }
+    ]
+}

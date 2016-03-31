@@ -1,0 +1,14 @@
+[
+  {
+    "dep": "auto-share",
+    "desc": ""
+  },
+  {
+    "dep": "autodeploy-transport",
+    "desc": "自动化部署网络传输通道。"
+  },
+  {
+    "dep": "autohost",
+    "desc": "Resource driven, transport agnostic host"
+  }
+]

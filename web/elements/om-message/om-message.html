@@ -1,0 +1,135 @@
+<dom-module id="om-message">
+  <style is="custom-style">
+    :host {
+      background: var(--paper-grey-300);
+    }
+
+    #message {
+      display: flex;
+      flex-direction: row;
+    }
+
+    .message-card {
+      flex: 1 1;
+      margin: 16px;
+    }
+
+    .request-uri-line {
+      display: flex;
+    }
+
+    .request-url {
+      display: flex;
+      flex: 1;
+      margin: 0 8px;
+      overflow: scroll;
+      white-space: nowrap;
+    }
+
+    .request-header-name,
+    .request-header-value,
+    .response-header-name,
+    .response-header-value {
+      word-wrap: break-word;
+    }
+
+    @media (max-width: 600px) {
+      #message {
+        flex-direction: column;
+      }
+    }
+  </style>
+  <template>
+    <paper-header-panel mode="seamed" class="fit">
+      <paper-toolbar>
+        <paper-icon-button
+          icon="arrow-back"
+          on-tap="_fireBack">
+        </paper-icon-button>
+        <div class="title">Message</div>                        
+        <div class="flex"></div>
+        <paper-icon-button icon="more-vert"></paper-icon-button>
+      </paper-toolbar>
+      <div id="message">
+        <paper-card
+          id="message-request"
+          class="message-card">
+          <div class="card-content">
+            <div class="request-uri-line">
+              <span class="request-method">[[message.request.method]]</span>
+              <span class="request-url">
+                <span
+                  class="request-scheme"
+                  hidden$="[[!message.request.scheme]]">
+                  [[message.request.scheme]]://
+                </span>
+                <span class="request-authority">[[message.request.authority]]</span>
+                <span class="request-path">[[message.request.path]]</span>
+                <span
+                  class="request-query"
+                  hidden$="[[!message.request.query]]">
+                  ?[[message.request.query]]
+                </span>
+              </span>
+              <span class="request-proto">[[message.request.proto]]</span>
+            </div>
+            <div class="request-headers">
+              <dl>
+                <template is="dom-repeat" items="[[message.request.headers]]" as="header">
+                  <template is="dom-if" if="[[!header.pseudo]]">
+                    <dt class="request-header-name">[[header.name]]<dt>
+                    <dd class="request-header-value">[[header.value]]</dd>
+                  </template>
+                </template>
+              </dl>
+            </div>
+          </div>
+        </paper-card>
+        <paper-card
+          id="message-request"
+          class="message-card">
+          <div class="card-content">
+            <div class="response-status-line">
+              <span class="response-proto">[[message.response.proto]]</span>
+              <span class="response-status">[[message.response.status]]</span>
+              <span class="response-reason">[[message.response.reason]]</span>
+            </div>
+            <div class="response-headers">
+              <dl>
+                <template is="dom-repeat" items="[[message.response.headers]]" as="header">
+                  <template is="dom-if" if="[[!header.pseudo]]">
+                    <dt class="response-header-name">[[header.name]]<dt>
+                    <dd class="response-header-value">[[header.value]]</dd>
+                  </template>
+                </template>
+              </dl>
+            </div>
+          </div>
+        </paper-card>
+      </div>
+    </paper-header-panel>
+  </template>
+  <script>
+    Polymer({
+      is: 'om-message',
+      properties: {
+        message: {
+          type: Object,
+          value: function() { return {}; },
+        },
+        entryAnimation: {
+          value: 'slide-from-right-animation',
+        },
+        exitAnimation: {
+          value: 'fade-out-animation',
+        },
+      },
+      behaviors: [
+        Polymer.NeonAnimatableBehavior,
+      ],
+      _fireBack: function() {
+        this.fire('back');
+      },
+    });
+  </script>
+</dom-module>

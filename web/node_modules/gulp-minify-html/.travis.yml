@@ -1,0 +1,7 @@
+sudo: false
+git:
+  depth: 2
+language: node_js
+node_js:
+  - "iojs-v2.1.0"
+  - node

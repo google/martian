@@ -1,0 +1,82 @@
+<dom-module id="om-messages-stream">
+  <template>
+    <content></content>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'om-messages-stream',
+      properties: {
+        src: {
+          type: String,
+        },
+        messages: {
+          type: Array,
+          value: function() { return []; },
+          notify: true,
+        },
+      },
+      listeners: {
+        'message-frame': '_handleFrame',
+      },
+      created: function() {
+        this._indexes = {};
+      },
+      _message: function(id) {
+        return {
+          id: id,
+          request: {
+            headers: [],
+            body: {
+              _parts: [],
+            },
+          },
+          response: {
+            headers: [],
+            body: {
+              _parts: [],
+            },
+          },
+        };
+      },
+      _handleFrame: function(e) {
+        var frame = e.detail;
+
+        var index = this._indexes[frame.id];
+        var message = this.messages[index];
+        if (!message) {
+          message = this._message(frame.id);
+          index = this.messages.push(message) - 1;
+          this._indexes[frame.id] = index;
+
+          this.notifySplices('messages', [
+            { index: index, removed: [], object: this.messages, type: 'splice' },
+          ]);
+        }
+
+        switch(frame.type) {
+          case 'header-frame':
+            var header = {
+              name: frame.name,
+              value: frame.value,
+              pseudo: frame.name.startsWith(':'),
+            };
+
+            message[frame.scope].headers.push(header);
+
+            if (header.pseudo) {
+              message[frame.scope][frame.name.slice(1)] = frame.value;
+            }
+
+            break;
+          case 'data-frame':
+            message[frame.scope].body._parts[frame.index] = new Uint8Array(frame.data);
+
+            break;
+        }
+
+        this.notifyPath('messages.' + index, message);
+      },
+    });
+  </script>
+</dom-module>

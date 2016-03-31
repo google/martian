@@ -1,0 +1,24 @@
+<script src="/scripts/frame-reader.js"></script>
+
+<dom-module id="om-message-websocket">
+  <script>
+    Polymer({
+      is: 'om-message-websocket',
+      properties: {
+        src: {
+          type: String,
+        },
+      },
+      created: function() {
+        this._reader = new FrameReader();
+      },
+      attached: function() {
+        this._socket = new WebSocket(this.src);
+        this._socket.binaryType = 'arraybuffer';
+        this._socket.onmessage = function(e) {
+          this.fire('message-frame', this._reader.read(e.data));
+        }.bind(this);
+      },
+    });
+  </script>
+</dom-module>

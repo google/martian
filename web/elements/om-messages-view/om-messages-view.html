@@ -1,0 +1,68 @@
+<dom-module id="om-messages-view">
+  <template>
+    <style>
+      :host {
+        font-family: Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        --paper-toolbar-background: var(--paper-red-500);
+      }
+
+      #message-item {
+        background: #fafafa;
+        border-bottom: 1px solid #e0e0e0;
+        padding: 16px;
+      }
+
+      #message-item-method {
+        text-align: right;
+        margin-right: 16px;
+        width: 80px;
+      }
+    </style>
+
+    <om-messages-stream messages="{{messages}}">
+      <om-message-websocket src="ws://localhost:8080/binlogs">
+      </om-message-websocket>
+
+      <neon-animated-pages
+        class="fit"
+        selected="{{page}}"
+        attr-for-selected="page">
+        <om-message-list
+          messages="[[messages]]"
+          page="list"
+          on-message-selected="_showMessage"
+          selected="{{selected}}">
+        </om-message-list>
+        <om-message
+          page="message"
+          message="[[selected]]"
+          on-back="_showList">
+        </om-message>
+      </neon-animated-pages>
+    </om-messages-stream>
+  </template>
+  <script>
+    Polymer({
+      is: 'om-messages-view',
+      properties: {
+        messages: {
+          type: Array,
+          value: function() { return []; },
+        },
+        selected: {
+          type: Object,
+        },
+        page: {
+          type: String,
+          value: 'list',
+        },
+      },
+      _showMessage: function() {
+        this.page = 'message';
+      },
+      _showList: function() {
+        this.page = 'list';
+      },
+    });
+  </script>
+</dom-module>
