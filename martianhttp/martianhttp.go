@@ -121,8 +121,8 @@ func (m *Modifier) VerifyResponses() error {
 // ResetRequestVerifications resets verifications on reqmod, iff reqmod is a
 // RequestVerifier.
 func (m *Modifier) ResetRequestVerifications() {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if reqv, ok := m.reqmod.(verify.RequestVerifier); ok {
 		reqv.ResetRequestVerifications()
@@ -132,8 +132,8 @@ func (m *Modifier) ResetRequestVerifications() {
 // ResetResponseVerifications resets verifications on resmod, iff resmod is a
 // ResponseVerifier.
 func (m *Modifier) ResetResponseVerifications() {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if resv, ok := m.resmod.(verify.ResponseVerifier); ok {
 		resv.ResetResponseVerifications()
