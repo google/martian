@@ -35,7 +35,7 @@ func TestNewStack(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
