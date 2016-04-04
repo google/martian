@@ -1077,3 +1077,85 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
 }
+
+func TestHTTPThroughConnectWithMITM(t *testing.T) {
+	t.Parallel()
+
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	p := NewProxy()
+	defer p.Close()
+
+	tm := martiantest.NewModifier()
+	tm.RequestFunc(func(req *http.Request) {
+		ctx := NewContext(req)
+		ctx.SkipRoundTrip()
+	})
+	p.SetRequestModifier(tm)
+
+	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
+	if err != nil {
+		t.Fatalf("mitm.NewAuthority(): got %v, want no error", err)
+	}
+
+	mc, err := mitm.NewConfig(ca, priv)
+	if err != nil {
+		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
+	}
+	p.SetMITM(mc)
+
+	go p.Serve(l)
+
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatalf("net.Dial(): got %v, want no error", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest("CONNECT", "//example.com:80", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	// CONNECT example.com:80 HTTP/1.1
+	// Host: example.com
+	if err := req.Write(conn); err != nil {
+		t.Fatalf("req.Write(): got %v, want no error", err)
+	}
+
+	// Response skipped round trip.
+	res, err := http.ReadResponse(bufio.NewReader(conn), req)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	if got, want := res.StatusCode, 200; got != want {
+		t.Errorf("res.StatusCode: got %d, want %d", got, want)
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	// GET http://example.com/ HTTP/1.1
+	// Host: example.com
+	if err := req.WriteProxy(conn); err != nil {
+		t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+	}
+
+	// Response from skipped round trip.
+	res, err = http.ReadResponse(bufio.NewReader(conn), req)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	if got, want := res.StatusCode, 200; got != want {
+		t.Errorf("res.StatusCode: got %d, want %d", got, want)
+	}
+}
