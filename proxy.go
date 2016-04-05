@@ -298,6 +298,23 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			proxyutil.Warning(req.Header, err)
 		}
 
+		if _, port, err := net.SplitHostPort(req.URL.Host); err == nil && port == "80" {
+			res := proxyutil.NewResponse(200, nil, req)
+
+			if err := p.resmod.ModifyResponse(res); err != nil {
+				log.Errorf("martian: error modifying CONNECT response: %v", err)
+				proxyutil.Warning(res.Header, err)
+			}
+
+			res.Write(brw)
+			brw.Flush()
+
+			brw.Writer.Reset(conn)
+			brw.Reader.Reset(conn)
+
+			return p.handle(ctx, conn, brw)
+		}
+
 		if p.mitm != nil {
 			log.Debugf("martian: attempting MITM for connection: %s", req.Host)
 			res := proxyutil.NewResponse(200, nil, req)
