@@ -325,7 +325,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			// 22 is the TLS handshake.
 			// https://tools.ietf.org/html/rfc5246#section-6.2.1
 			if b[0] == 22 {
-
+				// Prepend the previously read data to be read again by
+				// http.ReadRequest.
 				tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host))
 
 				brw.Writer.Reset(tlsconn)
@@ -334,6 +335,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return p.handle(ctx, tlsconn, brw)
 			}
 
+			// Prepend the previously read data to be read again by http.ReadRequest.
 			brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
 			return p.handle(ctx, conn, brw)
 		}
@@ -421,11 +423,16 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	return closing
 }
 
+// A peekedConn subverts the net.Conn.Read implementation, primarily so that
+// sniffed bytes can be transparently prepended.
 type peekedConn struct {
 	net.Conn
 	r io.Reader
 }
 
+// Read allows control over the embeded net.Conn's read data. By using an
+// io.MultiReader one can read from a conn, and then replace what they read, to
+// be read again.
 func (c *peekedConn) Read(buf []byte) (int, error) { return c.r.Read(buf) }
 
 func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, error) {
