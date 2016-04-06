@@ -1093,6 +1093,10 @@ func TestHTTPThroughConnectWithMITM(t *testing.T) {
 	tm.RequestFunc(func(req *http.Request) {
 		ctx := NewContext(req)
 		ctx.SkipRoundTrip()
+
+		if req.Method != "GET" && req.Method != "CONNECT" {
+			t.Errorf("unexpected method on request handler: %v", req.Method)
+		}
 	})
 	p.SetRequestModifier(tm)
 
@@ -1128,6 +1132,28 @@ func TestHTTPThroughConnectWithMITM(t *testing.T) {
 
 	// Response skipped round trip.
 	res, err := http.ReadResponse(bufio.NewReader(conn), req)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	if got, want := res.StatusCode, 200; got != want {
+		t.Errorf("res.StatusCode: got %d, want %d", got, want)
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	// GET http://example.com/ HTTP/1.1
+	// Host: example.com
+	if err := req.WriteProxy(conn); err != nil {
+		t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+	}
+
+	// Response from skipped round trip.
+	res, err = http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
 	}
