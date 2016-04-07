@@ -16,6 +16,7 @@ package martian
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -298,23 +299,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			proxyutil.Warning(req.Header, err)
 		}
 
-		if _, port, err := net.SplitHostPort(req.URL.Host); err == nil && port == "80" {
-			res := proxyutil.NewResponse(200, nil, req)
-
-			if err := p.resmod.ModifyResponse(res); err != nil {
-				log.Errorf("martian: error modifying CONNECT response: %v", err)
-				proxyutil.Warning(res.Header, err)
-			}
-
-			res.Write(brw)
-			brw.Flush()
-
-			brw.Writer.Reset(conn)
-			brw.Reader.Reset(conn)
-
-			return p.handle(ctx, conn, brw)
-		}
-
 		if p.mitm != nil {
 			log.Debugf("martian: attempting MITM for connection: %s", req.Host)
 			res := proxyutil.NewResponse(200, nil, req)
@@ -329,11 +313,31 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 			log.Debugf("martian: completed MITM for connection: %s", req.Host)
 
-			tlsconn := tls.Server(conn, p.mitm.TLSForHost(req.Host))
-			brw.Writer.Reset(tlsconn)
-			brw.Reader.Reset(tlsconn)
+			b := make([]byte, 1)
+			if _, err := brw.Read(b); err != nil {
+				log.Errorf("martian: error peeking message through CONNECT tunnel to determine type: %v", err)
+			}
 
-			return p.handle(ctx, tlsconn, brw)
+			// Drain all of the rest of the buffered data.
+			buf := make([]byte, brw.Reader.Buffered())
+			brw.Read(buf)
+
+			// 22 is the TLS handshake.
+			// https://tools.ietf.org/html/rfc5246#section-6.2.1
+			if b[0] == 22 {
+				// Prepend the previously read data to be read again by
+				// http.ReadRequest.
+				tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host))
+
+				brw.Writer.Reset(tlsconn)
+				brw.Reader.Reset(tlsconn)
+
+				return p.handle(ctx, tlsconn, brw)
+			}
+
+			// Prepend the previously read data to be read again by http.ReadRequest.
+			brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
+			return p.handle(ctx, conn, brw)
 		}
 
 		log.Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
@@ -418,6 +422,18 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	return closing
 }
+
+// A peekedConn subverts the net.Conn.Read implementation, primarily so that
+// sniffed bytes can be transparently prepended.
+type peekedConn struct {
+	net.Conn
+	r io.Reader
+}
+
+// Read allows control over the embeded net.Conn's read data. By using an
+// io.MultiReader one can read from a conn, and then replace what they read, to
+// be read again.
+func (c *peekedConn) Read(buf []byte) (int, error) { return c.r.Read(buf) }
 
 func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, error) {
 	if ctx.SkippingRoundTrip() {
