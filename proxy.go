@@ -357,11 +357,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			}
 
 			if err := res.Write(brw); err != nil {
-				log.Debugf("martian: got error while writing response back to client: %v", err)
+				log.Errorf("martian: got error while writing response back to client: %v", err)
 			}
 			err := brw.Flush()
 			if err != nil {
-				log.Debugf("martian: got error while flushing response back to client: %v", err)
+				log.Errorf("martian: got error while flushing response back to client: %v", err)
 			}
 			return err
 		}
