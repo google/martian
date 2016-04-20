@@ -71,7 +71,7 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
-		t.Fatalf("net.Liste(): got %v, want no error", err)
+		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
 
 	p := NewProxy()
@@ -1225,7 +1225,7 @@ func TestServerClosesConnection(t *testing.T) {
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
-		t.Fatalf("net.Liste(): got %v, want no error", err)
+		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
