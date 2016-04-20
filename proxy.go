@@ -424,9 +424,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	var closing error
-	if req.Close || p.Closing() {
+	if req.Close || res.Close || p.Closing() {
 		log.Debugf("martian: received close request: %v", req.RemoteAddr)
-		res.Header.Add("Connection", "close")
+		res.Close = false
 		closing = errClose
 	}
 
