@@ -308,8 +308,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				proxyutil.Warning(res.Header, err)
 			}
 
-			res.Write(brw)
-			brw.Flush()
+			if err := res.Write(brw); err != nil {
+				log.Errorf("martian: got error while writing response back to client: %v", err)
+			}
+			if err := brw.Flush(); err != nil {
+				log.Errorf("martian: got error while flushing response back to client: %v", err)
+			}
 
 			log.Debugf("martian: completed MITM for connection: %s", req.Host)
 
@@ -352,8 +356,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				proxyutil.Warning(res.Header, err)
 			}
 
-			res.Write(brw)
-			return brw.Flush()
+			if err := res.Write(brw); err != nil {
+				log.Debugf("martian: got error while writing response back to client: %v", err)
+			}
+			err := brw.Flush()
+			if err != nil {
+				log.Debugf("martian: got error while flushing response back to client: %v", err)
+			}
+			return err
 		}
 		defer res.Body.Close()
 		defer cconn.Close()
@@ -363,8 +373,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			proxyutil.Warning(res.Header, err)
 		}
 
-		res.Write(brw)
-		brw.Flush()
+		if err := res.Write(brw); err != nil {
+			log.Errorf("martian: got error while writing response back to client: %v", err)
+		}
+		if err := brw.Flush(); err != nil {
+			log.Errorf("martian: got error while flushing response back to client: %v", err)
+		}
 
 		cbw := bufio.NewWriter(cconn)
 		cbr := bufio.NewReader(cconn)
@@ -417,8 +431,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	log.Debugf("martian: sent response: %v", req.URL)
-	res.Write(brw)
-	brw.Flush()
+	if err := res.Write(brw); err != nil {
+		log.Errorf("martian: got error while writing response back to client: %v", err)
+	}
+	if err := brw.Flush(); err != nil {
+		log.Errorf("martian: got error while flushing response back to client: %v", err)
+	}
 
 	return closing
 }
