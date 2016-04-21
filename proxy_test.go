@@ -21,10 +21,12 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -69,7 +71,7 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
-		t.Fatalf("net.Liste(): got %v, want no error", err)
+		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
 
 	p := NewProxy()
@@ -1184,4 +1186,102 @@ func TestHTTPThroughConnectWithMITM(t *testing.T) {
 	if got, want := res.StatusCode, 200; got != want {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
 	}
+}
+
+func TestServerClosesConnection(t *testing.T) {
+	t.Parallel()
+
+	dstl, err := net.Listen("tcp4", ":0")
+	if err != nil {
+		t.Fatalf("Failed to create http listener: %v", err)
+	}
+	defer dstl.Close()
+
+	go func() {
+		t.Logf("Waiting for server side connection")
+		conn, err := dstl.Accept()
+		if err != nil {
+			t.Fatalf("Got error while accepting connection on destination listener: %v", err)
+		}
+		t.Logf("Accepted server side connection")
+
+		buf := make([]byte, 16384)
+		if _, err := conn.Read(buf); err != nil {
+			t.Fatalf("Error reading: %v", err)
+		}
+
+		_, err = conn.Write([]byte("HTTP/1.1 301 MOVED PERMANENTLY\r\n" +
+			"Server:  \r\n" +
+			"Date:  \r\n" +
+			"Referer:  \r\n" +
+			"Location: http://www.foo.com/\r\n" +
+			"Content-type: text/html\r\n" +
+			"Connection: close\r\n\r\n"))
+		if err != nil {
+			t.Fatalf("Got error while writting to connection on destination listener: %v", err)
+		}
+		conn.Close()
+	}()
+
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
+	if err != nil {
+		t.Fatalf("mitm.NewAuthority(): got %v, want no error", err)
+	}
+
+	mc, err := mitm.NewConfig(ca, priv)
+	if err != nil {
+		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
+	}
+	p := NewProxy()
+	p.SetMITM(mc)
+	defer p.Close()
+
+	// Start the proxy with a listener that will return a temporary error on
+	// Accept() three times.
+	go p.Serve(newTimeoutListener(l, 3))
+
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatalf("net.Dial(): got %v, want no error", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest("CONNECT", fmt.Sprintf("//%s", dstl.Addr().String()), nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	// CONNECT example.com:443 HTTP/1.1
+	// Host: example.com
+	if err := req.Write(conn); err != nil {
+		t.Fatalf("req.Write(): got %v, want no error", err)
+	}
+	res, err := http.ReadResponse(bufio.NewReader(conn), req)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	_, err = conn.Write([]byte("GET / HTTP/1.1\r\n" +
+		"User-Agent: curl/7.35.0\r\n" +
+		fmt.Sprintf("Host: %s\r\n", dstl.Addr()) +
+		"Accept: */*\r\n\r\n"))
+	if err != nil {
+		t.Fatalf("Error while writing GET request: %v", err)
+	}
+
+	res, err = http.ReadResponse(bufio.NewReader(io.TeeReader(conn, os.Stderr)), req)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+	_, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("error while ReadAll: %v", err)
+	}
+	defer res.Body.Close()
 }
