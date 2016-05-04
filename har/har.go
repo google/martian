@@ -38,7 +38,8 @@ import (
 
 // Logger maintains request and response log entries.
 type Logger struct {
-	creator *Creator
+	bodyLogging func(*http.Response) bool
+	creator     *Creator
 
 	mu      sync.Mutex
 	entries map[string]*Entry
@@ -59,7 +60,7 @@ type Log struct {
 	Entries []*Entry `json:"entries"`
 }
 
-// Creator is the program responsible for generating the log.
+// Creator is the program responsible for generating the log. Martian, in this case.
 type Creator struct {
 	// Name of the log creator application.
 	Name string `json:"name"`
@@ -233,6 +234,54 @@ type Content struct {
 	Encoding string `json:"encoding,omitempty"`
 }
 
+// Option is a configurable setting for the logger.
+type Option func(l *Logger)
+
+// BodyLogging returns an option that configures response body logging.
+func BodyLogging(enabled bool) Option {
+	return func(l *Logger) {
+		l.bodyLogging = func(*http.Response) bool {
+			return enabled
+		}
+	}
+}
+
+// BodyLoggingForContentTypes returns an option that logs response bodies based
+// on opting in to the Content-Type of the response.
+func BodyLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.bodyLogging = func(res *http.Response) bool {
+			rct := res.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return true
+				}
+			}
+
+			return false
+		}
+	}
+}
+
+// SkipBodyLoggingForContentTypes returns an option that logs response bodies based
+// on opting out of the Content-Type of the response.
+func SkipBodyLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.bodyLogging = func(res *http.Response) bool {
+			rct := res.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return false
+				}
+			}
+
+			return true
+		}
+	}
+}
+
 // NewLogger returns a HAR logger using name and version as the Creator.
 func NewLogger(name, version string) *Logger {
 	return &Logger{
@@ -262,10 +311,9 @@ func (l *Logger) LogRequest(id string, req *http.Request) error {
 		HeadersSize: -1,
 		BodySize:    req.ContentLength,
 		QueryString: []QueryString{},
+		Headers:     headers(proxyutil.RequestHeader(req).Map()),
+		Cookies:     cookies(req.Cookies()),
 	}
-
-	hreq.Headers = headers(proxyutil.RequestHeader(req).Map())
-	hreq.Cookies = cookies(req.Cookies())
 
 	for n, vs := range req.URL.Query() {
 		for _, v := range vs {
@@ -313,35 +361,36 @@ func (l *Logger) LogResponse(id string, res *http.Response) error {
 		StatusText:  http.StatusText(res.StatusCode),
 		HeadersSize: -1,
 		BodySize:    res.ContentLength,
+		Headers:     headers(proxyutil.ResponseHeader(res).Map()),
+		Cookies:     cookies(res.Cookies()),
 	}
 
 	if res.StatusCode >= 300 && res.StatusCode < 400 {
 		hres.RedirectURL = res.Header.Get("Location")
 	}
 
-	hres.Headers = headers(proxyutil.ResponseHeader(res).Map())
-	hres.Cookies = cookies(res.Cookies())
+	if l.bodyLogging(res) {
+		mv := messageview.New()
+		if err := mv.SnapshotResponse(res); err != nil {
+			return err
+		}
 
-	mv := messageview.New()
-	if err := mv.SnapshotResponse(res); err != nil {
-		return err
-	}
+		br, err := mv.BodyReader(messageview.Decode())
+		if err != nil {
+			return err
+		}
 
-	br, err := mv.BodyReader(messageview.Decode())
-	if err != nil {
-		return err
-	}
+		body, err := ioutil.ReadAll(br)
+		if err != nil {
+			return err
+		}
 
-	body, err := ioutil.ReadAll(br)
-	if err != nil {
-		return err
-	}
-
-	hres.Content = &Content{
-		Text:     body,
-		Encoding: "base64",
-		Size:     int64(len(body)),
-		MimeType: res.Header.Get("Content-Type"),
+		hres.Content = &Content{
+			Text:     body,
+			Encoding: "base64",
+			Size:     int64(len(body)),
+			MimeType: res.Header.Get("Content-Type"),
+		}
 	}
 
 	l.mu.Lock()

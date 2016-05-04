@@ -557,3 +557,41 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 		t.Errorf("len(log.Entries): got %d, want %d", got, want)
 	}
 }
+
+func TestOptionResposneBodyLogging(t *testing.T) {
+	t.Fatalf("fdfsad")
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	bdr := strings.NewReader("{\"response\": \"body\"")
+	res := proxyutil.NewResponse(200, bdr, req)
+	res.ContentLength = bdr.Len()
+	res.Header.Set("Content-Type", "application/json")
+
+	logger := NewLogger("martian", "2.0.0")
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log := logger.Export().Log
+	if got, want := len(log.Entries), 1; got != want {
+		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
+	}
+
+	if got, want := log.Entries[0].Response.Content.Text, "{\"response\": \"bdy\""; got != want {
+		t.Fatalf("log.Entries[0].Response.Content.Text: got %d, want %d", got, want)
+	}
+}
