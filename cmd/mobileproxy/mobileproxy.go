@@ -1,6 +1,6 @@
-// Package mobileproxy instantiates a Martian Proxy (go/martianproxy).
-// This package is a reference implmentation of Martian Proxy intended to
-// be cross compiled with google3/go/tools/gobind for use on Android and iOS.
+// Package mobileproxy instantiates a Martian Proxy.
+// This package is a reference implementation of Martian Proxy intended to
+// be cross compiled with gomobile for use on Android and iOS.
 package mobileproxy
 
 import (
@@ -33,14 +33,14 @@ import (
 	_ "github.com/google/martian/status"
 )
 
-// Martian is a wrapper for the initialized Martian proxy.
+// Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
 	proxy    *martian.Proxy
 	listener net.Listener
 	mux      *http.ServeMux
 }
 
-// Start runs a martian.Proxy on addr.
+// Start runs a martian.Proxy on addr
 func Start(proxyAddr string) (*Martian, error) {
 	return StartWithCertificate(proxyAddr, "", "")
 }
@@ -140,10 +140,12 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	}, nil
 }
 
-// Shutdown closes the martian.Proxy.
+// Shutdown tells the Proxy to close. The proxy will stay alive until all connections through it
+// have closed or timed out.
 func (p *Martian) Shutdown() {
-	mlog.Infof("mobileproxy: closing down proxy")
+	mlog.Infof("mobileproxy: telling proxy to close")
 	p.proxy.Close()
+	mlog.Infof("mobileproxy: proxy closed")
 }
 
 func SetLogLevel(l int) {
