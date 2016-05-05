@@ -558,8 +558,8 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 	}
 }
 
-func TestOptionResposneBodyLogging(t *testing.T) {
-	t.Fatalf("fdfsad")
+func TestOptionResponseBodyLogging(t *testing.T) {
+	// t.Fatalf("failing on purpose")
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
@@ -591,7 +591,7 @@ func TestOptionResposneBodyLogging(t *testing.T) {
 		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
 	}
 
-	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"bdy\""; got != want {
+	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\""; got != want {
 		t.Fatalf("log.Entries[0].Response.Content.Text: got %d, want %d", got, want)
 	}
 }

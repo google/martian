@@ -284,12 +284,21 @@ func SkipBodyLoggingForContentTypes(cts ...string) Option {
 
 // NewLogger returns a HAR logger using name and version as the Creator.
 func NewLogger(name, version string) *Logger {
-	return &Logger{
+	l := &Logger{
 		creator: &Creator{
 			Name:    name,
 			Version: version,
 		},
 		entries: make(map[string]*Entry),
+	}
+	l.SetOption(BodyLogging(true))
+	return l
+}
+
+// SetOption sets configurable options on the logger.
+func (l *Logger) SetOption(opts ...Option) {
+	for _, opt := range opts {
+		opt(l)
 	}
 }
 
