@@ -378,6 +378,11 @@ func (l *Logger) LogResponse(id string, res *http.Response) error {
 		hres.RedirectURL = res.Header.Get("Location")
 	}
 
+	hres.Content = &Content{
+		Encoding: "base64",
+		MimeType: res.Header.Get("Content-Type"),
+	}
+
 	if l.bodyLogging(res) {
 		mv := messageview.New()
 		if err := mv.SnapshotResponse(res); err != nil {
@@ -394,12 +399,8 @@ func (l *Logger) LogResponse(id string, res *http.Response) error {
 			return err
 		}
 
-		hres.Content = &Content{
-			Text:     body,
-			Encoding: "base64",
-			Size:     int64(len(body)),
-			MimeType: res.Header.Get("Content-Type"),
-		}
+		hres.Content.Text = body
+		hres.Content.Size = int64(len(body))
 	}
 
 	l.mu.Lock()

@@ -594,4 +594,24 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\""; got != want {
 		t.Fatalf("log.Entries[0].Response.Content.Text: got %d, want %d", got, want)
 	}
+
+	logger.Reset()
+	logger.SetOption(BodyLogging(false))
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log = logger.Export().Log
+	if got, want := len(log.Entries), 1; got != want {
+		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
+	}
+
+	if got, want := string(log.Entries[0].Response.Content.Text), ""; got != want {
+		t.Fatalf("log.Entries[0].Response.Content: got %d, want %d", got, want)
+	}
 }
