@@ -559,7 +559,6 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 }
 
 func TestOptionResponseBodyLogging(t *testing.T) {
-	// t.Fatalf("failing on purpose")
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
@@ -571,7 +570,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 	}
 	defer remove()
 
-	bdr := strings.NewReader("{\"response\": \"body\"")
+	bdr := strings.NewReader("{\"response\": \"body\"}")
 	res := proxyutil.NewResponse(200, bdr, req)
 	res.ContentLength = int64(bdr.Len())
 	res.Header.Set("Content-Type", "application/json")
@@ -591,11 +590,11 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
 	}
 
-	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\""; got != want {
+	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\"}"; got != want {
 		t.Fatalf("log.Entries[0].Response.Content.Text: got %d, want %d", got, want)
 	}
 
-	logger.Reset()
+	logger = NewLogger("martian", "2.0.0")
 	logger.SetOption(BodyLogging(false))
 
 	if err := logger.ModifyRequest(req); err != nil {
@@ -611,6 +610,38 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
 	}
 
+	if got, want := string(log.Entries[0].Response.Content.Text), ""; got != want {
+		t.Fatalf("log.Entries[0].Response.Content: got %d, want %d", got, want)
+	}
+
+	logger = NewLogger("martian", "2.0.0")
+	logger.SetOption(BodyLoggingForContentTypes("application/json"))
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log = logger.Export().Log
+	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\"}"; got != want {
+		t.Fatalf("log.Entries[0].Response.Content: got %d, want %d", got, want)
+	}
+
+	logger = NewLogger("martian", "2.0.0")
+	logger.SetOption(SkipBodyLoggingForContentTypes("application/json"))
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log = logger.Export().Log
 	if got, want := string(log.Entries[0].Response.Content.Text), ""; got != want {
 		t.Fatalf("log.Entries[0].Response.Content: got %d, want %d", got, want)
 	}
