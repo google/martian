@@ -162,6 +162,8 @@ func (p *Martian) Shutdown() {
 	mlog.Infof("mobileproxy: proxy closed")
 }
 
+// Sets the Martian log level (Silent = 0, Error, Info, Debug), controlling which Martian
+// log calls are displayed in the console
 func SetLogLevel(l int) {
 	mlog.SetLevel(l)
 }
