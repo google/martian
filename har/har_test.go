@@ -573,7 +573,7 @@ func TestOptionResposneBodyLogging(t *testing.T) {
 
 	bdr := strings.NewReader("{\"response\": \"body\"")
 	res := proxyutil.NewResponse(200, bdr, req)
-	res.ContentLength = bdr.Len()
+	res.ContentLength = int64(bdr.Len())
 	res.Header.Set("Content-Type", "application/json")
 
 	logger := NewLogger("martian", "2.0.0")
@@ -591,7 +591,7 @@ func TestOptionResposneBodyLogging(t *testing.T) {
 		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
 	}
 
-	if got, want := log.Entries[0].Response.Content.Text, "{\"response\": \"bdy\""; got != want {
+	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"bdy\""; got != want {
 		t.Fatalf("log.Entries[0].Response.Content.Text: got %d, want %d", got, want)
 	}
 }
