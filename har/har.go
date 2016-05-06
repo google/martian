@@ -38,8 +38,10 @@ import (
 
 // Logger maintains request and response log entries.
 type Logger struct {
-	bodyLogging func(*http.Response) bool
-	creator     *Creator
+	bodyLogging     func(*http.Response) bool
+	postDataLogging func(*http.Request) bool
+
+	creator *Creator
 
 	mu      sync.Mutex
 	entries map[string]*Entry
@@ -237,6 +239,51 @@ type Content struct {
 // Option is a configurable setting for the logger.
 type Option func(l *Logger)
 
+// PostDataLogging returns an option that configures request post data logging.
+func PostDataLogging(enabled bool) Option {
+	return func(l *Logger) {
+		l.postDataLogging = func(*http.Request) bool {
+			return enabled
+		}
+	}
+}
+
+// PostDataLoggingForContentTypes returns an option that logs request bodies based
+// on opting in to the Content-Type of the request.
+func PostDataLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.postDataLogging = func(req *http.Request) bool {
+			rct := req.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return true
+				}
+			}
+
+			return false
+		}
+	}
+}
+
+// SkipPostDataLoggingForContentTypes returns an option that logs request bodies based
+// on opting out of the Content-Type of the request.
+func SkipPostDataLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.postDataLogging = func(req *http.Request) bool {
+			rct := req.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return false
+				}
+			}
+
+			return true
+		}
+	}
+}
+
 // BodyLogging returns an option that configures response body logging.
 func BodyLogging(enabled bool) Option {
 	return func(l *Logger) {
@@ -282,7 +329,8 @@ func SkipBodyLoggingForContentTypes(cts ...string) Option {
 	}
 }
 
-// NewLogger returns a HAR logger using name and version as the Creator.
+// NewLogger returns a HAR logger using name and version as the Creator. The returned
+// logger logs all request post data and response bodies by default.
 func NewLogger(name, version string) *Logger {
 	l := &Logger{
 		creator: &Creator{
@@ -292,6 +340,7 @@ func NewLogger(name, version string) *Logger {
 		entries: make(map[string]*Entry),
 	}
 	l.SetOption(BodyLogging(true))
+	l.SetOption(PostDataLogging(true))
 	return l
 }
 
@@ -333,7 +382,7 @@ func (l *Logger) LogRequest(id string, req *http.Request) error {
 		}
 	}
 
-	pd, err := postData(req)
+	pd, err := postData(req, l.postDataLogging(req))
 	if err != nil {
 		return err
 	}
@@ -480,7 +529,7 @@ func headers(hs http.Header) []Header {
 	return hhs
 }
 
-func postData(req *http.Request) (*PostData, error) {
+func postData(req *http.Request, logBody bool) (*PostData, error) {
 	// If the request has no body (no Content-Length and Transfer-Encoding isn't
 	// chunked), skip the post data.
 	if req.ContentLength <= 0 && len(req.TransferEncoding) == 0 {
@@ -497,6 +546,10 @@ func postData(req *http.Request) (*PostData, error) {
 	pd := &PostData{
 		MimeType: mt,
 		Params:   []Param{},
+	}
+
+	if !logBody {
+		return pd, nil
 	}
 
 	mv := messageview.New()
