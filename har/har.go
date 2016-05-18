@@ -38,6 +38,9 @@ import (
 
 // Logger maintains request and response log entries.
 type Logger struct {
+	bodyLogging     func(*http.Response) bool
+	postDataLogging func(*http.Request) bool
+
 	creator *Creator
 
 	mu      sync.Mutex
@@ -59,7 +62,7 @@ type Log struct {
 	Entries []*Entry `json:"entries"`
 }
 
-// Creator is the program responsible for generating the log.
+// Creator is the program responsible for generating the log. Martian, in this case.
 type Creator struct {
 	// Name of the log creator application.
 	Name string `json:"name"`
@@ -233,14 +236,118 @@ type Content struct {
 	Encoding string `json:"encoding,omitempty"`
 }
 
-// NewLogger returns a HAR logger using name and version as the Creator.
+// Option is a configurable setting for the logger.
+type Option func(l *Logger)
+
+// PostDataLogging returns an option that configures request post data logging.
+func PostDataLogging(enabled bool) Option {
+	return func(l *Logger) {
+		l.postDataLogging = func(*http.Request) bool {
+			return enabled
+		}
+	}
+}
+
+// PostDataLoggingForContentTypes returns an option that logs request bodies based
+// on opting in to the Content-Type of the request.
+func PostDataLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.postDataLogging = func(req *http.Request) bool {
+			rct := req.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return true
+				}
+			}
+
+			return false
+		}
+	}
+}
+
+// SkipPostDataLoggingForContentTypes returns an option that logs request bodies based
+// on opting out of the Content-Type of the request.
+func SkipPostDataLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.postDataLogging = func(req *http.Request) bool {
+			rct := req.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return false
+				}
+			}
+
+			return true
+		}
+	}
+}
+
+// BodyLogging returns an option that configures response body logging.
+func BodyLogging(enabled bool) Option {
+	return func(l *Logger) {
+		l.bodyLogging = func(*http.Response) bool {
+			return enabled
+		}
+	}
+}
+
+// BodyLoggingForContentTypes returns an option that logs response bodies based
+// on opting in to the Content-Type of the response.
+func BodyLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.bodyLogging = func(res *http.Response) bool {
+			rct := res.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return true
+				}
+			}
+
+			return false
+		}
+	}
+}
+
+// SkipBodyLoggingForContentTypes returns an option that logs response bodies based
+// on opting out of the Content-Type of the response.
+func SkipBodyLoggingForContentTypes(cts ...string) Option {
+	return func(l *Logger) {
+		l.bodyLogging = func(res *http.Response) bool {
+			rct := res.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return false
+				}
+			}
+
+			return true
+		}
+	}
+}
+
+// NewLogger returns a HAR logger using name and version as the Creator. The returned
+// logger logs all request post data and response bodies by default.
 func NewLogger(name, version string) *Logger {
-	return &Logger{
+	l := &Logger{
 		creator: &Creator{
 			Name:    name,
 			Version: version,
 		},
 		entries: make(map[string]*Entry),
+	}
+	l.SetOption(BodyLogging(true))
+	l.SetOption(PostDataLogging(true))
+	return l
+}
+
+// SetOption sets configurable options on the logger.
+func (l *Logger) SetOption(opts ...Option) {
+	for _, opt := range opts {
+		opt(l)
 	}
 }
 
@@ -262,10 +369,9 @@ func (l *Logger) LogRequest(id string, req *http.Request) error {
 		HeadersSize: -1,
 		BodySize:    req.ContentLength,
 		QueryString: []QueryString{},
+		Headers:     headers(proxyutil.RequestHeader(req).Map()),
+		Cookies:     cookies(req.Cookies()),
 	}
-
-	hreq.Headers = headers(proxyutil.RequestHeader(req).Map())
-	hreq.Cookies = cookies(req.Cookies())
 
 	for n, vs := range req.URL.Query() {
 		for _, v := range vs {
@@ -276,7 +382,7 @@ func (l *Logger) LogRequest(id string, req *http.Request) error {
 		}
 	}
 
-	pd, err := postData(req)
+	pd, err := postData(req, l.postDataLogging(req))
 	if err != nil {
 		return err
 	}
@@ -313,35 +419,37 @@ func (l *Logger) LogResponse(id string, res *http.Response) error {
 		StatusText:  http.StatusText(res.StatusCode),
 		HeadersSize: -1,
 		BodySize:    res.ContentLength,
+		Headers:     headers(proxyutil.ResponseHeader(res).Map()),
+		Cookies:     cookies(res.Cookies()),
 	}
 
 	if res.StatusCode >= 300 && res.StatusCode < 400 {
 		hres.RedirectURL = res.Header.Get("Location")
 	}
 
-	hres.Headers = headers(proxyutil.ResponseHeader(res).Map())
-	hres.Cookies = cookies(res.Cookies())
-
-	mv := messageview.New()
-	if err := mv.SnapshotResponse(res); err != nil {
-		return err
-	}
-
-	br, err := mv.BodyReader(messageview.Decode())
-	if err != nil {
-		return err
-	}
-
-	body, err := ioutil.ReadAll(br)
-	if err != nil {
-		return err
-	}
-
 	hres.Content = &Content{
-		Text:     body,
 		Encoding: "base64",
-		Size:     int64(len(body)),
 		MimeType: res.Header.Get("Content-Type"),
+	}
+
+	if l.bodyLogging(res) {
+		mv := messageview.New()
+		if err := mv.SnapshotResponse(res); err != nil {
+			return err
+		}
+
+		br, err := mv.BodyReader(messageview.Decode())
+		if err != nil {
+			return err
+		}
+
+		body, err := ioutil.ReadAll(br)
+		if err != nil {
+			return err
+		}
+
+		hres.Content.Text = body
+		hres.Content.Size = int64(len(body))
 	}
 
 	l.mu.Lock()
@@ -421,7 +529,7 @@ func headers(hs http.Header) []Header {
 	return hhs
 }
 
-func postData(req *http.Request) (*PostData, error) {
+func postData(req *http.Request, logBody bool) (*PostData, error) {
 	// If the request has no body (no Content-Length and Transfer-Encoding isn't
 	// chunked), skip the post data.
 	if req.ContentLength <= 0 && len(req.TransferEncoding) == 0 {
@@ -438,6 +546,10 @@ func postData(req *http.Request) (*PostData, error) {
 	pd := &PostData{
 		MimeType: mt,
 		Params:   []Param{},
+	}
+
+	if !logBody {
+		return pd, nil
 	}
 
 	mv := messageview.New()
