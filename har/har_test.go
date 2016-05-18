@@ -591,7 +591,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 	}
 
 	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\"}"; got != want {
-		t.Fatalf("log.Entries[0].Response.Content.Text: got %d, want %d", got, want)
+		t.Fatalf("log.Entries[0].Response.Content.Text: got %s, want %s", got, want)
 	}
 
 	logger = NewLogger("martian", "2.0.0")
@@ -611,7 +611,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 	}
 
 	if got, want := string(log.Entries[0].Response.Content.Text), ""; got != want {
-		t.Fatalf("log.Entries[0].Response.Content: got %d, want %d", got, want)
+		t.Fatalf("log.Entries[0].Response.Content: got %s, want %s", got, want)
 	}
 
 	logger = NewLogger("martian", "2.0.0")
@@ -627,7 +627,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 
 	log = logger.Export().Log
 	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\"}"; got != want {
-		t.Fatalf("log.Entries[0].Response.Content: got %d, want %d", got, want)
+		t.Fatalf("log.Entries[0].Response.Content: got %s, want %s", got, want)
 	}
 
 	logger = NewLogger("martian", "2.0.0")
