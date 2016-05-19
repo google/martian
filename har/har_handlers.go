@@ -17,6 +17,7 @@ package har
 import (
 	"encoding/json"
 	"net/http"
+	"github.com/google/martian/log"
 )
 
 type exportHandler struct {
@@ -43,6 +44,13 @@ func NewResetHandler(l *Logger) http.Handler {
 
 // ServeHTTP writes the log in HAR format to the response body.
 func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		rw.Header().Add("Allow", "GET")
+		rw.WriteHeader(http.StatusMethodNotAllowed)
+		log.Errorf("har exportHandler.ServeHttp: method not allowed: %s", req.Method)
+		return
+	}
+
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	hl := h.logger.Export()
@@ -51,6 +59,13 @@ func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // ServeHTTP resets the log, which clears its entries.
 func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !(req.Method == "POST" || req.Method == "DELETE") {
+		rw.Header().Add("Allow", "POST")
+		rw.Header().Add("Allow", "DELETE")
+		rw.WriteHeader(http.StatusMethodNotAllowed)
+		log.Errorf("har resetHandler.ServeHttp: method not allowed: %s", req.Method)
+		return
+	}
 	h.logger.Reset()
 
 	rw.WriteHeader(http.StatusNoContent)
