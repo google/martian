@@ -46,7 +46,7 @@ func TestModifyRequest(t *testing.T) {
 	}
 	defer remove()
 
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -170,7 +170,7 @@ func TestModifyResponse(t *testing.T) {
 	}
 	res.Header.Set("Set-Cookie", cookie.String())
 
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -256,7 +256,7 @@ func TestModifyResponse(t *testing.T) {
 }
 
 func TestModifyRequestBodyURLEncoded(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	body := strings.NewReader("first=true&second=false")
 	req, err := http.NewRequest("POST", "http://example.com", body)
@@ -308,7 +308,7 @@ func TestModifyRequestBodyURLEncoded(t *testing.T) {
 }
 
 func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	body := "arbitrary binary data"
 	req, err := http.NewRequest("POST", "http://www.example.com", strings.NewReader(body))
@@ -345,7 +345,7 @@ func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
 }
 
 func TestModifyRequestBodyMultipart(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	body := new(bytes.Buffer)
 	mpw := multipart.NewWriter(body)
@@ -424,7 +424,7 @@ func TestModifyRequestBodyMultipart(t *testing.T) {
 }
 
 func TestHARExportsTime(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -463,7 +463,7 @@ func TestHARExportsTime(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -494,7 +494,7 @@ func TestReset(t *testing.T) {
 }
 
 func TestExportSortsEntries(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 	count := 10
 
 	for i := 0; i < count; i++ {
@@ -527,7 +527,7 @@ func TestExportSortsEntries(t *testing.T) {
 }
 
 func TestExportIgnoresOrphanedResponse(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -575,7 +575,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 	res.ContentLength = int64(bdr.Len())
 	res.Header.Set("Content-Type", "application/json")
 
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -594,7 +594,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 		t.Fatalf("log.Entries[0].Response.Content.Text: got %s, want %s", got, want)
 	}
 
-	logger = NewLogger()
+	logger = NewLogger("martian", "2.0.0")
 	logger.SetOption(BodyLogging(false))
 
 	if err := logger.ModifyRequest(req); err != nil {
@@ -614,7 +614,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 		t.Fatalf("log.Entries[0].Response.Content: got %s, want %s", got, want)
 	}
 
-	logger = NewLogger()
+	logger = NewLogger("martian", "2.0.0")
 	logger.SetOption(BodyLoggingForContentTypes("application/json"))
 
 	if err := logger.ModifyRequest(req); err != nil {
@@ -630,7 +630,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 		t.Fatalf("log.Entries[0].Response.Content: got %s, want %s", got, want)
 	}
 
-	logger = NewLogger()
+	logger = NewLogger("martian", "2.0.0")
 	logger.SetOption(SkipBodyLoggingForContentTypes("application/json"))
 
 	if err := logger.ModifyRequest(req); err != nil {
@@ -648,7 +648,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 }
 
 func TestOptionRequestPostDataLogging(t *testing.T) {
-	logger := NewLogger()
+	logger := NewLogger("martian", "2.0.0")
 	logger.SetOption(PostDataLoggingForContentTypes("application/x-www-form-urlencoded"))
 
 	body := strings.NewReader("first=true&second=false")
@@ -673,7 +673,7 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 		t.Fatalf("log.Entries[0].Request.PostData.Params[0].Value: got %s, want %s", got, want)
 	}
 
-	logger = NewLogger()
+	logger = NewLogger("martian", "2.0.0")
 	logger.SetOption(SkipPostDataLoggingForContentTypes("application/x-www-form-urlencoded"))
 
 	body = strings.NewReader("first=true&second=false")
