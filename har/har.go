@@ -329,13 +329,13 @@ func SkipBodyLoggingForContentTypes(cts ...string) Option {
 	}
 }
 
-// NewLogger returns a HAR logger using name and version as the Creator. The returned
+// NewLogger returns a HAR logger. The returned
 // logger logs all request post data and response bodies by default.
-func NewLogger(name, version string) *Logger {
+func NewLogger() *Logger {
 	l := &Logger{
 		creator: &Creator{
-			Name:    name,
-			Version: version,
+			Name:    "martian proxy",
+			Version: "2.0.0",
 		},
 		entries: make(map[string]*Entry),
 	}
