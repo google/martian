@@ -356,12 +356,12 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 	id := ctx.ID()
 
-	return l.LogRequest(id, req)
+	return l.RecordRequest(id, req)
 }
 
-// LogRequest logs the HTTP request with the given ID. The ID should be unique
+// RecordRequest logs the HTTP request with the given ID. The ID should be unique
 // per request/response pair.
-func (l *Logger) LogRequest(id string, req *http.Request) error {
+func (l *Logger) RecordRequest(id string, req *http.Request) error {
 	hreq := &Request{
 		Method:      req.Method,
 		URL:         req.URL.String(),
