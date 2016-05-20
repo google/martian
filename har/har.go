@@ -329,13 +329,13 @@ func SkipBodyLoggingForContentTypes(cts ...string) Option {
 	}
 }
 
-// NewLogger returns a HAR logger using name and version as the Creator. The returned
+// NewLogger returns a HAR logger. The returned
 // logger logs all request post data and response bodies by default.
-func NewLogger(name, version string) *Logger {
+func NewLogger() *Logger {
 	l := &Logger{
 		creator: &Creator{
-			Name:    name,
-			Version: version,
+			Name:    "martian proxy",
+			Version: "2.0.0",
 		},
 		entries: make(map[string]*Entry),
 	}
@@ -356,12 +356,12 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 	id := ctx.ID()
 
-	return l.LogRequest(id, req)
+	return l.RecordRequest(id, req)
 }
 
-// LogRequest logs the HTTP request with the given ID. The ID should be unique
+// RecordRequest logs the HTTP request with the given ID. The ID should be unique
 // per request/response pair.
-func (l *Logger) LogRequest(id string, req *http.Request) error {
+func (l *Logger) RecordRequest(id string, req *http.Request) error {
 	hreq := &Request{
 		Method:      req.Method,
 		URL:         req.URL.String(),
