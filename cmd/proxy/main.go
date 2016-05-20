@@ -299,7 +299,7 @@ func main() {
 	fg.AddResponseModifier(m)
 
 	if *harLogging {
-		hl := har.NewLogger()
+		hl := har.NewLogger("martian", "2.0.0")
 		stack.AddRequestModifier(hl)
 		stack.AddResponseModifier(hl)
 
