@@ -407,12 +407,12 @@ func (l *Logger) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
 	id := ctx.ID()
 
-	return l.LogResponse(id, res)
+	return l.RecordResponse(id, res)
 }
 
-// LogResponse logs an HTTP response, associating it with the previously-logged
+// RecordResponse logs an HTTP response, associating it with the previously-logged
 // HTTP request with the same ID.
-func (l *Logger) LogResponse(id string, res *http.Response) error {
+func (l *Logger) RecordResponse(id string, res *http.Response) error {
 	hres := &Response{
 		HTTPVersion: res.Proto,
 		Status:      res.StatusCode,
