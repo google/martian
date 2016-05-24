@@ -16,6 +16,11 @@ package martianurl
 
 // MatchHost matches two URL hosts with support for wildcards.
 func MatchHost(host, match string) bool {
+	// Short circuit if host is empty.
+	if host == "" {
+		return false
+	}
+
 	// Exact match, no need to loop.
 	if host == match {
 		return true
