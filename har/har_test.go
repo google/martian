@@ -46,7 +46,7 @@ func TestModifyRequest(t *testing.T) {
 	}
 	defer remove()
 
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -54,12 +54,6 @@ func TestModifyRequest(t *testing.T) {
 	log := logger.Export().Log
 	if got, want := log.Version, "1.2"; got != want {
 		t.Errorf("log.Version: got %q, want %q", got, want)
-	}
-	if got, want := log.Creator.Name, "martian"; got != want {
-		t.Errorf("log.Creator.Name: got %q, want %q", got, want)
-	}
-	if got, want := log.Creator.Version, "2.0.0"; got != want {
-		t.Errorf("log.Creator.Version: got %q, want %q", got, want)
 	}
 
 	if got, want := len(log.Entries), 1; got != want {
@@ -170,7 +164,7 @@ func TestModifyResponse(t *testing.T) {
 	}
 	res.Header.Set("Set-Cookie", cookie.String())
 
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -256,7 +250,7 @@ func TestModifyResponse(t *testing.T) {
 }
 
 func TestModifyRequestBodyURLEncoded(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	body := strings.NewReader("first=true&second=false")
 	req, err := http.NewRequest("POST", "http://example.com", body)
@@ -308,7 +302,7 @@ func TestModifyRequestBodyURLEncoded(t *testing.T) {
 }
 
 func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	body := "arbitrary binary data"
 	req, err := http.NewRequest("POST", "http://www.example.com", strings.NewReader(body))
@@ -345,7 +339,7 @@ func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
 }
 
 func TestModifyRequestBodyMultipart(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	body := new(bytes.Buffer)
 	mpw := multipart.NewWriter(body)
@@ -424,7 +418,7 @@ func TestModifyRequestBodyMultipart(t *testing.T) {
 }
 
 func TestHARExportsTime(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -463,7 +457,7 @@ func TestHARExportsTime(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -494,7 +488,7 @@ func TestReset(t *testing.T) {
 }
 
 func TestExportSortsEntries(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 	count := 10
 
 	for i := 0; i < count; i++ {
@@ -527,7 +521,7 @@ func TestExportSortsEntries(t *testing.T) {
 }
 
 func TestExportIgnoresOrphanedResponse(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -555,5 +549,146 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 	log := logger.Export().Log
 	if got, want := len(log.Entries), 0; got != want {
 		t.Errorf("len(log.Entries): got %d, want %d", got, want)
+	}
+}
+
+func TestOptionResponseBodyLogging(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	bdr := strings.NewReader("{\"response\": \"body\"}")
+	res := proxyutil.NewResponse(200, bdr, req)
+	res.ContentLength = int64(bdr.Len())
+	res.Header.Set("Content-Type", "application/json")
+
+	logger := NewLogger()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log := logger.Export().Log
+	if got, want := len(log.Entries), 1; got != want {
+		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
+	}
+
+	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\"}"; got != want {
+		t.Fatalf("log.Entries[0].Response.Content.Text: got %s, want %s", got, want)
+	}
+
+	logger = NewLogger()
+	logger.SetOption(BodyLogging(false))
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log = logger.Export().Log
+	if got, want := len(log.Entries), 1; got != want {
+		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
+	}
+
+	if got, want := string(log.Entries[0].Response.Content.Text), ""; got != want {
+		t.Fatalf("log.Entries[0].Response.Content: got %s, want %s", got, want)
+	}
+
+	logger = NewLogger()
+	logger.SetOption(BodyLoggingForContentTypes("application/json"))
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log = logger.Export().Log
+	if got, want := string(log.Entries[0].Response.Content.Text), "{\"response\": \"body\"}"; got != want {
+		t.Fatalf("log.Entries[0].Response.Content: got %s, want %s", got, want)
+	}
+
+	logger = NewLogger()
+	logger.SetOption(SkipBodyLoggingForContentTypes("application/json"))
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log = logger.Export().Log
+	if got, want := string(log.Entries[0].Response.Content.Text), ""; got != want {
+		t.Fatalf("log.Entries[0].Response.Content: got %v, want %v", got, want)
+	}
+}
+
+func TestOptionRequestPostDataLogging(t *testing.T) {
+	logger := NewLogger()
+	logger.SetOption(PostDataLoggingForContentTypes("application/x-www-form-urlencoded"))
+
+	body := strings.NewReader("first=true&second=false")
+	req, err := http.NewRequest("POST", "http://example.com", body)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	_, remove, err := martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	log := logger.Export().Log
+	if got, want := string(log.Entries[0].Request.PostData.Params[0].Value), "true"; got != want {
+		t.Fatalf("log.Entries[0].Request.PostData.Params[0].Value: got %s, want %s", got, want)
+	}
+
+	logger = NewLogger()
+	logger.SetOption(SkipPostDataLoggingForContentTypes("application/x-www-form-urlencoded"))
+
+	body = strings.NewReader("first=true&second=false")
+	req, err = http.NewRequest("POST", "http://example.com", body)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	_, remove, err = martian.TestContext(req)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	log = logger.Export().Log
+	if got, want := len(log.Entries[0].Request.PostData.Params), 0; got != want {
+		t.Fatalf("len(log.Entries[0].Request.PostData.Params): got %v, want %v", got, want)
 	}
 }

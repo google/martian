@@ -25,7 +25,7 @@ import (
 )
 
 func TestExportHandlerServeHTTP(t *testing.T) {
-	logger := NewLogger("martian", "2.0.0")
+	logger := NewLogger()
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {

@@ -16,6 +16,7 @@ package martian
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -320,18 +321,40 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return nil
 			}
 
-			res.Write(brw)
-			brw.Flush()
+			if err := res.Write(brw); err != nil {
+				log.Errorf("martian: got error while writing response back to client: %v", err)
+			}
+			if err := brw.Flush(); err != nil {
+				log.Errorf("martian: got error while flushing response back to client: %v", err)
+			}
 
 			log.Debugf("martian: completed MITM for connection: %s", req.Host)
 
-			tlsconn := tls.Server(conn, p.mitm.TLSForHost(req.Host))
-			brw.Writer.Reset(tlsconn)
-			brw.Reader.Reset(tlsconn)
+			b := make([]byte, 1)
+			if _, err := brw.Read(b); err != nil {
+				log.Errorf("martian: error peeking message through CONNECT tunnel to determine type: %v", err)
+			}
 
-			session.setConn(tlsconn, brw)
+			// Drain all of the rest of the buffered data.
+			buf := make([]byte, brw.Reader.Buffered())
+			brw.Read(buf)
 
-			return p.handle(ctx, tlsconn, brw)
+			// 22 is the TLS handshake.
+			// https://tools.ietf.org/html/rfc5246#section-6.2.1
+			if b[0] == 22 {
+				// Prepend the previously read data to be read again by
+				// http.ReadRequest.
+				tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host))
+
+				brw.Writer.Reset(tlsconn)
+				brw.Reader.Reset(tlsconn)
+
+				return p.handle(ctx, tlsconn, brw)
+			}
+
+			// Prepend the previously read data to be read again by http.ReadRequest.
+			brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
+			return p.handle(ctx, conn, brw)
 		}
 
 		log.Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
@@ -350,8 +373,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				return nil
 			}
 
-			res.Write(brw)
-			return brw.Flush()
+			if err := res.Write(brw); err != nil {
+				log.Errorf("martian: got error while writing response back to client: %v", err)
+			}
+			err := brw.Flush()
+			if err != nil {
+				log.Errorf("martian: got error while flushing response back to client: %v", err)
+			}
+			return err
 		}
 		defer res.Body.Close()
 		defer cconn.Close()
@@ -365,8 +394,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			return nil
 		}
 
-		res.Write(brw)
-		brw.Flush()
+		if err := res.Write(brw); err != nil {
+			log.Errorf("martian: got error while writing response back to client: %v", err)
+		}
+		if err := brw.Flush(); err != nil {
+			log.Errorf("martian: got error while flushing response back to client: %v", err)
+		}
 
 		cbw := bufio.NewWriter(cconn)
 		cbr := bufio.NewReader(cconn)
@@ -420,18 +453,34 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	var closing error
-	if req.Close || p.Closing() {
+	if req.Close || res.Close || p.Closing() {
 		log.Debugf("martian: received close request: %v", req.RemoteAddr)
-		res.Header.Add("Connection", "close")
+		res.Close = true
 		closing = errClose
 	}
 
 	log.Debugf("martian: sent response: %v", req.URL)
-	res.Write(brw)
-	brw.Flush()
+	if err := res.Write(brw); err != nil {
+		log.Errorf("martian: got error while writing response back to client: %v", err)
+	}
+	if err := brw.Flush(); err != nil {
+		log.Errorf("martian: got error while flushing response back to client: %v", err)
+	}
 
 	return closing
 }
+
+// A peekedConn subverts the net.Conn.Read implementation, primarily so that
+// sniffed bytes can be transparently prepended.
+type peekedConn struct {
+	net.Conn
+	r io.Reader
+}
+
+// Read allows control over the embeded net.Conn's read data. By using an
+// io.MultiReader one can read from a conn, and then replace what they read, to
+// be read again.
+func (c *peekedConn) Read(buf []byte) (int, error) { return c.r.Read(buf) }
 
 func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, error) {
 	if ctx.SkippingRoundTrip() {
