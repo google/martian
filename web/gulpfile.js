@@ -1,4 +1,4 @@
-//require('babel/register');
+// require('babel/register');
 
 var gulp = require('gulp');
 var babel = require('gulp-babel');
@@ -14,6 +14,6 @@ gulp.task('js', function() {
 });
 
 gulp.task('test', ['js'], function() {
-return gulp.src('dist/test/**/*-test.js')
+  return gulp.src('dist/test/**/*-test.js')
     .pipe(mocha());
 });
