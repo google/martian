@@ -1,0 +1,31 @@
+{
+  "name": "curio",
+  "version": "0.0.1",
+  "description": "Logs querying language",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "script-name": "babel-node script.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/google/martian/web/curio"
+  },
+  "keywords": [
+    "martian",
+    "proxy",
+    "ui"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^2.5.3"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.9.0"
+  }
+}
