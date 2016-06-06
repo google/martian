@@ -3,9 +3,8 @@
 var chai = require('chai'),
     assert = chai.assert;
 
-var scope = require('../../scripts/curio/scope'),
-    parse = require('../../scripts/curio/parser'),
-    Scope = scope.Scope,
+import Scope from '../../scripts/curio/scope';
+var parse = require('../../scripts/curio/parser'),
     Node = parse.Node;
 
 describe('Scope', function() {

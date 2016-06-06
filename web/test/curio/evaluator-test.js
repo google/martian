@@ -4,11 +4,11 @@ var chai = require('chai'),
     assert = chai.assert;
 
 var evaluate = require('../../scripts/curio/evaluator'),
-    scope = require('../../scripts/curio/scope'),
     parse = require('../../scripts/curio/parser'),
     Evaluator = evaluate.Evaluator,
-    Scope = scope.Scope,
     Node = parse.Node;
+
+import Scope from '../../scripts/curio/scope';
 
 describe('Evaluator', function() {
   it('evaluates a simple expression', function() {

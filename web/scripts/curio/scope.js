@@ -1,6 +1,6 @@
 'use strict';
 
-export class Scope {
+export default class Scope {
   constructor(up) {
     this.symbols = {};
     this.up = up;
