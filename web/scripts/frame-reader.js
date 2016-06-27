@@ -31,7 +31,7 @@ Parser.prototype.bytes = function(length) {
     return new Uint8Array(data);
 }
 
-function FrameReader(view) {
+function FrameReader() {
   this._frames = {
     1: 'header-frame',
     2: 'data-frame',
@@ -43,14 +43,17 @@ function FrameReader(view) {
   }
 
   this.n = 0;
-  this.view = view;
 }
 
-FrameReader.prototype.read = function() {
-  var parser = new Parser(this.view, this.n);
+FrameReader.prototype.read = function(arraybuffer_view) {
+  console.log(arraybuffer_view);
+  view = new DataView(arraybuffer_view);
+  console.log(view);
+
+  var parser = new Parser(view, 0);//this.n);
   var frame = {};
 
-  frame.magic = parser.uint32();
+  //frame.magic = parser.uint32();
   frame.type = this._frames[parser.uint8()];
   frame.scope = this._scopes[parser.uint8()];
   frame.id = parser.string(8);
