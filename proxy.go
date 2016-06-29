@@ -333,12 +333,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				// http.ReadRequest.
 				tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host))
 
-				log.Errorf("Calling handshake")
-
 				if err := tlsconn.Handshake(); err != nil && p.mitm.TLSHandshakeErrorHandler != nil {
-					log.Errorf("Handshake error: %v", err)
 					p.mitm.TLSHandshakeErrorHandler(req, err)
-					log.Errorf("Handshake error: %v", err)
 					return err
 				}
 
