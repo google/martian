@@ -43,16 +43,16 @@ var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 // Config is a set of configuration values that are used to build TLS configs
 // capable of MITM.
 type Config struct {
-	ca                       *x509.Certificate
-	capriv                   interface{}
-	priv                     *rsa.PrivateKey
-	keyID                    []byte
-	validity                 time.Duration
-	org                      string
-	getCertificate           func(*tls.ClientHelloInfo) (*tls.Certificate, error)
-	roots                    *x509.CertPool
-	skipVerify               bool
-	TLSHandshakeErrorCallback func(*http.Request, error)
+	ca                        *x509.Certificate
+	capriv                    interface{}
+	priv                      *rsa.PrivateKey
+	keyID                     []byte
+	validity                  time.Duration
+	org                       string
+	getCertificate            func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	roots                     *x509.CertPool
+	skipVerify                bool
+	tlsHandshakeErrorCallback func(*http.Request, error)
 
 	certmu sync.RWMutex
 	certs  map[string]*tls.Certificate
@@ -162,6 +162,19 @@ func (c *Config) SkipTLSVerify(skip bool) {
 // SetOrganization sets the organization of the certificate.
 func (c *Config) SetOrganization(org string) {
 	c.org = org
+}
+
+// SetTLSHandshakeErrorCallback sets the TLSHandshakeErrorCallback function.
+func (c *Config) SetTLSHandshakeErrorCallback(cb func(*http.Request, error)) {
+	c.tlsHandshakeErrorCallback = cb
+}
+
+// TLSHandshakeErrorCallback calls the TLSHandshakeErrorCallback in this Config,
+// if it is non-nil.
+func (c *Config) TLSHandshakeErrorCallback(r *http.Request, err error) {
+	if c.tlsHandshakeErrorCallback != nil {
+		c.tlsHandshakeErrorCallback(r, err)
+	}
 }
 
 // TLS returns a *tls.Config that will generate certificates on-the-fly using
