@@ -554,13 +554,11 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
 	}
 
-	roots := x509.NewCertPool()
-	roots.AddCert(ca)
-
 	tlsconn := tls.Client(conn, &tls.Config{
 		ServerName: "example.com",
-		// client has no cert so it will get "x509: certificate signed by unknown authority" from the 
+		// Client has no cert so it will get "x509: certificate signed by unknown authority" from the 
 		// handshake and send "remote error: bad certificate" to the server.
+		RootCAs: x509.NewCertPool(),
 	})
 	defer tlsconn.Close()
 
