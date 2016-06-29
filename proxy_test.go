@@ -483,7 +483,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	}
 }
 
-func TestIntegrationConnect(t *testing.T) {
+func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	t.Parallel()
 
 	l, err := net.Listen("tcp", "[::1]:0")
@@ -503,6 +503,11 @@ func TestIntegrationConnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
+	cb := make(chan error)
+	mc.TLSHandshakeErrorHandler = func(_ *http.Request, err error) {
+		cb <- err
+	}
+	p.SetMITM(mc)
 
 	tl, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
@@ -512,23 +517,15 @@ func TestIntegrationConnect(t *testing.T) {
 
 	go http.Serve(tl, http.HandlerFunc(
 		func(rw http.ResponseWriter, req *http.Request) {
-			rw.WriteHeader(299)
+			rw.WriteHeader(200)
 		}))
 
 	tm := martiantest.NewModifier()
-	reqerr := errors.New("request error")
-	reserr := errors.New("response error")
 
 	// Force the CONNECT request to dial the local TLS server.
 	tm.RequestFunc(func(req *http.Request) {
 		req.URL.Host = tl.Addr().String()
 	})
-
-	tm.RequestError(reqerr)
-	tm.ResponseError(reserr)
-
-	p.SetRequestModifier(tm)
-	p.SetResponseModifier(tm)
 
 	go p.Serve(l)
 
@@ -551,24 +548,9 @@ func TestIntegrationConnect(t *testing.T) {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
 
-	// CONNECT response after establishing tunnel.
-	res, err := http.ReadResponse(bufio.NewReader(conn), req)
-	if err != nil {
+	// CONNECT response after establishing tunnel.	
+	if _, err := http.ReadResponse(bufio.NewReader(conn), req); err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
-	}
-
-	if got, want := res.StatusCode, 200; got != want {
-		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
-	}
-
-	if !tm.RequestModified() {
-		t.Error("tm.RequestModified(): got false, want true")
-	}
-	if !tm.ResponseModified() {
-		t.Error("tm.ResponseModified(): got false, want true")
-	}
-	if got, want := res.Header.Get("Warning"), reserr.Error(); !strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %q, want to contain %q", "Warning", got, want)
 	}
 
 	roots := x509.NewCertPool()
@@ -576,7 +558,8 @@ func TestIntegrationConnect(t *testing.T) {
 
 	tlsconn := tls.Client(conn, &tls.Config{
 		ServerName: "example.com",
-		RootCAs:    roots,
+		// client has no cert so it will get "x509: certificate signed by unknown authority" from the 
+		// handshake and send "remote error: bad certificate" to the server.
 	})
 	defer tlsconn.Close()
 
@@ -586,25 +569,13 @@ func TestIntegrationConnect(t *testing.T) {
 	}
 	req.Header.Set("Connection", "close")
 
-	// GET / HTTP/1.1
-	// Host: example.com
-	// Connection: close
-	if err := req.Write(tlsconn); err != nil {
-		t.Fatalf("req.Write(): got %v, want no error", err)
-	}
+	if got, want := req.Write(tlsconn), "x509: certificate signed by unknown authority"; !strings.Contains(got.Error(), want) {
+		t.Fatalf("Got incorrect error from Client Handshake(), got: %v, want: %v", got, want)
+	}	
 
-	res, err = http.ReadResponse(bufio.NewReader(tlsconn), req)
-	if err != nil {
-		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
-	}
-	defer res.Body.Close()
-
-	if got, want := res.StatusCode, 299; got != want {
-		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
-	}
-	if got, want := res.Header.Get("Warning"), reserr.Error(); strings.Contains(got, want) {
-		t.Errorf("res.Header.Get(%q): got %s, want to not contain %s", "Warning", got, want)
-	}
+	if got, want := <- cb, "remote error: bad certificate"; !strings.Contains(got.Error(), want) {
+		t.Fatalf("Got incorrect error from Server Handshake(), got: %v, want: %v", got, want)
+	}	
 }
 
 func TestIntegrationConnectDownstreamProxy(t *testing.T) {

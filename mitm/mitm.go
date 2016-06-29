@@ -27,7 +27,8 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"math/big"
-	"net"
+	"net"	
+	"net/http"
 	"sync"
 	"time"
 
@@ -51,6 +52,7 @@ type Config struct {
 	getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	roots          *x509.CertPool
 	skipVerify     bool
+	TLSHandshakeErrorHandler func(*http.Request, error)
 
 	certmu sync.RWMutex
 	certs  map[string]*tls.Certificate
