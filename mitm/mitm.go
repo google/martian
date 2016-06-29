@@ -27,7 +27,7 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"math/big"
-	"net"	
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -43,15 +43,15 @@ var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 // Config is a set of configuration values that are used to build TLS configs
 // capable of MITM.
 type Config struct {
-	ca             *x509.Certificate
-	capriv         interface{}
-	priv           *rsa.PrivateKey
-	keyID          []byte
-	validity       time.Duration
-	org            string
-	getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
-	roots          *x509.CertPool
-	skipVerify     bool
+	ca                       *x509.Certificate
+	capriv                   interface{}
+	priv                     *rsa.PrivateKey
+	keyID                    []byte
+	validity                 time.Duration
+	org                      string
+	getCertificate           func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	roots                    *x509.CertPool
+	skipVerify               bool
 	TLSHandshakeErrorHandler func(*http.Request, error)
 
 	certmu sync.RWMutex

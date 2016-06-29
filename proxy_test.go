@@ -483,7 +483,6 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	}
 }
 
-
 func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	t.Parallel()
 
@@ -549,14 +548,14 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
 
-	// CONNECT response after establishing tunnel.	
+	// CONNECT response after establishing tunnel.
 	if _, err := http.ReadResponse(bufio.NewReader(conn), req); err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
 	}
 
 	tlsconn := tls.Client(conn, &tls.Config{
 		ServerName: "example.com",
-		// Client has no cert so it will get "x509: certificate signed by unknown authority" from the 
+		// Client has no cert so it will get "x509: certificate signed by unknown authority" from the
 		// handshake and send "remote error: bad certificate" to the server.
 		RootCAs: x509.NewCertPool(),
 	})
@@ -570,11 +569,11 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 
 	if got, want := req.Write(tlsconn), "x509: certificate signed by unknown authority"; !strings.Contains(got.Error(), want) {
 		t.Fatalf("Got incorrect error from Client Handshake(), got: %v, want: %v", got, want)
-	}	
+	}
 
-	if got, want := <- cb, "remote error: bad certificate"; !strings.Contains(got.Error(), want) {
+	if got, want := <-cb, "remote error: bad certificate"; !strings.Contains(got.Error(), want) {
 		t.Fatalf("Got incorrect error from Server Handshake(), got: %v, want: %v", got, want)
-	}	
+	}
 }
 
 func TestIntegrationConnect(t *testing.T) {
