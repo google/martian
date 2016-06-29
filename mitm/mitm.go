@@ -170,7 +170,8 @@ func (c *Config) SetTLSHandshakeErrorCallback(cb func(*http.Request, error)) {
 }
 
 // TLSHandshakeErrorCallback calls the TLSHandshakeErrorCallback in this Config,
-// if it is non-nil.
+// if it is non-nil. Request is the connect request that this handshake is being
+// executed through.
 func (c *Config) TLSHandshakeErrorCallback(r *http.Request, err error) {
 	if c.tlsHandshakeErrorCallback != nil {
 		c.tlsHandshakeErrorCallback(r, err)
