@@ -51,8 +51,8 @@ type Config struct {
 	org                       string
 	getCertificate            func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	roots                     *x509.CertPool
-	skipVerify                bool
-	tlsHandshakeErrorCallback func(*http.Request, error)
+	skipVerify             bool
+	handshakeErrorCallback func(*http.Request, error)
 
 	certmu sync.RWMutex
 	certs  map[string]*tls.Certificate
@@ -165,16 +165,16 @@ func (c *Config) SetOrganization(org string) {
 }
 
 // SetTLSHandshakeErrorCallback sets the TLSHandshakeErrorCallback function.
-func (c *Config) SetTLSHandshakeErrorCallback(cb func(*http.Request, error)) {
-	c.tlsHandshakeErrorCallback = cb
+func (c *Config) SetHandshakeErrorCallback(cb func(*http.Request, error)) {
+	c.handshakeErrorCallback = cb
 }
 
 // TLSHandshakeErrorCallback calls the TLSHandshakeErrorCallback in this Config,
 // if it is non-nil. Request is the connect request that this handshake is being
 // executed through.
-func (c *Config) TLSHandshakeErrorCallback(r *http.Request, err error) {
+func (c *Config) HandshakeErrorCallback(r *http.Request, err error) {
 	if c.tlsHandshakeErrorCallback != nil {
-		c.tlsHandshakeErrorCallback(r, err)
+		c.handshakeErrorCallback(r, err)
 	}
 }
 
