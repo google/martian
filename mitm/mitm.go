@@ -164,12 +164,12 @@ func (c *Config) SetOrganization(org string) {
 	c.org = org
 }
 
-// SetHandshakeErrorCallback sets the TLSHandshakeErrorCallback function.
+// SetHandshakeErrorCallback sets the handshakeErrorCallback function.
 func (c *Config) SetHandshakeErrorCallback(cb func(*http.Request, error)) {
 	c.handshakeErrorCallback = cb
 }
 
-// HandshakeErrorCallback calls the HandshakeErrorCallback function in this
+// HandshakeErrorCallback calls the handshakeErrorCallback function in this
 // Config, if it is non-nil. Request is the connect request that this handshake
 // is being executed through.
 func (c *Config) HandshakeErrorCallback(r *http.Request, err error) {
