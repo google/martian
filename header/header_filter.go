@@ -31,13 +31,16 @@ type Filter struct {
 	name, value string
 	reqmod      martian.RequestModifier
 	resmod      martian.ResponseModifier
+	elsereqmod  martian.RequestModifier
+	elseresmod  martian.ResponseModifier
 }
 
 type filterJSON struct {
-	Name     string               `json:"name"`
-	Value    string               `json:"value"`
-	Modifier json.RawMessage      `json:"modifier"`
-	Scope    []parse.ModifierType `json:"scope"`
+	Name         string               `json:"name"`
+	Value        string               `json:"value"`
+	Modifier     json.RawMessage      `json:"modifier"`
+	ElseModifier json.RawMessage      `json:"else"`
+	Scope        []parse.ModifierType `json:"scope"`
 }
 
 func init() {
@@ -47,31 +50,47 @@ func init() {
 // NewFilter builds a new header filter.
 func NewFilter(name, value string) *Filter {
 	return &Filter{
-		name:   http.CanonicalHeaderKey(name),
-		value:  value,
-		reqmod: noop,
-		resmod: noop,
+		name:       http.CanonicalHeaderKey(name),
+		value:      value,
+		reqmod:     noop,
+		resmod:     noop,
+		elsereqmod: noop,
+		elseresmod: noop,
 	}
 }
 
 // SetRequestModifier sets the request modifier of filter.
-func (f *Filter) SetRequestModifier(reqmod martian.RequestModifier) {
+func (f *Filter) SetRequestModifier(reqmod martian.RequestModifier, elsemod martian.RequestModifier) {
 	if reqmod == nil {
 		f.reqmod = noop
 		return
 	}
 
 	f.reqmod = reqmod
+
+	if elsemod == nil {
+		f.elsereqmod = noop
+		return
+	}
+
+	f.elsereqmod = elsemod
 }
 
 // SetResponseModifier sets the response modifier of filter.
-func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
+func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier, elsemod martian.ResponseModifier) {
 	if resmod == nil {
 		f.resmod = noop
 		return
 	}
 
 	f.resmod = resmod
+
+	if elsemod == nil {
+		f.elseresmod = noop
+		return
+	}
+
+	f.elseresmod = elsemod
 }
 
 // ModifyRequest runs reqmod iff req has a header with name matching value.
@@ -87,6 +106,10 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 		if v == f.value {
 			return f.reqmod.ModifyRequest(req)
 		}
+	}
+
+	if f.elsereqmod != nil {
+		return f.elsereqmod.ModifyRequest(req)
 	}
 
 	return nil
@@ -105,6 +128,10 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 		if v == f.value {
 			return f.resmod.ModifyResponse(res)
 		}
+	}
+
+	if f.elseresmod != nil {
+		return f.elseresmod.ModifyResponse(res)
 	}
 
 	return nil
@@ -154,6 +181,7 @@ func (f *Filter) ResetResponseVerifications() {
 //   "name": "Martian-Testing",
 //   "value": "true",
 //   "modifier": { ... }
+//   "else": {...}
 // }
 func filterFromJSON(b []byte) (*parse.Result, error) {
 	msg := &filterJSON{}
@@ -163,16 +191,24 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 
 	filter := NewFilter(msg.Name, msg.Value)
 
-	r, err := parse.FromJSON(msg.Modifier)
+	m, err := parse.FromJSON(msg.Modifier)
 	if err != nil {
 		return nil, err
 	}
 
-	reqmod := r.RequestModifier()
-	filter.SetRequestModifier(reqmod)
+	reqmod := m.RequestModifier()
+	resmod := m.ResponseModifier()
 
-	resmod := r.ResponseModifier()
-	filter.SetResponseModifier(resmod)
+	em, err := parse.FromJSON(msg.ElseModifier)
+	if err != nil {
+		return nil, err
+	}
+
+	elsereqmod := em.RequestModifier()
+	elseresmod := em.ResponseModifier()
+
+	filter.SetRequestModifier(reqmod, elsereqmod)
+	filter.SetResponseModifier(resmod, elseresmod)
 
 	return parse.NewResult(filter, msg.Scope)
 }
