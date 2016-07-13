@@ -25,6 +25,14 @@
           assert.equal(element.is, 'om-message');
           expect(element).to.be.ok;
         });
+        test('element displays method', function() {
+          let element = fixture('basic');
+          console.log(element);
+          assert.equal("", document.querySelector("#request-method").innerText);
+          element.message = {"request": {"method": "GET"}};
+          console.log(element);
+          assert.equal("GET", document.querySelector("#request-method").innerText);
+        });
       });
     </script>
     
