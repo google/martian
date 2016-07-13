@@ -483,6 +483,97 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	}
 }
 
+func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
+	t.Parallel()
+
+	l, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	p := NewProxy()
+	defer p.Close()
+
+	// Test TLS server.
+	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", time.Hour)
+	if err != nil {
+		t.Fatalf("mitm.NewAuthority(): got %v, want no error", err)
+	}
+	mc, err := mitm.NewConfig(ca, priv)
+	if err != nil {
+		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
+	}
+	cb := make(chan error)
+	mc.SetHandshakeErrorCallback(func(_ *http.Request, err error) { cb <- err })
+	p.SetMITM(mc)
+
+	tl, err := net.Listen("tcp", "[::1]:0")
+	if err != nil {
+		t.Fatalf("tls.Listen(): got %v, want no error", err)
+	}
+	tl = tls.NewListener(tl, mc.TLS())
+
+	go http.Serve(tl, http.HandlerFunc(
+		func(rw http.ResponseWriter, req *http.Request) {
+			rw.WriteHeader(200)
+		}))
+
+	tm := martiantest.NewModifier()
+
+	// Force the CONNECT request to dial the local TLS server.
+	tm.RequestFunc(func(req *http.Request) {
+		req.URL.Host = tl.Addr().String()
+	})
+
+	go p.Serve(l)
+
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatalf("net.Dial(): got %v, want no error", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest("CONNECT", "//example.com:443", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	// CONNECT example.com:443 HTTP/1.1
+	// Host: example.com
+	//
+	// Rewritten to CONNECT to host:port in CONNECT request modifier.
+	if err := req.Write(conn); err != nil {
+		t.Fatalf("req.Write(): got %v, want no error", err)
+	}
+
+	// CONNECT response after establishing tunnel.
+	if _, err := http.ReadResponse(bufio.NewReader(conn), req); err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+
+	tlsconn := tls.Client(conn, &tls.Config{
+		ServerName: "example.com",
+		// Client has no cert so it will get "x509: certificate signed by unknown authority" from the
+		// handshake and send "remote error: bad certificate" to the server.
+		RootCAs: x509.NewCertPool(),
+	})
+	defer tlsconn.Close()
+
+	req, err = http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Connection", "close")
+
+	if got, want := req.Write(tlsconn), "x509: certificate signed by unknown authority"; !strings.Contains(got.Error(), want) {
+		t.Fatalf("Got incorrect error from Client Handshake(), got: %v, want: %v", got, want)
+	}
+
+	if got, want := <-cb, "remote error: bad certificate"; !strings.Contains(got.Error(), want) {
+		t.Fatalf("Got incorrect error from Server Handshake(), got: %v, want: %v", got, want)
+	}
+}
+
 func TestIntegrationConnect(t *testing.T) {
 	t.Parallel()
 
