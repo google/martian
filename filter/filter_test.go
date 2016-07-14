@@ -8,12 +8,8 @@ import (
 	"github.com/google/martian/martiantest"
 )
 
-func TestRequestCondition(t *testing.T) {
+func TestRequestPositiveCondition(t *testing.T) {
 	hm := header.NewMatcher("Martian-Testing", "true")
-	tm := martiantest.NewModifier()
-
-	f := Filter{}
-	f.SetRequestCondition(hm, tm)
 
 	tt := []struct {
 		name   string
@@ -33,6 +29,11 @@ func TestRequestCondition(t *testing.T) {
 	}
 
 	for i, tc := range tt {
+		tm := martiantest.NewModifier()
+
+		f := New()
+		f.SetRequestCondition(hm)
+		f.SetRequestModifiers(tm, nil)
 		req, err := http.NewRequest("GET", "/", nil)
 		if err != nil {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -50,13 +51,8 @@ func TestRequestCondition(t *testing.T) {
 	}
 }
 
-func TestRequestInvertedCondition(t *testing.T) {
+func TestRequestNegativeCondition(t *testing.T) {
 	hm := header.NewMatcher("Martian-Testing", "true")
-	tm := martiantest.NewModifier()
-
-	f := Filter{}
-	f.SetRequestCondition(hm, tm)
-
 	tt := []struct {
 		name   string
 		values []string
@@ -75,6 +71,12 @@ func TestRequestInvertedCondition(t *testing.T) {
 	}
 
 	for i, tc := range tt {
+		tm := martiantest.NewModifier()
+
+		f := New()
+		f.SetRequestCondition(hm)
+		f.SetRequestModifiers(nil, tm)
+
 		req, err := http.NewRequest("GET", "/", nil)
 		if err != nil {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)

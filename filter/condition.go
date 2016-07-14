@@ -14,7 +14,6 @@ type RequestCondition interface {
 
 // type Condition struct {
 // 	reqcon RequestCondition
-// 	rescon ResponseCondition
 // }
 //
 // func (c *Condition) RequestCondition() RequestCondition {

@@ -6,33 +6,72 @@ import (
 	"github.com/google/martian"
 )
 
+var noop = martian.Noop("Filter")
+
 type Filter struct {
-	reqcond RequestCondition
-	rescond ResponseCondition
-	reqmod  martian.RequestModifier
-	resmod  martian.ResponseModifier
+	reqcond   RequestCondition
+	rescond   ResponseCondition
+	posreqmod martian.RequestModifier
+	posresmod martian.ResponseModifier
+	negreqmod martian.RequestModifier
+	negresmod martian.ResponseModifier
 }
 
-func (f *Filter) SetRequestCondition(reqcond RequestCondition, reqmod martian.RequestModifier) {
+func New() *Filter {
+	return &Filter{
+		posreqmod: noop,
+		posresmod: noop,
+		negresmod: noop,
+		negreqmod: noop,
+	}
+}
+
+func (f *Filter) SetRequestCondition(reqcond RequestCondition) {
 	f.reqcond = reqcond
-	f.reqmod = reqmod
 }
 
-func (f *Filter) SetResponseCondition(rescond ResponseCondition, resmod martian.ResponseModifier) {
+func (f *Filter) SetResponseCondition(rescond ResponseCondition) {
 	f.rescond = rescond
-	f.resmod = resmod
+}
+
+func (f *Filter) SetRequestModifiers(posmod martian.RequestModifier, negmod martian.RequestModifier) {
+	if posmod == nil {
+		posmod = noop
+	}
+	if negmod == nil {
+		negmod = noop
+	}
+	f.posreqmod = posmod
+	f.negreqmod = negmod
+}
+
+func (f *Filter) SetResponseModifiers(posmod martian.ResponseModifier, negmod martian.ResponseModifier) {
+	if posmod == nil {
+		posmod = noop
+	}
+	if negmod == nil {
+		negmod = noop
+	}
+	f.posresmod = posmod
+	f.negresmod = negmod
 }
 
 func (f *Filter) ModifyRequest(req *http.Request) error {
-	if !f.reqcond.MatchRequest(req) {
-		return nil
+	if f.reqcond.MatchRequest(req) {
+		return f.posreqmod.ModifyRequest(req)
 	}
-	return f.reqmod.ModifyRequest(req)
+
+	return f.negreqmod.ModifyRequest(req)
 }
 
 func (f *Filter) ModifyResponse(res *http.Response) error {
-	if !f.rescond.MatchResponse(res) {
-		return nil
+	if f.posresmod != nil && f.rescond.MatchResponse(res) {
+		return f.posresmod.ModifyResponse(res)
 	}
-	return f.resmod.ModifyResponse(res)
+
+	if f.negresmod != nil && !f.rescond.MatchResponse(res) {
+		return f.negresmod.ModifyResponse(res)
+	}
+
+	return nil
 }
