@@ -1,22 +1,24 @@
-package martian
+package filter
 
 import (
 	"net/http"
+
+	"github.com/google/martian"
 )
 
 type Filter struct {
 	reqcond RequestCondition
 	rescond ResponseCondition
-	reqmod  RequestModifier
-	resmod  ResponseModifier
+	reqmod  martian.RequestModifier
+	resmod  martian.ResponseModifier
 }
 
-func (f *Filter) SetRequestCondition(reqcond RequestCondition, reqmod RequestModifier) {
+func (f *Filter) SetRequestCondition(reqcond RequestCondition, reqmod martian.RequestModifier) {
 	f.reqcond = reqcond
 	f.reqmod = reqmod
 }
 
-func (f *Filter) SetResponseCondition(rescond ResponseCondition, resmod ResponseModifier) {
+func (f *Filter) SetResponseCondition(rescond ResponseCondition, resmod martian.ResponseModifier) {
 	f.rescond = rescond
 	f.resmod = resmod
 }
