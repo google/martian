@@ -19,9 +19,9 @@
   "author": "Adam Tanner",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/google/olympusmons/issues"
+    "url": "https://github.com/google/martian"
   },
-  "homepage": "https://github.com/google/olympusmons#readme",
+  "homepage": "https://github.com/google/martian",
   "devDependencies": {
     "babel": "^6.3.26",
     "babel-plugin-transform-es2015-modules-commonjs": "^6.4.5",
