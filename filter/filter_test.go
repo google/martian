@@ -8,7 +8,7 @@ import (
 	"github.com/google/martian/martiantest"
 )
 
-func TestRequestPositiveCondition(t *testing.T) {
+func TestRequestWhenTrueCondition(t *testing.T) {
 	hm := header.NewMatcher("Martian-Testing", "true")
 
 	tt := []struct {
@@ -33,7 +33,8 @@ func TestRequestPositiveCondition(t *testing.T) {
 
 		f := New()
 		f.SetRequestCondition(hm)
-		f.SetRequestModifiers(tm, nil)
+		f.RequestWhenTrue(tm)
+
 		req, err := http.NewRequest("GET", "/", nil)
 		if err != nil {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -51,7 +52,7 @@ func TestRequestPositiveCondition(t *testing.T) {
 	}
 }
 
-func TestRequestNegativeCondition(t *testing.T) {
+func TestRequestWhenFalse(t *testing.T) {
 	hm := header.NewMatcher("Martian-Testing", "true")
 	tt := []struct {
 		name   string
@@ -75,7 +76,7 @@ func TestRequestNegativeCondition(t *testing.T) {
 
 		f := New()
 		f.SetRequestCondition(hm)
-		f.SetRequestModifiers(nil, tm)
+		f.RequestWhenFalse(tm)
 
 		req, err := http.NewRequest("GET", "/", nil)
 		if err != nil {
