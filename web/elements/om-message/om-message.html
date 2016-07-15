@@ -60,18 +60,20 @@
               <span class="request-url">
                 <span
                   class="request-scheme"
+                  id="request-scheme"
                   hidden$="[[!message.request.scheme]]">
                   [[message.request.scheme]]://
                 </span>
-                <span class="request-authority">[[message.request.authority]]</span>
-                <span class="request-path">[[message.request.path]]</span>
+                <span class="request-authority" id="request-authority">[[message.request.authority]]</span>
+                <span class="request-path"
+                id="request-path">[[message.request.path]]</span>
                 <span
-                  class="request-query"
+                  class="request-query" id="request-query"
                   hidden$="[[!message.request.query]]">
                   ?[[message.request.query]]
                 </span>
               </span>
-              <span class="request-proto">[[message.request.proto]]</span>
+              <span class="request-proto" id="request-proto">[[message.request.proto]]</span>
             </div>
             <div class="request-headers">
               <dl>
@@ -86,13 +88,13 @@
           </div>
         </paper-card>
         <paper-card
-          id="message-request"
+          id="message-response"
           class="message-card">
           <div class="card-content">
             <div class="response-status-line">
-              <span class="response-proto">[[message.response.proto]]</span>
-              <span class="response-status">[[message.response.status]]</span>
-              <span class="response-reason">[[message.response.reason]]</span>
+              <span class="response-proto" id="response-proto">[[message.response.proto]]</span>
+              <span class="response-status" id="response-status">[[message.response.status]]</span>
+              <span class="response-reason" id="response-reason">[[message.response.reason]]</span>
             </div>
             <div class="response-headers">
               <dl>
