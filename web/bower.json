@@ -3,7 +3,9 @@
   "description": "Web UI for Martian",
   "main": "index.js",
   "authors": [
-    "Adam Tanner"
+    "Adam Tanner",
+    "Joe Mathes",
+    "Bramha Ghosh"
   ],
   "license": "Apache-2.0",
   "keywords": [
@@ -13,7 +15,7 @@
     "ui"
   ],
   "moduleType": [],
-  "homepage": "https://github.com/google/olympusmons",
+  "homepage": "https://github.com/google/martian",
   "private": true,
   "ignore": [
     "**/.*",
