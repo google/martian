@@ -64,5 +64,5 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 		return f.tresmod.ModifyResponse(res)
 	}
 
-	return f.tresmod.ModifyResponse(res)
+	return f.fresmod.ModifyResponse(res)
 }
