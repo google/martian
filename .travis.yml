@@ -6,4 +6,4 @@ go:
 script:
   - go get -u golang.org/x/mobile/cmd/gomobile
   - gomobile init
-  - gomobile bind -target=android github.com/google.com/martian/mobileproxy
+  - gomobile bind -target=android github.com/google/martian/mobileproxy
