@@ -1,9 +1,10 @@
-language: go
+language: android
 
 go:
   - 1.6
 
 script:
+  - go test ./...
   - go get -u golang.org/x/mobile/cmd/gomobile
   - gomobile init
   - gomobile bind -target=android github.com/google/martian/mobileproxy
