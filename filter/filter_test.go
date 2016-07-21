@@ -15,12 +15,14 @@
 package filter
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/google/martian/header"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/verify"
 )
 
 func TestRequestWhenTrueCondition(t *testing.T) {
@@ -189,5 +191,70 @@ func TestResponseWhenFalse(t *testing.T) {
 		if tm.ResponseModified() != tc.want {
 			t.Errorf("%d. tm.ResponseModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
 		}
+	}
+}
+
+func TestPassThroughVerifyhRequests(t *testing.T) {
+	f := NewFilter("Martian-Testing", "true")
+	if err := f.VerifyRequests(); err != nil {
+		t.Fatalf("VerifyRequest(): got %v, want no error", err)
+	}
+
+	tv := &verify.TestVerifier{
+		RequestError: errors.New("verify request failure"),
+	}
+
+	f.SetRequestModifier(tv)
+
+	if got, want := f.VerifyRequests().Error(), "verify request failure"; got != want {
+		t.Fatalf("VerifyRequests(): got %s, want %s", got, want)
+	}
+}
+
+func TestPassThroughVerifyResponses(t *testing.T) {
+	f := NewFilter("Martian-Testing", "true")
+	if err := f.VerifyResponses(); err != nil {
+		t.Fatalf("VerifyResponses(): got %v, want no error", err)
+	}
+
+	tv := &verify.TestVerifier{
+		ResponseError: errors.New("verify response failure"),
+	}
+
+	f.SetResponseModifier(tv)
+
+	if got, want := f.VerifyResponses().Error(), "verify response failure"; got != want {
+		t.Fatalf("VerifyResponses(): got %s, want %s", got, want)
+	}
+}
+
+func TestResets(t *testing.T) {
+	f := NewFilter("Martian-Testing", "true")
+
+	tv := &verify.TestVerifier{
+		ResponseError: errors.New("verify response failure"),
+	}
+	f.SetResponseModifier(tv)
+
+	tv = &verify.TestVerifier{
+		RequestError: errors.New("verify request failure"),
+	}
+	f.SetRequestModifier(tv)
+
+	if err := f.VerifyRequests(); err == nil {
+		t.Fatal("VerifyRequests(): got nil, want error")
+	}
+	if err := f.VerifyResponses(); err == nil {
+		t.Fatal("VerifyResponses(): got nil, want error")
+	}
+
+	f.ResetRequestVerifications()
+	f.ResetResponseVerifications()
+
+	if err := f.VerifyRequests(); err != nil {
+		t.Errorf("VerifyRequests(): got %v, want no error", err)
+	}
+	if err := f.VerifyResponses(); err != nil {
+		t.Errorf("VerifyResponses(): got %v, want no error", err)
 	}
 }

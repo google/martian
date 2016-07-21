@@ -1,13 +1,33 @@
+// Copyright 2015 Google Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package filter provides a modifier that executes a given set of child
+// modifiers based on the evaluated value of the provided conditional.
 package filter
 
 import (
 	"net/http"
 
 	"github.com/google/martian"
+	"github.com/google/martian/verify"
 )
 
 var noop = martian.Noop("Filter")
 
+// Filter is a modifer that contains conditions to evaluate on request and
+// response as well as a set of modifiers to execute based on the value of
+// the provided RequestCondition or ResponseCondition.
 type Filter struct {
 	reqcond RequestCondition
 	rescond ResponseCondition
@@ -18,6 +38,8 @@ type Filter struct {
 	fresmod martian.ResponseModifier
 }
 
+// New returns a pointer to a Filter with all child modifiers initialized to
+// the noop modifier.
 func New() *Filter {
 	return &Filter{
 		treqmod: noop,
@@ -27,30 +49,42 @@ func New() *Filter {
 	}
 }
 
+// SetRequestCondition sets the condition to evaluate on requests.
 func (f *Filter) SetRequestCondition(reqcond RequestCondition) {
 	f.reqcond = reqcond
 }
 
+// SetResponseCondition sets the condition to evaluate on responses.
 func (f *Filter) SetResponseCondition(rescond ResponseCondition) {
 	f.rescond = rescond
 }
 
+// RequestWhenTrue sets the martian.RequestModifier that is executed
+// when the RequestCondition evaluates to True.
 func (f *Filter) RequestWhenTrue(mod martian.RequestModifier) {
 	f.treqmod = mod
 }
 
-func (f *Filter) ResponseWhenTrue(mod martian.ResponseModifier) {
-	f.tresmod = mod
-}
-
+// RequestWhenFalse sets the martian.RequestModifier that is executed
+// when the RequestCondition evaluates to False.
 func (f *Filter) RequestWhenFalse(mod martian.RequestModifier) {
 	f.freqmod = mod
 }
 
+// ResponseWhenTrue sets the martian.ResponseModifier that is executed
+// when the ResponseCondition evaluates to True.
+func (f *Filter) ResponseWhenTrue(mod martian.ResponseModifier) {
+	f.tresmod = mod
+}
+
+// ResponseWhenFalse sets the martian.ResponseModifier that is executed
+// when the ResponseCondition evaluates to False.
 func (f *Filter) ResponseWhenFalse(mod martian.ResponseModifier) {
 	f.fresmod = mod
 }
 
+// ModifyRequest evaluates reqcond and executes treqmod iff reqcond evaluates
+// to true; otherwise, freqmod is executed.
 func (f *Filter) ModifyRequest(req *http.Request) error {
 	if f.reqcond.MatchRequest(req) {
 		return f.treqmod.ModifyRequest(req)
@@ -59,10 +93,69 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 	return f.freqmod.ModifyRequest(req)
 }
 
+// ModifyResponse evaluates rescond and executes tresmod iff rescond evaluates
+// to true; otherwise, fresmod is executed.
 func (f *Filter) ModifyResponse(res *http.Response) error {
 	if f.rescond.MatchResponse(res) {
 		return f.tresmod.ModifyResponse(res)
 	}
 
 	return f.fresmod.ModifyResponse(res)
+}
+
+// VerifyRequests returns an error containing all the verification errors
+// returned by request verifiers.
+func (f *Filter) VerifyRequests() error {
+	treqv, ok := f.treqmod.(verify.RequestVerifier)
+	if !ok {
+		return nil
+	}
+
+	freqv, ok := f.freqmod.(verify.RequestVerifier)
+	if !ok {
+		return nil
+	}
+
+	merr := verify.NewMultiError()
+	merr.Add(treqv.VerifyRequests())
+	merr.Add(freqv.VerifyRequests())
+
+	return merr
+}
+
+// VerifyResponses returns an error containing all the verification errors
+// returned by response verifiers.
+func (f *Filter) VerifyResponses() error {
+	tresv, ok := f.tresmod.(verify.ResponseVerifier)
+	if !ok {
+		return nil
+	}
+
+	fresv, ok := f.fresmod.(verify.ResponseVerifier)
+	if !ok {
+		return nil
+	}
+
+	merr := verify.NewMultiError()
+	merr.Add(tresv.VerifyResponses())
+	merr.Add(fresv.VerifyResponses())
+
+	return merr
+}
+
+// ResetRequestVerifications resets the state of the contained request verifiers.
+func (f *Filter) ResetRequestVerifications() {
+	if treqv, ok := f.treqmod.(verify.RequestVerifier); ok {
+		treqv.ResetRequestVerifications()
+	}
+	if freqv, ok := f.freqmod.(verify.RequestVerifier); ok {
+		freqv.ResetRequestVerifications()
+	}
+}
+
+// ResetResponseVerifications resets the state of the contained request verifiers.
+func (f *Filter) ResetResponseVerifications() {
+	if tresv, ok := f.tresmod.(verify.ResponseVerifier); ok {
+		tresv.ResetResponseVerifications()
+	}
 }

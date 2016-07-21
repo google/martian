@@ -34,10 +34,11 @@ type Filter struct {
 }
 
 type filterJSON struct {
-	Name     string               `json:"name"`
-	Value    string               `json:"value"`
-	Modifier json.RawMessage      `json:"modifier"`
-	Scope    []parse.ModifierType `json:"scope"`
+	Name         string               `json:"name"`
+	Value        string               `json:"value"`
+	Modifier     json.RawMessage      `json:"modifier"`
+	ElseModifier json.RawMessage      `json:"else"`
+	Scope        []parse.ModifierType `json:"scope"`
 }
 
 func init() {
@@ -154,6 +155,7 @@ func (f *Filter) ResetResponseVerifications() {
 //   "name": "Martian-Testing",
 //   "value": "true",
 //   "modifier": { ... }
+//   "else": { ... }
 // }
 func filterFromJSON(b []byte) (*parse.Result, error) {
 	msg := &filterJSON{}
