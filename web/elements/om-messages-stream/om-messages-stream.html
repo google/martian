@@ -46,14 +46,10 @@
         var message = this.messages[index];
         if (!message) {
           message = this._message(frame.id);
-          index = this.messages.push(message) - 1;
+          this.messages.push(message);
+          index = this.messages.length - 1;
           this._indexes[frame.id] = index;
-
-          this.notifySplices('messages', [
-            { index: index, removed: [], object: this.messages, type: 'splice' },
-          ]);
         }
-
         switch(frame.type) {
           case 'header-frame':
             var header = {
@@ -74,8 +70,10 @@
 
             break;
         }
-
-        this.notifyPath('messages.' + index, message);
+        this.debounce('messages.' + index, () => {
+          console.log("debounced notifypath", index);
+          this.notifyPath('messages.' + index, message);
+        }, 100);
       },
     });
   </script>

@@ -33,10 +33,10 @@
       }
     </style>
 
-    <om-message-search id="search" with-backdrop></om-message-search>
+    <om-message-search id="search" query="{{query}}" with-backdrop></om-message-search>
     <paper-header-panel mode="seamed" class="fit">
       <paper-toolbar>
-        <div class="title">Logs</div>
+        <div class="title">Logs<span hidden$="[[!query]]"> matching "[[query]]"</div></div>
         <div class="flex"></div>
         <paper-icon-button
           icon="file-upload"
@@ -47,25 +47,22 @@
           on-tap="_showSearch"></paper-icon-button>
       </paper-toolbar>
       <iron-list
-        items="[[messages]]"
+        items="[[filteredMessages]]"
         as="message">
         <template>
-          <paper-item id="message-item" on-tap="_selectMessage">
+
+          <paper-item id="message-item" class="message-item" on-tap="_selectMessage">
             <paper-item-body two-line>
               <div class="message-item-primary">
                 <div id="message-item-url">
                   <span
                     class="request-scheme"
-                    hidden$="[[!message.request.scheme]]">
-                    [[message.request.scheme]]://
-                  </span>
+                    hidden$="[[!message.request.scheme]]">[[message.request.scheme]]://</span>
                   <span class="request-authority">[[message.request.authority]]</span>
                   <span class="request-path">[[message.request.path]]</span>
                   <span
                     class="request-query"
-                    hidden$="[[!message.request.query]]">
-                    [[message.request.query]]
-                  </span>
+                    hidden$="[[!message.request.query]]">?[[message.request.query]]</span>
                 </div>
                 <div class="response-status">[[message.response.status]]</div>
               </div>
@@ -84,9 +81,16 @@
     Polymer({
       is: 'om-message-list',
       properties: {
+        query: {
+          type: String,
+          value: "",
+        },
+        filteredMessages: {
+          type: Array,
+          computed: 'filterMessages(messages.*, query)',
+        },
         messages: {
           type: Array,
-          value: function() { return []; },
         },
         selected: {
           type: Object,
@@ -102,6 +106,20 @@
       behaviors: [
         Polymer.NeonAnimatableBehavior,
       ],
+      filterMessages: function(messages, query) {
+        if (!query) {
+          return this.messages.slice(0, this.messages.length);
+        }
+        return this.messages.filter(function(message) {
+          var req = JSON.parse(JSON.stringify(message.request));
+          var url = req.scheme ? req.scheme + "://" : "";
+          url += req.authority;
+          url += req.path;
+          url += (req.query ? "?" + req.query : "");
+          console.log(url);
+          return url.match(query);
+        });
+      },
       attached: function() {
         this.$.upload.addEventListener('change', function(e) {
           for (var i = 0, file; file = e.currentTarget.files[i]; i++) {

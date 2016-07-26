@@ -28,15 +28,16 @@
       <paper-icon-button icon="arrow-back" on-tap="_hideSearch"></paper-icon-button>
       <input is="iron-input"
         id="message-search-input"
-        placeholder="Messages"
-        bind-value="{{query}}">
-        <paper-icon-button
-          hidden$="[[_blank(query)]]"
-          icon="help-outline"></paper-icon-button>
-        <paper-icon-button
-          hidden$="[[!_blank(query)]]"
-          on-tap="_resetQuery"
-          icon="close"></paper-icon-button>
+        placeholder="regex search"
+        on-keyup="_checkForEnter"
+        bind-value="{{partialQuery}}">
+      <paper-icon-button
+        hidden$="[[_blank(partialQuery)]]"
+        icon="help-outline"></paper-icon-button>
+      <paper-icon-button
+        hidden$="[[!_blank(partialQuery)]]"
+        on-tap="_resetQuery"
+        icon="close"></paper-icon-button>
     </paper-toolbar>
   </template>
   <script>
@@ -45,7 +46,12 @@
       properties: {
         query: {
           type: String,
-          value: null,
+          value: '',
+          notify: true,
+        },
+        partialQuery: {
+          type: String,
+          value: '',
         },
       },
       behaviors: [
@@ -59,11 +65,19 @@
       },
       _resetQuery: function() {
         this.async(function() {
-          this.query = null;
+          this.partialQuery = '';
         }, 100);
       },
-      _blank: function(query) {
-        return !!query;
+      _blank: function(partialQuery) {
+        return !!partialQuery;
+      },
+      _checkForEnter: function(key) {
+        if(key.keyCode != 13) {
+          return;
+        }
+        console.log(key);
+        this.query = this.partialQuery;
+        this._hideSearch();
       },
     });
   </script>
