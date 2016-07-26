@@ -24,7 +24,6 @@
           let element = fixture('basic');
 
           assert.equal(element.is, 'om-message');
-          expect(element).to.be.ok;
         });
         test('element displays method', function() {
           let element = fixture('basic');
@@ -52,16 +51,16 @@
           let element = fixture('basic');
           var scheme = element.$["request-scheme"];
 
-          expect(scheme.hasAttribute("hidden"));
+          assert(scheme.hasAttribute("hidden"));
 
           element.message = {"request": {}};
-          expect(scheme.hasAttribute("hidden"));
+          assert(scheme.hasAttribute("hidden"));
 
           element.message = {"request": {"scheme": "http"}};
-          expect(!scheme.hasAttribute("hidden"));
+          assert(!scheme.hasAttribute("hidden"));
 
           element.message = {"request": {}};
-          expect(scheme.hasAttribute("hidden"));
+          assert(scheme.hasAttribute("hidden"));
         });
         test('request authority displayed', function() {
           let element = fixture('basic');
@@ -101,16 +100,16 @@
           let element = fixture('basic');
           var query = element.$["request-query"];
 
-          expect(query.hasAttribute("hidden"));
+          assert(query.hasAttribute("hidden"));
 
           element.message = {"request": {}};
-          expect(query.hasAttribute("hidden"));
+          assert(query.hasAttribute("hidden"));
 
           element.message = {"request": {"query": "sort=top"}};
-          expect(!query.hasAttribute("hidden"));
+          assert(!query.hasAttribute("hidden"));
 
           element.message = {"request": {}};
-          expect(query.hasAttribute("hidden"));
+          assert(query.hasAttribute("hidden"));
         });
         test('request proto displayed', function() {
           let element = fixture('basic');
