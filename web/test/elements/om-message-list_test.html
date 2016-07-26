@@ -20,11 +20,71 @@
     </test-fixture>
     <script>
       suite('om-message-list', function() {
+        var message1 = {
+          "id": "deadbeef",
+          "request": {
+            "headers": [
+              {"name": ":scheme", "value": "http", "pseudo":true},
+              {"name": ":method", "value": "CONNECT", "pseudo":true},
+              {"name": ":authority", "value": "ssl.gstatic.com:443", "pseudo":true},
+              {"name": ":path", "value": "", "pseudo":true},
+              {"name": ":query", "value": "", "pseudo":true},
+              {"name": ":proto", "value": "HTTP/1.1", "pseudo":true},
+              {"name": ":remote", "value": "[::1]:60221", "pseudo":true},
+              {"name": "User-Agent", "value": "fake User-Agent", "pseudo":false},
+              {"name": "Host", "value": "ssl.gstatic.com:443", "pseudo":false}
+            ],
+            "body": {
+              "_parts": []
+            },
+            "scheme": "http",
+            "method": "CONNECT",
+            "authority": "ssl.gstatic.com:443",
+            "path": "?foo=bar",
+            "query": "",
+            "proto": "HTTP/1.1",
+            "remote": "[::1]:60221"
+          },
+          "response": {
+            "headers": [
+              {"name": ":status", "value": "200", "pseudo":true},
+              {"name": ":proto", "value": "HTTP/1.1", "pseudo":true},
+              {"name": ":reason", "value": "200 OK", "pseudo":true}
+            ],
+            "body": {
+              "_parts": [{"0": 1,"1": 0}]
+            },
+            "status": "200",
+            "proto": "HTTP/1.1",
+            "reason": "200 OK"
+          }
+        };
+        var message2 = JSON.parse(JSON.stringify(message1));
+        message2.id = "0ddba115";
+        message2.request.method = "GET";
+        var message3 = JSON.parse(JSON.stringify(message1));
+        message3.id = "defec8ed";
+        message3.request.authority = "example.com";
+
+
         test('instantiating the element works', function() {
           let element = fixture('basic');
           assert.equal(element.is, 'om-message-list');
-          expect(element).to.be.ok;
         });
+
+        test('populate list of messages', function(done) {
+          let element = fixture('basic');
+
+          element.messages = [message1, message2, message3];
+          element.querySelector('iron-list').notifyResize();
+
+          flush(function() {
+            assert.equal(3, document.querySelectorAll(".message-item").length);
+            done();
+          });
+
+        });
+
       });
     </script>
     
