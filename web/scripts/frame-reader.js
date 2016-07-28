@@ -46,9 +46,7 @@ function FrameReader() {
 }
 
 FrameReader.prototype.read = function(arraybuffer_view) {
-  console.log(arraybuffer_view);
   view = new DataView(arraybuffer_view);
-  console.log(view);
 
   var parser = new Parser(view, 0);//this.n);
   var frame = {};
@@ -63,7 +61,6 @@ FrameReader.prototype.read = function(arraybuffer_view) {
       var nameLength = parser.uint32();
       var valueLength = parser.uint32();
 
-      console.log('header-frame length', nameLength, valueLength);
 
       frame.name = parser.string(nameLength);
       frame.value = parser.string(valueLength);
@@ -74,12 +71,10 @@ FrameReader.prototype.read = function(arraybuffer_view) {
         frame.end = parser.uint8();
 
         var dataLength = parser.uint32();
-        console.log('data-frame length', dataLength);
         frame.data = parser.bytes(dataLength);
 
         break;
       default:
-        console.log('received unknown frame: ' + frame.id);
   };
 
   this.n = parser._offset;
