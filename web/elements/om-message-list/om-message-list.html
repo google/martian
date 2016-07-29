@@ -39,12 +39,14 @@
         <div class="title">Logs<span hidden$="[[!query]]"> matching "[[query]]"</div></div>
         <div class="flex"></div>
         <paper-icon-button
+          hidden
           icon="file-upload"
           on-tap="_openFileDialog"></paper-icon-button>
         <input type="file" id="upload" accept=".marbl" hidden>
         <paper-icon-button
           icon="search"
-          on-tap="_showSearch"></paper-icon-button>
+          on-tap="_showSearch"
+          id="message-search-button"></paper-icon-button>
       </paper-toolbar>
       <iron-list
         items="[[filteredMessages]]"
@@ -116,7 +118,6 @@
           url += req.authority;
           url += req.path;
           url += (req.query ? "?" + req.query : "");
-          console.log(url);
           return url.match(query);
         });
       },

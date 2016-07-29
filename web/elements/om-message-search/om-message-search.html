@@ -25,7 +25,7 @@
       }
     </style>
     <paper-toolbar id="message-search">
-      <paper-icon-button icon="arrow-back" on-tap="_hideSearch"></paper-icon-button>
+      <paper-icon-button id="message-search-back" icon="arrow-back" on-tap="_hideSearch"></paper-icon-button>
       <input is="iron-input"
         id="message-search-input"
         placeholder="regex search"
@@ -75,7 +75,9 @@
         if(key.keyCode != 13) {
           return;
         }
-        console.log(key);
+        this.submitQuery();
+      },
+      submitQuery: function() {
         this.query = this.partialQuery;
         this._hideSearch();
       },

@@ -40,8 +40,8 @@
             "scheme": "http",
             "method": "CONNECT",
             "authority": "ssl.gstatic.com:443",
-            "path": "?foo=bar",
-            "query": "",
+            "path": "/index.html",
+            "query": "foo=bar",
             "proto": "HTTP/1.1",
             "remote": "[::1]:60221"
           },
@@ -59,12 +59,9 @@
             "reason": "200 OK"
           }
         };
-        var message2 = JSON.parse(JSON.stringify(message1));
-        message2.id = "0ddba115";
-        message2.request.method = "GET";
-        var message3 = JSON.parse(JSON.stringify(message1));
-        message3.id = "defec8ed";
-        message3.request.authority = "example.com";
+        var getVisibleListItems = function() {
+            return document.querySelectorAll(".message-item:not([hidden])");
+        };
 
 
         test('instantiating the element works', function() {
@@ -74,17 +71,43 @@
 
         test('populate list of messages', function(done) {
           let element = fixture('basic');
+          var message2 = JSON.parse(JSON.stringify(message1));
+          message2.id = "0ddba115";
+          var message3 = JSON.parse(JSON.stringify(message1));
+          message3.id = "defec8ed";
 
           element.messages = [message1, message2, message3];
           element.querySelector('iron-list').notifyResize();
 
           flush(function() {
-            assert.equal(3, document.querySelectorAll(".message-item").length);
+            assert.equal(3, getVisibleListItems().length);
             done();
           });
 
         });
+        test('search a list of messages', function(done) {
+          let element = fixture('basic');
+          var message2 = JSON.parse(JSON.stringify(message1));
+          message2.id = "0ddba115";
+          message2.request.query = "foo=baz";
 
+          element.messages = [message1, message2];
+          element.querySelector('iron-list').notifyResize();
+
+          flush(function() {
+
+            assert.equal(2, getVisibleListItems().length);
+  
+            element.querySelector('#message-search-button').click();
+            element.querySelector('#message-search-input').bindValue =
+              "http://ssl\\.gstatic\\.com:443/index\\.html\\?foo=bar";
+            element.querySelector('om-message-search').submitQuery();
+            flush(function() {
+              assert.equal(1, getVisibleListItems().length);
+              done();
+            });
+          });
+        });
       });
     </script>
     
