@@ -19,14 +19,17 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"net"
 	"reflect"
 	"testing"
 )
 
 func TestResponseWriter(t *testing.T) {
 	buf := &bytes.Buffer{}
+	rc, _ := net.Pipe()
+	brw := bufio.NewReadWriter(bufio.NewReader(rc), bufio.NewWriter(rc))
 
-	rw := newResponseWriter(nil, buf, true)
+	rw := newResponseWriter(nil, brw, true)
 	rw.Header().Set("Martian-Response", "true")
 	rw.Header().Set("Content-Length", "12")
 
@@ -70,8 +73,9 @@ func TestResponseWriter(t *testing.T) {
 
 func TestResponseWriterChunkedEncoding(t *testing.T) {
 	buf := &bytes.Buffer{}
+	brw := bufio.NewReadWriter(bufio.NewReader(buf), bufio.NewWriter(buf))
 
-	rw := newResponseWriter(nil, buf, true)
+	rw := newResponseWriter(nil, brw, true)
 	rw.Header().Set("Martian-Response", "true")
 
 	rw.Write([]byte("test "))

@@ -558,7 +558,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -652,7 +652,7 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, remove, err := martian.TestContext(req)
+	_, remove, err := martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
@@ -677,7 +677,7 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, remove, err = martian.TestContext(req)
+	_, remove, err = martian.TestContext(req, nil, nil)
 	if err != nil {
 		t.Fatalf("martian.TestContext(): got %v, want no error", err)
 	}
