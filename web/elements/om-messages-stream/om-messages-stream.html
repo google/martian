@@ -71,7 +71,6 @@
             break;
         }
         this.debounce('messages.' + index, () => {
-          console.log("debounced notifypath", index);
           this.notifyPath('messages.' + index, message);
         }, 100);
       },
