@@ -346,6 +346,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				// http.ReadRequest.
 				tlsconn := tls.Server(&peekedConn{conn, io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn)}, p.mitm.TLSForHost(req.Host))
 
+				if err := tlsconn.Handshake(); err != nil {
+					p.mitm.HandshakeErrorCallback(req, err)
+					return err
+				}
+
 				brw.Writer.Reset(tlsconn)
 				brw.Reader.Reset(tlsconn)
 

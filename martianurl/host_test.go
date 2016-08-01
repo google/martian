@@ -29,6 +29,8 @@ func TestMatchHost(t *testing.T) {
 		{"www.example.com", "*.example.com", true},
 		{"one.two.example.com", "*.example.com", false},
 		{"one.two.example.com", "*.*.example.com", true},
+		{"", "", false},
+		{"", "foo", false},
 	}
 
 	for i, tc := range tt {
