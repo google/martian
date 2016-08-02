@@ -1,0 +1,182 @@
+<!--
+Copyright 2015 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Package martian provides an HTTP/1.1 proxy with an API for configurable
+request and response modifiers.
+-->
+
+<dom-module id="om-message-list">
+  <template>
+    <style is="custom-style">
+      #message-item {
+        display: flex;
+        padding: 16px;
+      }
+
+      #message-item-url {
+        display: inline-flex;
+        flex: 1;
+        min-width: 0;
+        overflow: scroll;
+        white-space: nowrap;
+      }
+
+      #message-item-url:after {
+        background: linear-gradient(to left, rgba(255, 255, 255, 1) 0%, rgba(0, 0, 0, 0) 15%);
+        content: "";
+        display: block;
+        height: 60%;
+        position: absolute;
+        right: 50px;
+        width: 95%;
+      }
+
+      .message-item-primary {
+        display: flex;
+      }
+
+      .response-status {
+        margin-left: 16px;
+      }
+    </style>
+
+    <om-message-search id="search" query="{{query}}" with-backdrop></om-message-search>
+    <paper-header-panel mode="seamed" class="fit">
+      <paper-toolbar>
+        <div class="title">Logs<span hidden$="[[!query]]"> matching "[[query]]"</div></div>
+        <div class="flex"></div>
+        <paper-icon-button
+          hidden
+          icon="file-upload"
+          on-tap="_openFileDialog"></paper-icon-button>
+        <input type="file" id="upload" accept=".marbl" hidden>
+        <paper-icon-button
+          icon="search"
+          on-tap="_showSearch"
+          id="message-search-button"></paper-icon-button>
+      </paper-toolbar>
+      <iron-list
+        items="[[filteredMessages]]"
+        as="message">
+        <template>
+
+          <paper-item id="message-item" class="message-item" on-tap="_selectMessage">
+            <paper-item-body two-line>
+              <div class="message-item-primary">
+                <div id="message-item-url">
+                  <span
+                    class="request-scheme"
+                    hidden$="[[!message.request.scheme]]">[[message.request.scheme]]://</span>
+                  <span class="request-authority">[[message.request.authority]]</span>
+                  <span class="request-path">[[message.request.path]]</span>
+                  <span
+                    class="request-query"
+                    hidden$="[[!message.request.query]]">?[[message.request.query]]</span>
+                </div>
+                <div class="response-status">[[message.response.status]]</div>
+              </div>
+              <div class="message-item-secondary" secondary>
+                <span id="message-item-method">[[message.request.method]]</span>
+                <span id="message-item-remote">[[message.request.remote]]</span>
+                <span id="message-item-id">[[message.id]]</span>
+              </div>
+            <paper-item-body>
+          </paper-item>
+        </template>
+      </iron-list>
+    </paper-header-panel>
+  </template>
+  <script>
+    Polymer({
+      is: 'om-message-list',
+      properties: {
+        query: {
+          type: String,
+          value: "",
+        },
+        filteredMessages: {
+          type: Array,
+          computed: 'filterMessages(messages.*, query)',
+        },
+        messages: {
+          type: Array,
+        },
+        selected: {
+          type: Object,
+          notify: true,
+        },
+        entryAnimation: {
+          value: 'slide-from-left-animation',
+        },
+        exitAnimation: {
+          value: 'fade-out-animation',
+        },
+      },
+      behaviors: [
+        Polymer.NeonAnimatableBehavior,
+      ],
+      filterMessages: function(messages, query) {
+        if (!query) {
+          return this.messages.slice(0, this.messages.length);
+        }
+        return this.messages.filter(function(message) {
+          var req = JSON.parse(JSON.stringify(message.request));
+          var url = req.scheme ? req.scheme + "://" : "";
+          url += req.authority;
+          url += req.path;
+          url += (req.query ? "?" + req.query : "");
+          return url.match(query);
+        });
+      },
+      attached: function() {
+        this.$.upload.addEventListener('change', function(e) {
+          for (var i = 0, file; file = e.currentTarget.files[i]; i++) {
+            this._parseFile(file);
+          }
+        }.bind(this));
+      },
+      _parseFile: function(file) {
+        var reader = new FileReader()
+        var worker = new Worker('/elements/om-message-list/parse-log.js');
+
+        worker.addEventListener('message', function(e) {
+          console.log('message-frame', e.data);
+          this.fire('message-frame', e.data);
+        }.bind(this));
+
+        reader.onload = function(e) {
+          console.log('read file, posting to web worker');
+          worker.postMessage(e.target.result, [e.target.result]);
+        };
+
+        reader.onerror = function(e) {
+          console.log('error reading file', e);
+        };
+
+        reader.readAsArrayBuffer(file);
+      },
+      _selectMessage: function(e) {
+        this.selected = e.model.message;
+        this.fire('message-selected', e.model.message);
+      },
+      _showSearch: function() {
+        this.$.search.open();
+      },
+      _openFileDialog: function() {
+        this.$.upload.click();
+      },
+    });
+  </script>
+</dom-module>

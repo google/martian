@@ -1,0 +1,105 @@
+<!--
+Copyright 2015 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Package martian provides an HTTP/1.1 proxy with an API for configurable
+request and response modifiers.
+-->
+
+<dom-module id="om-message-search">
+  <template>
+    <style is="custom-style">
+      :host {
+        @apply(--layout-fit);
+
+        --paper-toolbar-background: #fefefe;
+        --paper-toolbar-color: var(--paper-grey-700, #aaa);
+
+        top: 0;
+      }
+
+      #message-search {
+        @apply(--shadow-elevation-2dp);
+      }
+
+      #message-search-input {
+        @apply(--layout-flex);
+
+        background: transparent;
+        border-width: 0;
+        font-size: 16px;
+        outline: none;
+        width: 100vw;
+      }
+    </style>
+    <paper-toolbar id="message-search">
+      <paper-icon-button id="message-search-back" icon="arrow-back" on-tap="_hideSearch"></paper-icon-button>
+      <input is="iron-input"
+        id="message-search-input"
+        placeholder="regex search"
+        on-keyup="_checkForEnter"
+        bind-value="{{partialQuery}}">
+      <paper-icon-button
+        hidden$="[[_blank(partialQuery)]]"
+        icon="help-outline"></paper-icon-button>
+      <paper-icon-button
+        hidden$="[[!_blank(partialQuery)]]"
+        on-tap="_resetQuery"
+        icon="close"></paper-icon-button>
+    </paper-toolbar>
+  </template>
+  <script>
+    Polymer({
+      is: 'om-message-search',
+      properties: {
+        query: {
+          type: String,
+          value: '',
+          notify: true,
+        },
+        partialQuery: {
+          type: String,
+          value: '',
+        },
+      },
+      behaviors: [
+        Polymer.IronOverlayBehavior,
+        Polymer.IronFitBehavior,
+      ],
+      _hideSearch: function() {
+        this.async(function() {
+          this.close(); 
+        }, 100);
+      },
+      _resetQuery: function() {
+        this.async(function() {
+          this.partialQuery = '';
+        }, 100);
+      },
+      _blank: function(partialQuery) {
+        return !!partialQuery;
+      },
+      _checkForEnter: function(key) {
+        if(key.keyCode != 13) {
+          return;
+        }
+        this.submitQuery();
+      },
+      submitQuery: function() {
+        this.query = this.partialQuery;
+        this._hideSearch();
+      },
+    });
+  </script>
+</dom-module>

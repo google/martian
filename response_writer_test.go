@@ -18,28 +18,33 @@ import (
 	"bufio"
 	"bytes"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"reflect"
 	"testing"
 )
 
 func TestResponseWriter(t *testing.T) {
-	buf := &bytes.Buffer{}
+	sconn, cconn := net.Pipe()
 
-	rw := newResponseWriter(buf, true)
-	rw.Header().Set("Martian-Response", "true")
-	rw.Header().Set("Content-Length", "12")
+	go func() {
+		brw := bufio.NewReadWriter(bufio.NewReader(sconn), bufio.NewWriter(sconn))
+		defer brw.Flush()
 
-	rw.Write([]byte("test "))
+		rw := newResponseWriter(sconn, brw, true)
+		defer rw.Close()
 
-	// This will be ignored.
-	rw.WriteHeader(400)
+		rw.Header().Set("Martian-Response", "true")
+		rw.Header().Set("Content-Length", "12")
+		rw.Write([]byte("test "))
 
-	rw.Write([]byte("content"))
+		// This will be ignored.
+		rw.WriteHeader(400)
 
-	rw.Close()
+		rw.Write([]byte("content"))
+	}()
 
-	res, err := http.ReadResponse(bufio.NewReader(buf), nil)
+	res, err := http.ReadResponse(bufio.NewReader(cconn), nil)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
 	}
@@ -69,16 +74,20 @@ func TestResponseWriter(t *testing.T) {
 }
 
 func TestResponseWriterChunkedEncoding(t *testing.T) {
-	buf := &bytes.Buffer{}
+	sconn, cconn := net.Pipe()
 
-	rw := newResponseWriter(buf, true)
-	rw.Header().Set("Martian-Response", "true")
+	go func() {
+		brw := bufio.NewReadWriter(bufio.NewReader(sconn), bufio.NewWriter(sconn))
+		defer brw.Flush()
 
-	rw.Write([]byte("test "))
-	rw.Write([]byte("content"))
-	rw.Close()
+		rw := newResponseWriter(sconn, brw, true)
+		defer rw.Close()
 
-	res, err := http.ReadResponse(bufio.NewReader(buf), nil)
+		rw.Header().Set("Martian-Response", "true")
+		rw.Write([]byte("test content"))
+	}()
+
+	res, err := http.ReadResponse(bufio.NewReader(cconn), nil)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
 	}
