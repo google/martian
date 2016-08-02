@@ -194,7 +194,7 @@ func TestResponseWhenFalse(t *testing.T) {
 	}
 }
 
-func TestPassThroughVerifyhRequests(t *testing.T) {
+func TestPassThroughVerifyRequests(t *testing.T) {
 	f := NewFilter("Martian-Testing", "true")
 	if err := f.VerifyRequests(); err != nil {
 		t.Fatalf("VerifyRequest(): got %v, want no error", err)
