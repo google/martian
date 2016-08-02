@@ -86,12 +86,16 @@ func (rw *responseWriter) WriteHeader(status int) {
 		rw.hdr.Set("Transfer-Encoding", "chunked")
 		rw.chunked = true
 
+		rw.hdr.Write(rw.bw)
+		rw.bw.Write([]byte("\r\n"))
 		rw.bw.Flush()
+
 		rw.bw.Writer.Reset(httputil.NewChunkedWriter(rw.conn))
+		return
 	}
 
-	rw.hdr.Write(rw.conn)
-	rw.conn.Write([]byte("\r\n"))
+	rw.hdr.Write(rw.bw)
+	rw.bw.Write([]byte("\r\n"))
 }
 
 // Close writes the trailing newline for chunked responses.
@@ -102,7 +106,7 @@ func (rw *responseWriter) Close() error {
 
 	if rw.chunked {
 		rw.bw.Flush()
-		rw.conn.Write([]byte("\r\n"))
+		rw.conn.Write([]byte("0\r\n\r\n"))
 	}
 
 	return nil
