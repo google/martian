@@ -1,0 +1,40 @@
+{
+  "name": "page",
+  "description": "Tiny client-side router",
+  "keywords": [
+    "page",
+    "route",
+    "router",
+    "routes",
+    "pushState"
+  ],
+  "main": "page.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/visionmedia/page.js"
+  },
+  "ignore": [
+    ".gitignore",
+    ".npmignore",
+    ".travis.yml",
+    "component.json",
+    "examples",
+    "History.md",
+    "Makefile",
+    "package.json",
+    "Readme.md",
+    "test"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/visionmedia/page.js",
+  "version": "1.7.1",
+  "_release": "1.7.1",
+  "_resolution": {
+    "type": "version",
+    "tag": "1.7.1",
+    "commit": "415eee81d5a32ad5869073838acc35cd3fbb140f"
+  },
+  "_source": "git://github.com/visionmedia/page.js.git",
+  "_target": "*",
+  "_originalSource": "visionmedia/page.js"
+}

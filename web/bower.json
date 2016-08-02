@@ -28,6 +28,7 @@
     "polymer": "~1.2.3",
     "iron-elements": "~1.0.7",
     "paper-elements": "~1.0.6",
+    "app-route": "PolymerElements/app-route#^0.9.2",
     "platinum-elements": "PolymerElements/platinum-elements#~1.2.0",
     "web-component-tester": "Polymer/web-component-tester#~4.1.0"
   },
