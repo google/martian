@@ -503,8 +503,9 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
-	cb := make(chan error)
-	mc.SetHandshakeErrorCallback(func(_ *http.Request, err error) { cb <- err })
+	//	cb := make(chan error)
+	var cberr error
+	mc.SetHandshakeErrorCallback(func(_ *http.Request, err error) { cberr = err })
 	p.SetMITM(mc)
 
 	tl, err := net.Listen("tcp", "[::1]:0")
@@ -565,11 +566,13 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	}
 	req.Header.Set("Connection", "close")
 
+	req.Write(tlsconn)
+
 	if got, want := req.Write(tlsconn), "x509: certificate signed by unknown authority"; !strings.Contains(got.Error(), want) {
 		t.Fatalf("Got incorrect error from Client Handshake(), got: %v, want: %v", got, want)
 	}
 
-	if got, want := <-cb, "remote error: bad certificate"; !strings.Contains(got.Error(), want) {
+	if got, want := cberr, "remote error: bad certificate"; !strings.Contains(got.Error(), want) {
 		t.Fatalf("Got incorrect error from Server Handshake(), got: %v, want: %v", got, want)
 	}
 }
