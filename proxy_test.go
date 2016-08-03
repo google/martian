@@ -566,8 +566,6 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	}
 	req.Header.Set("Connection", "close")
 
-	req.Write(tlsconn)
-
 	if got, want := req.Write(tlsconn), "x509: certificate signed by unknown authority"; !strings.Contains(got.Error(), want) {
 		t.Fatalf("Got incorrect error from Client Handshake(), got: %v, want: %v", got, want)
 	}
