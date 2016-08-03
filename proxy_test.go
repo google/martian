@@ -503,7 +503,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
-	//	cb := make(chan error)
+
 	var cberr error
 	mc.SetHandshakeErrorCallback(func(_ *http.Request, err error) { cberr = err })
 	p.SetMITM(mc)
