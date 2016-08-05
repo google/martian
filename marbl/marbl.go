@@ -1,3 +1,19 @@
+// Copyright 2015 Google Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package marbl provides HTTP traffic logs streamed over websockets
+// that can be added to any point within a Maritan modifier tree.
 package marbl
 
 import (
@@ -6,14 +22,15 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/google/martian/log"
 	"github.com/google/martian/proxyutil"
 )
 
 // Frame Header
 // FrameType	 uint8
-// MessageType uint8
-// ID					 [8]byte
-// Payload		 HeaderFrame/DataFrame
+// MessageType   uint8
+// ID		     [8]byte
+// Payload		 HeaderFrame/BodyFrame
 
 // Header Frame
 // NameLen  uint32
@@ -22,32 +39,44 @@ import (
 // Value    variable
 
 // Data Frame
-// Index uint32
+// Index    uint32
 // Terminal uint8
-// Len  uint32
-// Data variable
+// Len      uint32
+// Data     variable
 
+// MessageType incicates whether the message represents an HTTP request or response.
 type MessageType uint8
-type FrameType uint8
 
 const (
-	Unknown  MessageType = 0x0
-	Request  MessageType = 0x1
+	// Unknown type of Message.
+	Unknown MessageType = 0x0
+	// Request indicates a message that contains an HTTP request.
+	Request MessageType = 0x1
+	// Response indicates a that contains an HTTP response.
 	Response MessageType = 0x2
 )
 
+// FrameType indicates whether the frame contains a Header or Data.
+type FrameType uint8
+
 const (
+	// UnknownFrame incates an unknown type of Frame.
 	UnknownFrame FrameType = 0x0
-	HeaderFrame  FrameType = 0x1
-	DataFrame    FrameType = 0x2
+	// HeaderFrame indicates a frame that contains a header.
+	HeaderFrame FrameType = 0x1
+	// BodyFrame indicates a frame that contains the body.
+	BodyFrame FrameType = 0x2
 )
 
+// Stream writes logs of requests and responses to a writer.
 type Stream struct {
 	w      io.Writer
 	framec chan []byte
 	closec chan struct{}
 }
 
+// NewStream initializes a Stream with an io.Writer to log requests and
+// responses to.
 func NewStream(w io.Writer) *Stream {
 	s := &Stream{
 		w:      w,
@@ -66,7 +95,7 @@ func (s *Stream) loop() {
 		case f := <-s.framec:
 			_, err := s.w.Write(f)
 			if err != nil {
-				// log the error.
+				log.Errorf("martian: Error while writing log entry to stream.")
 			}
 		case <-s.closec:
 			return
@@ -74,6 +103,7 @@ func (s *Stream) loop() {
 	}
 }
 
+// Close signals Stream to exit from the log loop and stop writing logs.
 func (s *Stream) Close() error {
 	close(s.closec)
 
@@ -106,15 +136,15 @@ func (s *Stream) sendHeader(id string, mt MessageType, key, value string) {
 	s.framec <- f
 }
 
-func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b []byte) {
+func (s *Stream) sendBody(id string, mt MessageType, i uint32, terminal bool, b []byte) {
 	bl := uint32(len(b))
 
-	var ti uint8
+	var ti uint16
 	if terminal {
 		ti = 1
 	}
 
-	f := newFrame(id, DataFrame, mt, 40+bl)
+	f := newFrame(id, BodyFrame, mt, 40+bl)
 	f = append(f, byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	f = append(f, byte(ti>>8), byte(ti))
 	f = append(f, byte(bl>>24), byte(bl>>16), byte(bl>>8), byte(bl))
@@ -123,6 +153,7 @@ func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b 
 	s.framec <- f
 }
 
+// LogRequest writes an http.Request to Stream with an id unique for the request.
 func (s *Stream) LogRequest(id string, req *http.Request) error {
 	s.sendHeader(id, Request, ":method", req.Method)
 	s.sendHeader(id, Request, ":scheme", req.URL.Scheme)
@@ -150,6 +181,8 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 	return nil
 }
 
+// LogResponse writes an http.Response to Stream with an id unique for the request
+// that the response is responding to..
 func (s *Stream) LogResponse(id string, res *http.Response) error {
 	s.sendHeader(id, Response, ":proto", res.Proto)
 	s.sendHeader(id, Response, ":status", strconv.Itoa(res.StatusCode))
@@ -181,6 +214,8 @@ type bodyLogger struct {
 	body  io.ReadCloser
 }
 
+// Read implements the standard Reader interface. Read reads the bytes of the body
+// and returns the number of bytes read and an error.
 func (bl *bodyLogger) Read(b []byte) (int, error) {
 	var terminal bool
 
@@ -189,11 +224,12 @@ func (bl *bodyLogger) Read(b []byte) (int, error) {
 		terminal = true
 	}
 
-	bl.s.sendData(bl.id, bl.mt, atomic.AddUint32(&bl.index, 1)-1, terminal, b)
+	bl.s.sendBody(bl.id, bl.mt, atomic.AddUint32(&bl.index, 1)-1, terminal, b)
 
 	return n, err
 }
 
+// Close closes the bodyLogger.
 func (bl *bodyLogger) Close() error {
 	return bl.body.Close()
 }
