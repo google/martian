@@ -31,12 +31,22 @@ request and response modifiers.
       created: function() {
         this._reader = new FrameReader();
       },
-      attached: function() {
+      resetSocket: function() {
         this._socket = new WebSocket(this.src);
+        var _this = this;
+        this._socket.onerror = function(error) {
+          error.preventDefault();
+          console.log("Couldn't find a Martian proxy at '" + _this.src
+            + "'. Make sure your query param looks like '?martian=domain:socket/path',"
+            + " (for example '?martian=localhost:8080/binlogs'), and that there's a Martian proxy there.")
+        }.bind(this);
         this._socket.binaryType = 'arraybuffer';
         this._socket.onmessage = function(e) {
           this.fire('message-frame', this._reader.read(e.data));
         }.bind(this);
+      },
+      attached: function() {
+        this.resetSocket();
       },
     });
   </script>
