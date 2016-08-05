@@ -38,7 +38,8 @@ func NewHandler() *Handler {
 	}
 }
 
-// Write 
+// Write writes frames to all websocket subscribers and returns the number
+// of bytes written and an error.
 func (h *Handler) Write(b []byte) (int, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
