@@ -15,8 +15,11 @@
 package martian
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"net"
 	"net/http"
 	"sync"
 )
@@ -35,10 +38,13 @@ type Context struct {
 
 // Session provides information and storage about a connection.
 type Session struct {
-	mu     sync.RWMutex
-	id     string
-	secure bool
-	vals   map[string]interface{}
+	mu       sync.RWMutex
+	id       string
+	secure   bool
+	hijacked bool
+	conn     net.Conn
+	brw      *bufio.ReadWriter
+	vals     map[string]interface{}
 }
 
 var (
@@ -58,7 +64,7 @@ func NewContext(req *http.Request) *Context {
 // context and a function to remove the associated context. If it fails to
 // generate either a new session or a new context it will return an error.
 // Intended for tests only.
-func TestContext(req *http.Request) (ctx *Context, remove func(), err error) {
+func TestContext(req *http.Request, conn net.Conn, bw *bufio.ReadWriter) (ctx *Context, remove func(), err error) {
 	ctxmu.Lock()
 	defer ctxmu.Unlock()
 
@@ -67,7 +73,7 @@ func TestContext(req *http.Request) (ctx *Context, remove func(), err error) {
 		return ctx, func() { unlink(req) }, nil
 	}
 
-	s, err := newSession()
+	s, err := newSession(conn, bw)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -105,6 +111,39 @@ func (s *Session) MarkSecure() {
 	defer s.mu.Unlock()
 
 	s.secure = true
+}
+
+// Hijack takes control of the connection from the proxy. No further action
+// will be taken by the proxy and the connection will be closed following the
+// return of the hijacker.
+func (s *Session) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.hijacked {
+		return nil, nil, fmt.Errorf("martian: session has already been hijacked")
+	}
+	s.hijacked = true
+
+	return s.conn, s.brw, nil
+}
+
+// Hijacked returns whether the connection has been hijacked.
+func (s *Session) Hijacked() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.hijacked
+}
+
+// setConn resets the underlying connection and bufio.ReadWriter of the
+// session. Used by the proxy when the connection is upgraded to TLS.
+func (s *Session) setConn(conn net.Conn, brw *bufio.ReadWriter) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.conn = conn
+	s.brw = brw
 }
 
 // Get takes key and returns the associated value from the session.
@@ -199,7 +238,7 @@ func unlink(req *http.Request) {
 }
 
 // newSession builds a new session.
-func newSession() (*Session, error) {
+func newSession(conn net.Conn, brw *bufio.ReadWriter) (*Session, error) {
 	sid, err := newID()
 	if err != nil {
 		return nil, err
@@ -207,6 +246,8 @@ func newSession() (*Session, error) {
 
 	return &Session{
 		id:   sid,
+		conn: conn,
+		brw:  brw,
 		vals: make(map[string]interface{}),
 	}, nil
 }

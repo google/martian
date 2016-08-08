@@ -1,0 +1,98 @@
+<!--
+Copyright 2015 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Package martian provides an HTTP/1.1 proxy with an API for configurable
+request and response modifiers.
+-->
+
+<dom-module id="om-messages-stream">
+  <template>
+    <content></content>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'om-messages-stream',
+      properties: {
+        src: {
+          type: String,
+        },
+        messages: {
+          type: Array,
+          value: function() { return []; },
+          notify: true,
+        },
+      },
+      listeners: {
+        'message-frame': '_handleFrame',
+      },
+      created: function() {
+        this._indexes = {};
+      },
+      _message: function(id) {
+        return {
+          id: id,
+          request: {
+            headers: [],
+            body: {
+              _parts: [],
+            },
+          },
+          response: {
+            headers: [],
+            body: {
+              _parts: [],
+            },
+          },
+        };
+      },
+      _handleFrame: function(e) {
+        var frame = e.detail;
+
+        var index = this._indexes[frame.id];
+        var message = this.messages[index];
+        if (!message) {
+          message = this._message(frame.id);
+          this.messages.push(message);
+          index = this.messages.length - 1;
+          this._indexes[frame.id] = index;
+        }
+        switch(frame.type) {
+          case 'header-frame':
+            var header = {
+              name: frame.name,
+              value: frame.value,
+              pseudo: frame.name.startsWith(':'),
+            };
+
+            message[frame.scope].headers.push(header);
+
+            if (header.pseudo) {
+              message[frame.scope][frame.name.slice(1)] = frame.value;
+            }
+
+            break;
+          case 'data-frame':
+            message[frame.scope].body._parts[frame.index] = new Uint8Array(frame.data);
+
+            break;
+        }
+        this.debounce('messages.' + index, () => {
+          this.notifyPath('messages.' + index, message);
+        }, 100);
+      },
+    });
+  </script>
+</dom-module>

@@ -1,0 +1,37 @@
+{
+  "name": "olympusmons",
+  "description": "Web UI for Martian",
+  "main": "index.js",
+  "authors": [
+    "Adam Tanner",
+    "Joe Mathes",
+    "Bramha Ghosh"
+  ],
+  "license": "Apache-2.0",
+  "keywords": [
+    "martian",
+    "proxy",
+    "google",
+    "ui"
+  ],
+  "moduleType": [],
+  "homepage": "https://github.com/google/martian",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "polymer": "~1.2.3",
+    "iron-elements": "~1.0.7",
+    "paper-elements": "~1.0.6",
+    "platinum-elements": "PolymerElements/platinum-elements#~1.2.0",
+    "web-component-tester": "Polymer/web-component-tester#~4.1.0"
+  },
+  "devDependencies": {
+    "gulp": "~3.9.0"
+  }
+}
