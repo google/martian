@@ -34,14 +34,33 @@ request and response modifiers.
 
     <test-fixture id="basic">
       <template>
-        <om-messages-view></om-messages-view>
+        <om-messages-view queryParams="?martian=localhost:8080/binlogs"></om-messages-view>
       </template>
     </test-fixture>
     <script>
       suite('om-messages-view', function() {
+        var FakeWebSocket = function(url) {
+          this.url = url;
+        };
+        WebSocket = FakeWebSocket;
+
         test('instantiating the element works', function() {
           let element = fixture('basic');
           assert.equal(element.is, 'om-messages-view');
+        });
+
+        test('connect to martian based on query param', function() {
+          let element = fixture('basic');
+          var omWebsocket = element.querySelector("om-message-websocket");
+          assert.equal(omWebsocket._socket.url, "ws://");
+
+          element.queryParams = {martian: "localhost:8080/binlogs"};
+          omWebsocket.resetSocket();
+          assert.equal(omWebsocket._socket.url, "ws://localhost:8080/binlogs");
+
+          element.queryParams = {martian: "someOtherUrl.com:1337/path"};
+          omWebsocket.resetSocket();
+          assert.equal(omWebsocket._socket.url, "ws://someOtherUrl.com:1337/path");
         });
       });
     </script>

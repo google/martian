@@ -1,0 +1,14 @@
+{
+  "name": "app-route",
+  "description": "App route",
+  "dependencies": {
+    "polymer": "Polymer/polymer#^1.0",
+    "page": "visionmedia/page.js"
+  },
+  "keywords": [
+    "web-components",
+    "web-app",
+    "router",
+    "route"
+  ]
+}

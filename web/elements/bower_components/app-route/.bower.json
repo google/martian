@@ -1,0 +1,25 @@
+{
+  "name": "app-route",
+  "description": "App route",
+  "dependencies": {
+    "polymer": "Polymer/polymer#^1.0",
+    "page": "visionmedia/page.js"
+  },
+  "keywords": [
+    "web-components",
+    "web-app",
+    "router",
+    "route"
+  ],
+  "homepage": "https://github.com/x-element/app-route",
+  "_release": "2869c7bc2c",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "2869c7bc2c70e4fd86e931192bcd46f3cff50d42"
+  },
+  "_source": "https://github.com/x-element/app-route.git",
+  "_target": "*",
+  "_originalSource": "app-route",
+  "_direct": true
+}
