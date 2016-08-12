@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 	"sync/atomic"
 
 	"github.com/google/martian/proxyutil"
@@ -124,6 +125,7 @@ func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b 
 }
 
 func (s *Stream) LogRequest(id string, req *http.Request) error {
+	
 	s.sendHeader(id, Request, ":method", req.Method)
 	s.sendHeader(id, Request, ":scheme", req.URL.Scheme)
 	s.sendHeader(id, Request, ":authority", req.URL.Host)
@@ -131,6 +133,8 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 	s.sendHeader(id, Request, ":query", req.URL.RawQuery)
 	s.sendHeader(id, Request, ":proto", req.Proto)
 	s.sendHeader(id, Request, ":remote", req.RemoteAddr)
+	ts := strconv.FormatInt(time.Now().UnixNano() / 1000 / 1000, 10)
+	s.sendHeader(id, Request, ":timestamp", ts)
 
 	h := proxyutil.RequestHeader(req)
 
@@ -154,6 +158,8 @@ func (s *Stream) LogResponse(id string, res *http.Response) error {
 	s.sendHeader(id, Response, ":proto", res.Proto)
 	s.sendHeader(id, Response, ":status", strconv.Itoa(res.StatusCode))
 	s.sendHeader(id, Response, ":reason", res.Status)
+	ts := strconv.FormatInt(time.Now().UnixNano() / 1000 / 1000, 10)
+	s.sendHeader(id, Response, ":timestamp", ts)
 
 	h := proxyutil.ResponseHeader(res)
 
