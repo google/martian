@@ -126,7 +126,6 @@ func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b 
 }
 
 func (s *Stream) LogRequest(id string, req *http.Request) error {
-	
 	s.sendHeader(id, Request, ":method", req.Method)
 	s.sendHeader(id, Request, ":scheme", req.URL.Scheme)
 	s.sendHeader(id, Request, ":authority", req.URL.Host)
