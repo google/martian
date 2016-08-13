@@ -21,63 +21,50 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/martian/log"
 	"github.com/google/martian/proxyutil"
 )
 
-func deserializeHeaders(bs []byte) map[string]string {
-	i := 8
-	log.Errorf("deserializing: %v", bs)
+func deserializeHeaders(b bytes.Buffer) map[string]string {
 	headers := make(map[string]string)
-	var kl, vl int
-	var key, val string
 
-	for i < len(bs) {
-		i += 2
-		kl = int(bs[i]<<24 + bs[i+1]<<16 + bs[i+2]<<8 + bs[i+3])
-		vl = int(bs[i+4]<<24 + bs[i+5]<<16 + bs[i+6]<<8 + bs[i+7])
-		i += 8
-		key = string(bs[i : i+kl])
-		val = string(bs[i+kl : i+kl+vl])
-		log.Errorf("decoded %v into %s:%s", bs[i:i+kl+vl], key, val)
-
-		headers[key] = val
-		i += kl + vl + 8
+	reader := NewReader(&b)
+	frame, _ := reader.ReadFrame()
+	for frame != nil {
+		headerFrame, _ := frame.(Header)
+		headers[headerFrame.Name] = headerFrame.Value
+		frame, _ = reader.ReadFrame()
 	}
 
 	return headers
 }
 
-// func TestSendTimestampWithLogRequest(t *testing.T) {
-// 	req, err := http.NewRequest("POST", "http://example.com", nil)
-// 	if err != nil {
-// 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-// 	}
-// 	var b bytes.Buffer
-// 	s := NewStream(&b)
+func TestSendTimestampWithLogRequest(t *testing.T) {
+	req, err := http.NewRequest("POST", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	var b bytes.Buffer
+	s := NewStream(&b)
 
-// 	before := time.Now().UnixNano() / 1000 / 1000
-// 	s.LogRequest("Fake_Id0", req)
-// 	s.Close()
-// 	after := time.Now().UnixNano() / 1000 / 1000
+	before := time.Now().UnixNano() / 1000 / 1000
+	s.LogRequest("Fake_Id0", req)
+	s.Close()
+	after := time.Now().UnixNano() / 1000 / 1000
 
-// 	ob := new(bytes.Buffer)
-// 	ob.ReadFrom(&b)
+	headers := deserializeHeaders(b)
 
-// 	headers := deserializeHeaders(ob.Bytes())
-
-// 	timestr, ok := headers[":timestamp"]
-// 	if !ok {
-// 		t.Fatalf("headers[:timestamp]: got no such header, want :timestamp (headers were: %v)", headers)
-// 	}
-// 	ts, err := strconv.ParseInt(timestr, 10, 64)
-// 	if err != nil {
-// 		t.Fatalf("strconv.ParseInt: got %s, want no error. Invalidly formatted timestamp ('%s')", err, timestr)
-// 	}
-// 	if ts < before || ts > after {
-// 		t.Fatalf("headers[:timestamp]: got %d, want timestamp between %d and %d", ts, before, after)
-// 	}
-// }
+	timestr, ok := headers[":timestamp"]
+	if !ok {
+		t.Fatalf("headers[:timestamp]: got no such header, want :timestamp (headers were: %v)", headers)
+	}
+	ts, err := strconv.ParseInt(timestr, 10, 64)
+	if err != nil {
+		t.Fatalf("strconv.ParseInt: got %s, want no error. Invalidly formatted timestamp ('%s')", err, timestr)
+	}
+	if ts < before || ts > after {
+		t.Fatalf("headers[:timestamp]: got %d, want timestamp between %d and %d", ts, before, after)
+	}
+}
 
 func TestSendTimestampWithLogResponse(t *testing.T) {
 	req, err := http.NewRequest("POST", "http://example.com", nil)
@@ -93,13 +80,7 @@ func TestSendTimestampWithLogResponse(t *testing.T) {
 	s.Close()
 	after := time.Now().UnixNano() / 1000 / 1000
 
-	ob := new(bytes.Buffer)
-	ob.ReadFrom(&b)
-	reader := NewReader(&b)
-	frame, _ := reader.ReadFrame()
-	log.Errorf("frame: %v", frame)
-
-	headers := deserializeHeaders(ob.Bytes())
+	headers := deserializeHeaders(b)
 
 	timestr, ok := headers[":timestamp"]
 	if !ok {

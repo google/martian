@@ -11,24 +11,24 @@ type Reader struct {
 	r io.Reader
 }
 
-type headerFrame struct {
+type Header struct {
 	ID          string
 	MessageType MessageType
 	Name        string
 	Value       string
 }
 
-func (hf headerFrame) String() string {
+func (hf Header) String() string {
 	return fmt.Sprintf("ID=%s; Type=%d; Name=%s; Value=%s", hf.ID, hf.MessageType, hf.Name, hf.Value)
 }
 
-type dataFrame struct {
+type Data struct {
 	ID          string
 	MessageType MessageType
 	Data        []byte
 }
 
-func (df dataFrame) String() string {
+func (df Data) String() string {
 	dl := len(df.Data)
 	if dl > 20 {
 		dl = 20
@@ -56,7 +56,7 @@ func (r *Reader) ReadFrame() (Frame, error) {
 
 	switch FrameType(fh[0]) {
 	case HeaderFrame:
-		hf := headerFrame{
+		hf := Header{
 			ID:          string(fh[2:]),
 			MessageType: MessageType(fh[1]),
 		}
@@ -79,7 +79,7 @@ func (r *Reader) ReadFrame() (Frame, error) {
 
 		return hf, nil
 	case DataFrame:
-		df := dataFrame{
+		df := Data{
 			ID:          string(fh[2:]),
 			MessageType: MessageType(fh[1]),
 		}
