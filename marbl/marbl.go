@@ -76,6 +76,7 @@ func (s *Stream) loop() {
 }
 
 func (s *Stream) Close() error {
+	s.closec <- struct{}{}
 	close(s.closec)
 
 	return nil
