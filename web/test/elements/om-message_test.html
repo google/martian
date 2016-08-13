@@ -191,6 +191,18 @@ request and response modifiers.
           element.message = {"response": {"status": "404"}};
           assert.equal("404", status.innerText);
         });
+        test('response latency displayed', function() {
+          let element = fixture('basic');
+          var status = element.$["response-latency"];
+
+          assert.equal("", status.innerText);
+
+          element.message = {"response": {"latency": "20ms"}};
+          assert.equal("20ms", status.innerText);
+
+          element.message = {"response": {"latency": "40ms"}};
+          assert.equal("40ms", status.innerText);
+        });
         test('response reason displayed', function() {
           let element = fixture('basic');
           var reason = element.$["response-reason"];
