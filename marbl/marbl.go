@@ -1,54 +1,86 @@
+// Copyright 2015 Google Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package marbl provides HTTP traffic logs streamed over websockets
+// that can be added to any point within a Maritan modifier tree.
+// Marbl transmits HTTP logs that are serialized based on the following
+// schema:
+//
+// Frame Header
+// FrameType   uint8
+// MessageType uint8
+// ID		   [8]byte
+// Payload	   HeaderFrame/DataFrame
+//
+// Header   Frame
+// NameLen  uint32
+// ValueLen uint32
+// Name	    variable
+// Value    variable
+//
+// Data Frame
+// Index    uint32
+// Terminal uint8
+// Len      uint32
+// Data     variable
 package marbl
 
 import (
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 	"sync/atomic"
+	"time"
 
+	"github.com/google/martian/log"
 	"github.com/google/martian/proxyutil"
 )
 
-// Frame Header
-// FrameType	 uint8
-// MessageType uint8
-// ID					 [8]byte
-// Payload		 HeaderFrame/DataFrame
-
-// Header Frame
-// NameLen  uint32
-// ValueLen uint32
-// Name	    variable
-// Value    variable
-
-// Data Frame
-// Index uint32
-// Terminal uint8
-// Len  uint32
-// Data variable
-
+// MessageType incicates whether the message represents an HTTP request or response.
 type MessageType uint8
-type FrameType uint8
 
 const (
-	Unknown  MessageType = 0x0
-	Request  MessageType = 0x1
+	// Unknown type of Message.
+	Unknown MessageType = 0x0
+	// Request indicates a message that contains an HTTP request.
+	Request MessageType = 0x1
+	// Response indicates a message that contains an HTTP response.
 	Response MessageType = 0x2
 )
 
+// FrameType indicates whether the frame contains a Header or Data.
+type FrameType uint8
+
 const (
+	// UnknownFrame indicates an unknown type of Frame.
 	UnknownFrame FrameType = 0x0
-	HeaderFrame  FrameType = 0x1
-	DataFrame    FrameType = 0x2
+	// HeaderFrame indicates a frame that contains a header.
+	HeaderFrame FrameType = 0x1
+	// DataFrame indicates a frame that contains the payload, usually the body.
+	DataFrame FrameType = 0x2
 )
 
+// Stream writes logs of requests and responses to a writer.
 type Stream struct {
 	w      io.Writer
 	framec chan []byte
 	closec chan struct{}
 }
 
+// NewStream initializes a Stream with an io.Writer to log requests and
+// responses to. Upon construction, a goroutine is started that listens for frames
+// and writes them to w.
 func NewStream(w io.Writer) *Stream {
 	s := &Stream{
 		w:      w,
@@ -67,7 +99,7 @@ func (s *Stream) loop() {
 		case f := <-s.framec:
 			_, err := s.w.Write(f)
 			if err != nil {
-				// log the error.
+				log.Errorf("martian: Error while writing frame")
 			}
 		case <-s.closec:
 			return
@@ -75,6 +107,7 @@ func (s *Stream) loop() {
 	}
 }
 
+// Close signals Stream to stop listening for frames in the log loop and stop writing logs.
 func (s *Stream) Close() error {
 	s.closec <- struct{}{}
 	close(s.closec)
@@ -83,11 +116,6 @@ func (s *Stream) Close() error {
 }
 
 func newFrame(id string, ft FrameType, mt MessageType, plen uint32) []byte {
-	// FrameType:   1 byte
-	// MessageType: 1 byte
-	// ID:			    8 bytes
-	// Payload:     plen bytes
-
 	f := make([]byte, 0, 10+plen)
 	f = append(f, byte(ft), byte(mt))
 	f = append(f, id[:8]...)
@@ -111,7 +139,7 @@ func (s *Stream) sendHeader(id string, mt MessageType, key, value string) {
 func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b []byte) {
 	bl := uint32(len(b))
 
-	var ti uint8
+	var ti uint16
 	if terminal {
 		ti = 1
 	}
@@ -125,6 +153,7 @@ func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b 
 	s.framec <- f
 }
 
+// LogRequest writes an http.Request to Stream with an id unique for the request / response pair.
 func (s *Stream) LogRequest(id string, req *http.Request) error {
 	s.sendHeader(id, Request, ":method", req.Method)
 	s.sendHeader(id, Request, ":scheme", req.URL.Scheme)
@@ -133,7 +162,7 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 	s.sendHeader(id, Request, ":query", req.URL.RawQuery)
 	s.sendHeader(id, Request, ":proto", req.Proto)
 	s.sendHeader(id, Request, ":remote", req.RemoteAddr)
-	ts := strconv.FormatInt(time.Now().UnixNano() / 1000 / 1000, 10)
+	ts := strconv.FormatInt(time.Now().UnixNano()/1000/1000, 10)
 	s.sendHeader(id, Request, ":timestamp", ts)
 
 	h := proxyutil.RequestHeader(req)
@@ -154,11 +183,12 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 	return nil
 }
 
+// LogResponse writes an http.Response to Stream with an id unique for the request / response pair.
 func (s *Stream) LogResponse(id string, res *http.Response) error {
 	s.sendHeader(id, Response, ":proto", res.Proto)
 	s.sendHeader(id, Response, ":status", strconv.Itoa(res.StatusCode))
 	s.sendHeader(id, Response, ":reason", res.Status)
-	ts := strconv.FormatInt(time.Now().UnixNano() / 1000 / 1000, 10)
+	ts := strconv.FormatInt(time.Now().UnixNano()/1000/1000, 10)
 	s.sendHeader(id, Response, ":timestamp", ts)
 
 	h := proxyutil.ResponseHeader(res)
@@ -187,6 +217,8 @@ type bodyLogger struct {
 	body  io.ReadCloser
 }
 
+// Read implements the standard Reader interface. Read reads the bytes of the body
+// and returns the number of bytes read and an error.
 func (bl *bodyLogger) Read(b []byte) (int, error) {
 	var terminal bool
 
@@ -200,6 +232,7 @@ func (bl *bodyLogger) Read(b []byte) (int, error) {
 	return n, err
 }
 
+// Close closes the bodyLogger.
 func (bl *bodyLogger) Close() error {
 	return bl.body.Close()
 }
