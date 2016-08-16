@@ -1,0 +1,27 @@
+<link rel="import" href="../polymer/polymer.html">
+<script src="../page/page.js"></script>
+<script>
+  Polymer({
+
+    is: 'app-route',
+
+    properties: {
+      path: {
+        type: String
+      },
+      page: {
+        type: String
+      }
+    },
+
+    attached: function () {
+      page(this.path, this.handler.bind(this));
+    },
+
+    handler: function (context) {
+      context.page_name = this.page;
+      this.fire('route', context);
+    }
+
+  });
+</script>

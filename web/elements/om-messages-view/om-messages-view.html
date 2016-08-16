@@ -20,7 +20,10 @@
     </style>
 
     <om-messages-stream messages="{{messages}}">
-      <om-message-websocket src="ws://localhost:8080/binlogs">
+      <!-- app-location binds to the app's URL -->
+      <app-location query-params="{{queryParams}}"></app-location>
+
+      <om-message-websocket src="ws://{{martian}}">
       </om-message-websocket>
 
       <neon-animated-pages
@@ -56,6 +59,20 @@
           type: String,
           value: 'list',
         },
+        queryParams: {
+          type: Object,
+          notify: true,
+        },
+        martian: {
+          type: String,
+          computed: 'extractMartian(queryParams)',
+        },
+      },
+      extractMartian: function(queryParams) {
+        if (!queryParams.martian) {
+          window.location.search = "?martian=localhost:8080/binlogs";
+        }
+        return queryParams.martian;
       },
       _showMessage: function() {
         this.page = 'message';
