@@ -34,7 +34,6 @@ request and response modifiers.
       }
 
       #message-item-url:after {
-        background: linear-gradient(to left, rgba(255, 255, 255, 1) 0%, rgba(0, 0, 0, 0) 15%);
         content: "";
         display: block;
         height: 60%;
@@ -45,6 +44,11 @@ request and response modifiers.
 
       .message-item-primary {
         display: flex;
+      }
+
+      .response-latency {
+        font-size: 10px;
+        margin-left: 16px;
       }
 
       .response-status {
@@ -85,6 +89,7 @@ request and response modifiers.
                     class="request-query"
                     hidden$="[[!message.request.query]]">?[[message.request.query]]</span>
                 </div>
+                <div class="response-latency">[[message.response.latency]]</div>
                 <div class="response-status">[[message.response.status]]</div>
               </div>
               <div class="message-item-secondary" secondary>
