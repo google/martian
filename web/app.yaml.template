@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Package martian provides an HTTP/1.1 proxy with an API for configurable
-# request and response modifiers.
-
 application: [[application]]
 runtime: python27
 version: 1
