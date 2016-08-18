@@ -43,7 +43,6 @@ def main(args):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Deploy Martian Proxy web UI to an App Engine application."
                                    "\nMust be run from the root of the web directory.")
-  parser.add_argument("-a", "--application", required=True, help="The app engine project to deploy to."
-                      "\nSame thing you'd put after 'application:' in app.yaml.")
-  parser.add_argument("-u", "--user", help="Your app engine username. (What you'd pass with -e to appcfg.py)")
+  parser.add_argument("-a", "--application", required=True, help="The app engine project/application to deploy.")
+  parser.add_argument("-u", "--user", help="App engine username for user doing the deploy.")
   main(parser.parse_args())
