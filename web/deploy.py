@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Package martian provides an HTTP/1.1 proxy with an API for configurable
-# request and response modifiers.
-
 
 import argparse
 import os
@@ -25,6 +22,14 @@ from subprocess import Popen, PIPE
 
 
 def main(args):
+  """ This function deploys the Martian web UI ("Olympus Mons") to Google App Engine.
+
+  To deploy it, you need an existing App Engine project and username.
+
+  Args:
+    args (dict): The parsed command line parameters containing the
+                 App Engine application name and optional user name 
+  """
   Popen(["rm", "app.yaml"], stderr=PIPE).communicate()
   with open("app.yaml.template", "rb") as template:
     with open("app.yaml", "wb") as result:
