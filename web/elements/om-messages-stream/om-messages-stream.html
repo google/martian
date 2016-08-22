@@ -59,6 +59,7 @@ request and response modifiers.
         };
       },
       _handleFrame: function(e) {
+        var _this = this;
         var frame = e.detail;
 
         var index = this._indexes[frame.id];
@@ -81,6 +82,18 @@ request and response modifiers.
 
             if (header.pseudo) {
               message[frame.scope][frame.name.slice(1)] = frame.value;
+              if (true
+                  && frame.name.slice(1) == "timestamp"
+                  && message.request != undefined && message.request.timestamp != undefined
+                  && message.response != undefined && message.response.timestamp != undefined) {
+                var rawLatency = parseInt(message.response.timestamp) - parseInt(message.request.timestamp);
+                if (rawLatency < 1000) {
+                  message.response.latency = rawLatency + "ms";
+                } else {
+                  rawLatency = Math.round(rawLatency / 10) / 100;
+                  message.response.latency = rawLatency + "s";
+                }
+              }
             }
 
             break;
@@ -89,8 +102,17 @@ request and response modifiers.
 
             break;
         }
-        this.debounce('messages.' + index, () => {
-          this.notifyPath('messages.' + index, message);
+        this.debounce('messages.' + index, () => { 
+          var msgcopy = JSON.parse(JSON.stringify(message));
+          _this.messages.splice(index, 1);
+          _this.messages.splice(index, 0, msgcopy);
+          _this.notifySplices('messages', [{
+            index: index,
+            removed: [message],
+            addedCount:1,
+            object:_this.messages,
+            type:"splice"
+          }]);
         }, 100);
       },
     });
