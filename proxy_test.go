@@ -504,7 +504,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
 
-	// TODO: herr is not never being asserted against. It should be pushed on to a channel
+	// TODO: herr is not being asserted against. It should be pushed on to a channel
 	// of err, and the assertion should pull off of it and assert. That design resulted in the test
 	// hanging for unknown reasons.
 	var herr error
