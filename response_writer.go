@@ -100,13 +100,12 @@ func (rw *responseWriter) WriteHeader(status int) {
 
 // Close writes the trailing newline for chunked responses.
 func (rw *responseWriter) Close() error {
-	defer rw.bw.Writer.Reset(rw.conn)
-
 	if rw.hijacked {
 		return errHijacked
 	}
 
 	if rw.chunked {
+		defer rw.bw.Writer.Reset(rw.conn)
 		rw.bw.Flush()
 		rw.conn.Write([]byte("0\r\n\r\n"))
 	}
