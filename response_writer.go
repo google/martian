@@ -105,6 +105,7 @@ func (rw *responseWriter) Close() error {
 	}
 
 	if rw.chunked {
+		defer rw.bw.Writer.Reset(rw.conn)
 		rw.bw.Flush()
 		rw.conn.Write([]byte("0\r\n\r\n"))
 	}
