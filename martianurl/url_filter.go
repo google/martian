@@ -101,7 +101,7 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 //   "scheme": "https",
 //   "host": "example.com",
 //   "path": "/foo/bar",
-//   "rawQuery": "q=value",
+//   "query": "q=value",
 //   "scope": ["request", "response"],
 //   "modifier": { ... }
 // }
