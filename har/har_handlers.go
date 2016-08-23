@@ -59,7 +59,7 @@ func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // ServeHTTP resets the log, which clears its entries.
 func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if !(req.Method == "POST" || req.Method == "DELETE")  {
+	if !(req.Method == "POST" || req.Method == "DELETE") {
 		rw.Header().Add("Allow", "POST")
 		rw.Header().Add("Allow", "DELETE")
 		rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -67,6 +67,8 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.logger.Reset()
+
+	log.Infof("har: logs cleared")
 
 	rw.WriteHeader(http.StatusNoContent)
 }
