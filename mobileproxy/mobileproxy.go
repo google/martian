@@ -68,15 +68,6 @@ func Start(proxyAddr string) (*Martian, error) {
 func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, error) {
 	flag.Set("logtostderr", "true")
 
-	signal.Ignore(syscall.SIGPIPE)
-
-	l, err := net.Listen("tcp", proxyAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	mlog.Debugf("mobileproxy: started listener: %v", l.Addr())
-
 	p := martian.NewProxy()
 
 	mux := http.NewServeMux()
@@ -152,9 +143,15 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	mlog.Debugf("mobileproxy: reset verifications with requests to http://martian.proxy/verify/reset")
 
 	// Ignore SIGPIPE
-	mlog.Debugf("mobileproxy: ignoring SIGPIPE for lldb")
+	mlog.Debugf("mobileproxy: ignoring SIGPIPE signals")
 	signal.Ignore(syscall.SIGPIPE)
 
+	l, err := net.Listen("tcp", proxyAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	mlog.Debugf("mobileproxy: started listener: %v", l.Addr())
 	mlog.Infof("mobileproxy: starting proxy")
 	go p.Serve(l)
 	mlog.Infof("mobileproxy: started proxy on listener")
@@ -169,9 +166,9 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 // Shutdown tells the Proxy to close. The proxy will stay alive until all connections through it
 // have closed or timed out.
 func (p *Martian) Shutdown() {
-	mlog.Infof("mobileproxy: telling proxy to close")
+	mlog.Infof("mobileproxy: shutting down proxy")
 	p.proxy.Close()
-	mlog.Infof("mobileproxy: proxy closed")
+	mlog.Infof("mobileproxy: proxy shut down")
 }
 
 // SetLogLevel sets the Martian log level (Silent = 0, Error, Info, Debug), controlling which Martian
