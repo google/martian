@@ -21,13 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
-	"github.com/google/martian"
-	"github.com/google/martian/har"
-	"github.com/google/martian/httpspec"
-	mlog "github.com/google/martian/log"
-	"github.com/google/martian/martianhttp"
-	"github.com/google/martian/mitm"
-	"github.com/google/martian/verify"
 	"log"
 	"net"
 	"net/http"
@@ -35,18 +28,28 @@ import (
 	"syscall"
 	"time"
 
-	// side-effect importing modifiers to register them with the proxy
+	"github.com/google/martian"
+	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
 	_ "github.com/google/martian/fifo"
+	"github.com/google/martian/har"
+	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/header"
+	"github.com/google/martian/httpspec"
+	mlog "github.com/google/martian/log"
+	"github.com/google/martian/martianhttp"
+	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
+	"github.com/google/martian/mitm"
+	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/pingback"
 	_ "github.com/google/martian/priority"
 	_ "github.com/google/martian/querystring"
 	_ "github.com/google/martian/skip"
 	_ "github.com/google/martian/status"
+	"github.com/google/martian/verify"
 )
 
 // Martian is a wrapper for the initialized Martian proxy
@@ -64,15 +67,6 @@ func Start(proxyAddr string) (*Martian, error) {
 // StartWithCertificate runs a proxy on addr and configures a cert for MITM
 func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, error) {
 	flag.Set("logtostderr", "true")
-
-	signal.Ignore(syscall.SIGPIPE)
-
-	l, err := net.Listen("tcp", proxyAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	mlog.Debugf("mobileproxy: started listener: %v", l.Addr())
 
 	p := martian.NewProxy()
 
@@ -148,6 +142,17 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	mux.Handle("martian.proxy/verify/reset", rh)
 	mlog.Debugf("mobileproxy: reset verifications with requests to http://martian.proxy/verify/reset")
 
+	// Ignore SIGPIPE
+	mlog.Debugf("mobileproxy: ignoring SIGPIPE signals")
+	signal.Ignore(syscall.SIGPIPE)
+
+	l, err := net.Listen("tcp", proxyAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	mlog.Debugf("mobileproxy: started listener: %v", l.Addr())
+	mlog.Infof("mobileproxy: starting proxy")
 	go p.Serve(l)
 	mlog.Infof("mobileproxy: started proxy on listener")
 
@@ -161,12 +166,12 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 // Shutdown tells the Proxy to close. The proxy will stay alive until all connections through it
 // have closed or timed out.
 func (p *Martian) Shutdown() {
-	mlog.Infof("mobileproxy: telling proxy to close")
+	mlog.Infof("mobileproxy: shutting down proxy")
 	p.proxy.Close()
-	mlog.Infof("mobileproxy: proxy closed")
+	mlog.Infof("mobileproxy: proxy shut down")
 }
 
-// Sets the Martian log level (Silent = 0, Error, Info, Debug), controlling which Martian
+// SetLogLevel sets the Martian log level (Silent = 0, Error, Info, Debug), controlling which Martian
 // log calls are displayed in the console
 func SetLogLevel(l int) {
 	mlog.SetLevel(l)
