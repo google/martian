@@ -299,7 +299,7 @@ func main() {
 	if *api != "" {
 		host := *apiAddr
 		if host[0] == ':' {
-			host = fmt.Sprintf("localhost%s", *apiAddr)
+			host = fmt.Sprintf("localhost:%s", *apiAddr)
 		}
 
 		apif := martianurl.NewFilter(&url.URL{Host: *api})
