@@ -32,6 +32,8 @@ import (
 	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
+	"github.com/google/martian/cors"
+	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/fifo"
 	"github.com/google/martian/har"
 	// side-effect importing to register with JSON API
@@ -56,7 +58,6 @@ import (
 type Martian struct {
 	proxy    *martian.Proxy
 	listener net.Listener
-	mux      *http.ServeMux
 }
 
 // Start runs a martian.Proxy on addr
@@ -69,9 +70,6 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	flag.Set("logtostderr", "true")
 
 	p := martian.NewProxy()
-
-	mux := http.NewServeMux()
-	p.SetMux(mux)
 
 	if cert != "" && key != "" {
 		tlsc, err := tls.X509KeyPair([]byte(cert), []byte(key))
@@ -98,8 +96,7 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 
 		p.SetMITM(mc)
 
-		mux.Handle("martian.proxy/authority.cer", martianhttp.NewAuthorityHandler(x509c))
-		mlog.Debugf("mobileproxy: install cert from http://martian.proxy/authority.cer")
+		configureAPI("/authority.cer", martianhttp.NewAuthorityHandler(x509c))
 	}
 
 	stack, fg := httpspec.NewStack("martian.mobileproxy")
@@ -121,26 +118,26 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	// These handlers take precendence over proxy traffic and will not be intercepted.
 
 	// Retrieve HAR logs
-	mux.Handle("martian.proxy/logs", har.NewExportHandler(hl))
-	mux.Handle("martian.proxy/logs/reset", har.NewResetHandler(hl))
+	configureAPI("/logs", har.NewExportHandler(hl))
+	configureAPI("/logs/reset", har.NewResetHandler(hl))
 
 	// Update modifiers.
-	mux.Handle("martian.proxy/configure", m)
-	mlog.Debugf("mobileproxy: configure with requests to http://martian.proxy/configure")
+	configureAPI("/configure", m)
+	mlog.Debugf("mobileproxy: configure with requests to /configure")
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
-	mux.Handle("martian.proxy/verify", vh)
-	mlog.Debugf("mobileproxy: check verifications with requests to http://martian.proxy/verify")
+	configureAPI("/verify", vh)
+	mlog.Debugf("mobileproxy: check verifications with requests to /verify")
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	mux.Handle("martian.proxy/verify/reset", rh)
-	mlog.Debugf("mobileproxy: reset verifications with requests to http://martian.proxy/verify/reset")
+	configureAPI("/verify/reset", rh)
+	mlog.Debugf("mobileproxy: reset verifications with requests to /verify/reset")
 
 	// Ignore SIGPIPE
 	mlog.Debugf("mobileproxy: ignoring SIGPIPE signals")
@@ -159,7 +156,6 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	return &Martian{
 		proxy:    p,
 		listener: l,
-		mux:      mux,
 	}, nil
 }
 
@@ -175,4 +171,9 @@ func (p *Martian) Shutdown() {
 // log calls are displayed in the console
 func SetLogLevel(l int) {
 	mlog.SetLevel(l)
+}
+
+func configureAPI(path string, handler http.Handler) {
+	handler = cors.NewHandler(handler)
+	http.Handle(path, handler)
 }

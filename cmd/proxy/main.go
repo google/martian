@@ -149,8 +149,9 @@
 //   -tls-addr=":4443"
 //     host:port of the proxy over TLS
 //   -api="martian.proxy"
-//     hostname that can be used to reference the configuration API when
-//     configuring through the proxy
+//     hostname that can be used to reference the configuration API
+//   -apiAddr="8181"
+//     port of the configuration API endpoints
 //   -cert=""
 //     PEM encoded X.509 CA certificate; if set, it will be set as the
 //     issuer for dynamically-generated certificates during man-in-the-middle
@@ -188,12 +189,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"time"
 
 	"github.com/google/martian"
@@ -203,6 +205,7 @@ import (
 	"github.com/google/martian/marbl"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/martianlog"
+	"github.com/google/martian/martianurl"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/trafficshape"
 	"github.com/google/martian/verify"
@@ -210,7 +213,6 @@ import (
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
 	mlog "github.com/google/martian/log"
-	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"
 	_ "github.com/google/martian/priority"
@@ -223,6 +225,7 @@ var (
 	addr           = flag.String("addr", ":8080", "host:port of the proxy")
 	tlsAddr        = flag.String("tls-addr", ":4443", "host:port of the proxy over TLS")
 	api            = flag.String("api", "martian.proxy", "hostname for the API")
+	apiAddr        = flag.String("api-addr", ":8181", "port of the configuration api")
 	generateCA     = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
 	cert           = flag.String("cert", "", "CA certificate used to sign MITM certificates")
 	key            = flag.String("key", "", "private key of the CA used to sign MITM certificates")
@@ -240,9 +243,6 @@ func main() {
 	mlog.SetLevel(*level)
 
 	p := martian.NewProxy()
-
-	// Respond with 404 to any unknown proxy path.
-	http.HandleFunc(*api+"/", http.NotFound)
 
 	var x509c *x509.Certificate
 	var priv interface{}
@@ -280,7 +280,7 @@ func main() {
 
 		// Expose certificate authority.
 		ah := martianhttp.NewAuthorityHandler(x509c)
-		configure("/authority.cer", ah)
+		configureApi("/authority.cer", ah)
 
 		// Start TLS listener for transparent MITM.
 		tl, err := net.Listen("tcp", *tlsAddr)
@@ -295,6 +295,19 @@ func main() {
 	p.SetRequestModifier(stack)
 	p.SetResponseModifier(stack)
 
+	// Redirect API traffic.
+	if *api != "" {
+		host := *apiAddr
+		if host[0] == ':' {
+			host = fmt.Sprintf("localhost%s", *apiAddr)
+		}
+
+		apif := martianurl.NewFilter(&url.URL{Host: *api})
+		apif.SetRequestModifier(martianurl.NewModifier(&url.URL{Host: host}))
+
+		fg.AddRequestModifier(apif)
+	}
+
 	m := martianhttp.NewModifier()
 	fg.AddRequestModifier(m)
 	fg.AddResponseModifier(m)
@@ -304,8 +317,8 @@ func main() {
 		stack.AddRequestModifier(hl)
 		stack.AddResponseModifier(hl)
 
-		configure("/logs", har.NewExportHandler(hl))
-		configure("/logs/reset", har.NewResetHandler(hl))
+		configureApi("/logs", har.NewExportHandler(hl))
+		configureApi("/logs/reset", har.NewResetHandler(hl))
 	}
 
 	logger := martianlog.NewLogger()
@@ -326,19 +339,19 @@ func main() {
 	// intercepted.
 
 	// Configure modifiers.
-	configure("/configure", m)
+	configureApi("/configure", m)
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
-	configure("/verify", vh)
+	configureApi("/verify", vh)
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	configure("/verify/reset", rh)
+	configureApi("/verify/reset", rh)
 
 	l, err := net.Listen("tcp", *addr)
 	if err != nil {
@@ -348,7 +361,7 @@ func main() {
 	if *trafficShaping {
 		tsl := trafficshape.NewListener(l)
 		tsh := trafficshape.NewHandler(tsl)
-		configure("/shape-traffic", tsh)
+		configureApi("/shape-traffic", tsh)
 
 		l = tsl
 	}
@@ -356,6 +369,8 @@ func main() {
 	log.Println("martian: proxy started on:", l.Addr())
 
 	go p.Serve(l)
+
+	go http.ListenAndServe(*apiAddr, nil)
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, os.Kill)
@@ -365,11 +380,11 @@ func main() {
 	log.Println("martian: shutting down")
 }
 
-// configure installs a configuration handler at path.
-func configure(path string, handler http.Handler) {
+// configure installs a configuration api handler at path.
+func configureApi(path string, handler http.Handler) {
 	if *allowCORS {
 		handler = cors.NewHandler(handler)
 	}
 
-	http.Handle(filepath.Join(*api, path), handler)
+	http.Handle(path, handler)
 }
