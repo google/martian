@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package mux contains a filter that executes modifiers when there is a
+// Package servemux contains a filter that executes modifiers when there is a
 // pattern match in a mux.
-package mux
+package servemux
 
 import (
 	"net/http"
