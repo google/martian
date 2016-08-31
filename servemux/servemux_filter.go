@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All rights reserved.
+// Copyright 2016 Google Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ func NewFilter(mux *http.ServeMux) *Filter {
 	return &Filter{
 		reqmod: noop,
 		resmod: noop,
-		mux:    http.DefaultServeMux,
+		mux:    mux,
 	}
 }
 

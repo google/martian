@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All rights reserved.
+// Copyright 2016 Google Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ import (
 	"github.com/google/martian/proxyutil"
 )
 
-func TestModifyReques(t *testing.T) {
-	http.HandleFunc("example.com/test", func(w http.ResponseWriter, r *http.Request) {
-		return
-	})
-	f := NewFilter(nil)
+func TestModifyRequest(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("example.com/test", nil)
+
+	f := NewFilter(mux)
 	tm := martiantest.NewModifier()
 	f.SetRequestModifier(tm)
 
@@ -38,8 +38,8 @@ func TestModifyReques(t *testing.T) {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
 
-	if tm.RequestModified() != true {
-		t.Errorf("tm.RequestModified(): got %t, want %t", tm.RequestModified(), true)
+	if !tm.RequestModified() {
+		t.Error("tm.RequestModified(): got false, want true")
 	}
 
 	tm.Reset()
@@ -59,10 +59,10 @@ func TestModifyReques(t *testing.T) {
 }
 
 func TestModifyResponse(t *testing.T) {
-	http.HandleFunc("example.com/restest", func(w http.ResponseWriter, r *http.Request) {
-		return
-	})
-	f := NewFilter(nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("example.com/restest", nil)
+
+	f := NewFilter(mux)
 	tm := martiantest.NewModifier()
 	f.SetResponseModifier(tm)
 
@@ -76,8 +76,8 @@ func TestModifyResponse(t *testing.T) {
 		t.Errorf("ModifyResponse(): got %v, want no error", err)
 	}
 
-	if tm.ResponseModified() != true {
-		t.Errorf("tm.RequestModified(): got %t, want %t", tm.RequestModified(), true)
+	if !tm.ResponseModified() {
+		t.Errorf("tm.RequestModified(): got false, want true")
 	}
 
 	tm.Reset()
