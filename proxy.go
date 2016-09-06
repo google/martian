@@ -55,7 +55,6 @@ type Proxy struct {
 	mitm         *mitm.Config
 	proxyURL     *url.URL
 	conns        *sync.WaitGroup
-	mux          *http.ServeMux
 	closing      int32 // atomic
 
 	reqmod RequestModifier
@@ -79,7 +78,6 @@ func NewProxy() *Proxy {
 		},
 		timeout: 5 * time.Minute,
 		conns:   &sync.WaitGroup{},
-		mux:     http.DefaultServeMux,
 		reqmod:  noop,
 		resmod:  noop,
 	}
@@ -113,12 +111,6 @@ func (p *Proxy) SetTimeout(timeout time.Duration) {
 // SetMITM sets the config to use for MITMing of CONNECT requests.
 func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
-}
-
-// SetMux sets the http.ServeMux to use for internal proxy requests. Defaults
-// to http.DefaultServeMux.
-func (p *Proxy) SetMux(mux *http.ServeMux) {
-	p.mux = mux
 }
 
 // Close sets the proxying to the closing state and waits for all connections
@@ -241,31 +233,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		return errClose
 	}
 	defer req.Body.Close()
-
-	if h, pattern := p.mux.Handler(req); pattern != "" {
-		defer brw.Flush()
-
-		closing := req.Close || p.Closing()
-
-		log.Infof("martian: intercepted configuration request: %s", req.URL)
-		rw := newResponseWriter(conn, brw, closing)
-
-		h.ServeHTTP(rw, req)
-
-		if !rw.hijacked {
-			defer rw.Close()
-
-			// Call WriteHeader to ensure a response is sent, since the handler isn't
-			// required to call WriteHeader/Write.
-			rw.WriteHeader(200)
-		}
-
-		if rw.hijacked || closing {
-			return errClose
-		}
-
-		return nil
-	}
 
 	session := ctx.Session()
 
