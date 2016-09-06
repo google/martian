@@ -552,6 +552,37 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 	}
 }
 
+func TestSkippingLogging(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	ctx, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	ctx.SkipLogging()
+
+	logger := NewLogger()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log := logger.Export().Log
+	if got, want := len(log.Entries), 0; got != want {
+		t.Fatalf("len(log.Entries): got %d, want %d", got, want)
+	}
+}
+
 func TestOptionResponseBodyLogging(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -663,8 +694,19 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 	}
 
 	log := logger.Export().Log
-	if got, want := string(log.Entries[0].Request.PostData.Params[0].Value), "true"; got != want {
-		t.Fatalf("log.Entries[0].Request.PostData.Params[0].Value: got %s, want %s", got, want)
+
+	for _, param := range log.Entries[0].Request.PostData.Params {
+		if param.Name == "first" {
+			if got, want := param.Value, "true"; got != want {
+				t.Fatalf("Params[%q].Value: got %s, want %s", param.Name, got, want)
+			}
+		}
+
+		if param.Name == "second" {
+			if got, want := param.Value, "false"; got != want {
+				t.Fatalf("Params[%q].Value: got %s, want %s", param.Name, got, want)
+			}
+		}
 	}
 
 	logger = NewLogger()

@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/martian"
 	"github.com/google/martian/log"
 	"github.com/google/martian/messageview"
 	"github.com/google/martian/parse"
@@ -84,6 +85,11 @@ func (l *Logger) SetLogFunc(logFunc func(line string)) {
 // request content
 // --------------------------------------------------------------------------------
 func (l *Logger) ModifyRequest(req *http.Request) error {
+	ctx := martian.NewContext(req)
+	if ctx.SkippingLogging() {
+		return nil
+	}
+
 	b := &bytes.Buffer{}
 
 	fmt.Fprintln(b, "")
@@ -130,6 +136,11 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 // response content
 // --------------------------------------------------------------------------------
 func (l *Logger) ModifyResponse(res *http.Response) error {
+	ctx := martian.NewContext(res.Request)
+	if ctx.SkippingLogging() {
+		return nil
+	}
+
 	b := &bytes.Buffer{}
 	fmt.Fprintln(b, "")
 	fmt.Fprintln(b, strings.Repeat("-", 80))

@@ -354,6 +354,10 @@ func (l *Logger) SetOption(opts ...Option) {
 // ModifyRequest logs requests.
 func (l *Logger) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
+	if ctx.SkippingLogging() {
+		return nil
+	}
+
 	id := ctx.ID()
 
 	return l.RecordRequest(id, req)
@@ -405,6 +409,9 @@ func (l *Logger) RecordRequest(id string, req *http.Request) error {
 // ModifyResponse logs responses.
 func (l *Logger) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
+	if ctx.SkippingLogging() {
+		return nil
+	}
 	id := ctx.ID()
 
 	return l.RecordResponse(id, res)
