@@ -62,10 +62,9 @@ request and response modifiers.
         <div class="title">Logs<span hidden$="[[!query]]"> matching "[[query]]"</div></div>
         <div class="flex"></div>
         <paper-icon-button
-          hidden
           icon="file-upload"
           on-tap="_openFileDialog"></paper-icon-button>
-        <input type="file" id="upload" accept=".marbl" hidden>
+        <input type="file" id="upload" accept=".marbl"hidden>
         <paper-icon-button
           icon="search"
           on-tap="_showSearch"
@@ -153,7 +152,7 @@ request and response modifiers.
         }.bind(this));
       },
       _parseFile: function(file) {
-        var reader = new FileReader()
+        var reader = new FileReader();
         var worker = new Worker('/elements/om-message-list/parse-log.js');
 
         worker.addEventListener('message', function(e) {
