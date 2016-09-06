@@ -63,13 +63,12 @@ function FrameReader() {
   this.n = 0;
 }
 
-FrameReader.prototype.read = function(arraybuffer_view) {
-  view = new DataView(arraybuffer_view);
+FrameReader.prototype.read = function(arraybuffer_view, offset) {
+  var view = new DataView(arraybuffer_view);
 
-  var parser = new Parser(view, 0);//this.n);
+  var parser = new Parser(view, offset);
   var frame = {};
 
-  //frame.magic = parser.uint32();
   frame.type = this._frames[parser.uint8()];
   frame.scope = this._scopes[parser.uint8()];
   frame.id = parser.string(8);
