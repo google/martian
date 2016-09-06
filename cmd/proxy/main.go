@@ -188,6 +188,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -197,6 +198,7 @@ import (
 	"time"
 
 	"github.com/google/martian"
+	mapi "github.com/google/martian/api"
 	"github.com/google/martian/cors"
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
@@ -204,6 +206,7 @@ import (
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/martianlog"
 	"github.com/google/martian/mitm"
+	"github.com/google/martian/servemux"
 	"github.com/google/martian/trafficshape"
 	"github.com/google/martian/verify"
 
@@ -221,6 +224,7 @@ import (
 var (
 	level          = flag.Int("v", 0, "log level")
 	addr           = flag.String("addr", ":8080", "host:port of the proxy")
+	apiAddr        = flag.String("api-addr", ":8181", "port of the configuration api")
 	tlsAddr        = flag.String("tls-addr", ":4443", "host:port of the proxy over TLS")
 	api            = flag.String("api", "martian.proxy", "hostname for the API")
 	generateCA     = flag.Bool("generate-ca-cert", false, "generate CA certificate and private key for MITM")
@@ -240,9 +244,6 @@ func main() {
 	mlog.SetLevel(*level)
 
 	p := martian.NewProxy()
-
-	// Respond with 404 to any unknown proxy path.
-	http.HandleFunc(*api+"/", http.NotFound)
 
 	var x509c *x509.Certificate
 	var priv interface{}
@@ -295,6 +296,20 @@ func main() {
 	p.SetRequestModifier(stack)
 	p.SetResponseModifier(stack)
 
+	// Redirect API traffic to API server.
+	if *apiAddr != "" {
+		host := *apiAddr
+		if host[0] == ':' {
+			host = fmt.Sprintf("localhost:%s", *apiAddr)
+		}
+
+		// Forward traffic that pattern matches in http.DefaultServeMux
+		apif := servemux.NewFilter(nil)
+		apif.SetRequestModifier(mapi.NewForwarder(host))
+
+		fg.AddRequestModifier(apif)
+	}
+
 	m := martianhttp.NewModifier()
 	fg.AddRequestModifier(m)
 	fg.AddResponseModifier(m)
@@ -315,15 +330,12 @@ func main() {
 	stack.AddResponseModifier(logger)
 
 	lsh := marbl.NewHandler()
+	// retrieve binary marbl logs
 	http.Handle("/binlogs", lsh)
 
 	lsm := marbl.NewModifier(lsh)
 	stack.AddRequestModifier(lsm)
 	stack.AddResponseModifier(lsm)
-
-	// Proxy specific handlers.
-	// These handlers take precedence over proxy traffic and will not be
-	// intercepted.
 
 	// Configure modifiers.
 	configure("/configure", m)
@@ -356,6 +368,8 @@ func main() {
 	log.Println("martian: proxy started on:", l.Addr())
 
 	go p.Serve(l)
+
+	go http.ListenAndServe(*apiAddr, nil)
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, os.Kill)
