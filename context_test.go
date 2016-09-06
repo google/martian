@@ -53,6 +53,11 @@ func TestContexts(t *testing.T) {
 		t.Error("ctx.SkippingRoundTrip(): got false, want true")
 	}
 
+	ctx.SkipLogging()
+	if !ctx.SkippingLogging() {
+		t.Error("ctx.SkippingLogging(): got false, want true")
+	}
+
 	s := ctx.Session()
 
 	if len(s.ID()) != 16 {

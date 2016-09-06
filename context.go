@@ -34,6 +34,7 @@ type Context struct {
 	mu            sync.RWMutex
 	vals          map[string]interface{}
 	skipRoundTrip bool
+	skipLogging   bool
 }
 
 // Session provides information and storage about a connection.
@@ -209,6 +210,22 @@ func (ctx *Context) SkippingRoundTrip() bool {
 	defer ctx.mu.RUnlock()
 
 	return ctx.skipRoundTrip
+}
+
+// SkipLogging skips logging by Martian loggers for the current request.
+func (ctx *Context) SkipLogging() {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
+	ctx.skipLogging = true
+}
+
+// SkippingLogging returns whether the current request / response pair will be logged.
+func (ctx *Context) SkippingLogging() bool {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
+	return ctx.skipLogging
 }
 
 // newID creates a new 16 character random hex ID; note these are not UUIDs.
