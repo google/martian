@@ -71,7 +71,6 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	p := martian.NewProxy()
 
 	mux := http.NewServeMux()
-	p.SetMux(mux)
 
 	if cert != "" && key != "" {
 		tlsc, err := tls.X509KeyPair([]byte(cert), []byte(key))
