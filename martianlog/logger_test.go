@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -46,6 +47,13 @@ func ExampleLogger() {
 	}
 	req.TransferEncoding = []string{"chunked"}
 	req.Header.Set("Content-Encoding", "gzip")
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer remove()
 
 	if err := l.ModifyRequest(req); err != nil {
 		fmt.Println(err)
