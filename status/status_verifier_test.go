@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
@@ -40,6 +41,12 @@ func TestVerifyResponses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%d. http.NewRequest(): got %v, want no error", i, err)
 		}
+		_, remove, err := martian.TestContext(req, nil, nil)
+		if err != nil {
+			t.Fatalf("TestContext(): got %v, want no error", err)
+		}
+		defer remove()
+
 		res := proxyutil.NewResponse(tc.got, nil, req)
 
 		if err := v.ModifyResponse(res); err != nil {
@@ -94,6 +101,12 @@ func TestVerifierFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
 
 	res := proxyutil.NewResponse(200, nil, req)
 	if err := resv.ModifyResponse(res); err != nil {

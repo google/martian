@@ -188,13 +188,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/google/martian"
@@ -298,14 +298,14 @@ func main() {
 
 	// Redirect API traffic to API server.
 	if *apiAddr != "" {
-		host := *apiAddr
-		if host[0] == ':' {
-			host = fmt.Sprintf("localhost:%s", *apiAddr)
+		port, err := strconv.Atoi(*apiAddr)
+		if err != nil {
+			log.Fatal(err)
 		}
 
 		// Forward traffic that pattern matches in http.DefaultServeMux
 		apif := servemux.NewFilter(nil)
-		apif.SetRequestModifier(mapi.NewForwarder(host))
+		apif.SetRequestModifier(mapi.NewForwarder("", port))
 
 		fg.AddRequestModifier(apif)
 	}

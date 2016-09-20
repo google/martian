@@ -12,36 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package api contains a forwarder to route system HTTP requests to the API server.
+// Package api contains a forwarder to route system HTTP requests to the
+// local API server.
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 )
 
 // Forwarder is a request modifier that routes the request to the API server and
 // marks the request for skipped logging.
 type Forwarder struct {
 	host string
+	port int
 }
 
 // NewForwarder returns a Forwarder that rewrites requests to host.
-func NewForwarder(host string) *Forwarder {
+func NewForwarder(host string, port int) *Forwarder {
 	return &Forwarder{
 		host: host,
+		port: port,
 	}
 }
 
-// ModifyRequest changes the request host to f.Host, downgrades the scheme to http
-// and marks the request context for skipped logging.
+// ModifyRequest forwards the request to the local API server running at f.port,
+// downgrades the scheme to http and marks the request context for skipped logging.
 func (f *Forwarder) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
+	ctx.APIRequest()
 	ctx.SkipLogging()
 
+	in := req.URL.String()
 	req.URL.Scheme = "http"
-	req.URL.Host = f.host
+	req.URL.Host = fmt.Sprintf("%s:%d", "localhost", f.port)
+	out := req.URL.String()
+	log.Infof("api.Forwarder: forwarding %s to %s", in, out)
 
 	return nil
 }
