@@ -22,9 +22,9 @@ import (
 )
 
 func TestApiForwarder(t *testing.T) {
-	forwarder := NewForwarder("apihost.com")
+	forwarder := NewForwarder("", 8181)
 
-	req, err := http.NewRequest("GET", "https://localhost:8080/configure", nil)
+	req, err := http.NewRequest("GET", "https://martian.proxy/configure", nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
@@ -42,11 +42,15 @@ func TestApiForwarder(t *testing.T) {
 	if got, want := req.URL.Scheme, "http"; got != want {
 		t.Errorf("req.URL.Scheme: got %s, want %s", got, want)
 	}
-	if got, want := req.URL.Host, "apihost.com"; got != want {
+	if got, want := req.URL.Host, "localhost:8181"; got != want {
 		t.Errorf("req.URL.Host: got %s, want %s", got, want)
 	}
 
 	if !ctx.SkippingLogging() {
-		t.Errorf("SkippingLogging: got false, want true")
+		t.Errorf("ctx.SkippingLogging: got false, want true")
+	}
+
+	if !ctx.IsAPIRequest() {
+		t.Errorf("ctx.IsApiRequest: got false, want true")
 	}
 }

@@ -35,6 +35,7 @@ type Context struct {
 	vals          map[string]interface{}
 	skipRoundTrip bool
 	skipLogging   bool
+	apiRequest    bool
 }
 
 // Session provides information and storage about a connection.
@@ -226,6 +227,24 @@ func (ctx *Context) SkippingLogging() bool {
 	defer ctx.mu.RUnlock()
 
 	return ctx.skipLogging
+}
+
+// APIRequest marks the requests as a request to the proxy API.
+func (ctx *Context) APIRequest() {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
+	ctx.apiRequest = true
+}
+
+// IsAPIRequest returns true when the request patterns matches a pattern in the proxy
+// mux. The mux is usually defined as a parameter to the api.Forwarder, which uses
+// http.DefaultServeMux by default.
+func (ctx *Context) IsAPIRequest() bool {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+
+	return ctx.apiRequest
 }
 
 // newID creates a new 16 character random hex ID; note these are not UUIDs.
