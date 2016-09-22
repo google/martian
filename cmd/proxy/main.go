@@ -146,6 +146,8 @@
 // The flags are:
 //   -addr=":8080"
 //     host:port of the proxy
+//   -api-addr=":8181"
+//     host:port of the proxy API
 //   -tls-addr=":4443"
 //     host:port of the proxy over TLS
 //   -api="martian.proxy"
@@ -195,6 +197,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/martian"
@@ -298,6 +301,7 @@ func main() {
 
 	// Redirect API traffic to API server.
 	if *apiAddr != "" {
+		*apiAddr = strings.Replace(*apiAddr, ":", "", 1)
 		port, err := strconv.Atoi(*apiAddr)
 		if err != nil {
 			log.Fatal(err)
