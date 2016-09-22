@@ -301,8 +301,8 @@ func main() {
 
 	// Redirect API traffic to API server.
 	if *apiAddr != "" {
-		*apiAddr = strings.Replace(*apiAddr, ":", "", 1)
-		port, err := strconv.Atoi(*apiAddr)
+		apip := strings.Replace(*apiAddr, ":", "", 1)
+		port, err := strconv.Atoi(apip)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -389,5 +389,12 @@ func configure(path string, handler http.Handler) {
 		handler = cors.NewHandler(handler)
 	}
 
+	// register handler for martian.proxy to be forwarded to
+	// local API server
 	http.Handle(filepath.Join(*api, path), handler)
+
+	// register handler for local API server
+	p := filepath.Join("localhost"+*apiAddr, path)
+	log.Println("martian: registered " + p)
+	http.Handle(p, handler)
 }
