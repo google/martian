@@ -195,7 +195,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -384,16 +384,16 @@ func main() {
 }
 
 // configure installs a configuration handler at path.
-func configure(path string, handler http.Handler) {
+func configure(pattern string, handler http.Handler) {
 	if *allowCORS {
 		handler = cors.NewHandler(handler)
 	}
 
 	// register handler for martian.proxy to be forwarded to
 	// local API server
-	http.Handle(filepath.Join(*api, path), handler)
+	http.Handle(path.Join(*api, pattern), handler)
 
 	// register handler for local API server
-	p := filepath.Join("localhost"+*apiAddr, path)
+	p := path.Join("localhost"+*apiAddr, pattern)
 	http.Handle(p, handler)
 }
