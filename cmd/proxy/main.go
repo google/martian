@@ -395,6 +395,5 @@ func configure(path string, handler http.Handler) {
 
 	// register handler for local API server
 	p := filepath.Join("localhost"+*apiAddr, path)
-	log.Println("martian: registered " + p)
 	http.Handle(p, handler)
 }
