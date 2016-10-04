@@ -34,7 +34,7 @@ request and response modifiers.
 
     <test-fixture id="basic">
       <template>
-        <om-messages-view queryParams="?martian=localhost:8080/binlogs"></om-messages-view>
+        <om-messages-view></om-messages-view>
       </template>
     </test-fixture>
     <script>
@@ -52,15 +52,32 @@ request and response modifiers.
         test('connect to martian based on query param', function() {
           let element = fixture('basic');
           var omWebsocket = element.querySelector("om-message-websocket");
-          assert.equal(omWebsocket._socket.url, "ws://");
+          assert(!omWebsocket._socket);
 
-          element.queryParams = {martian: "localhost:8080/binlogs"};
+          element.queryParams = {martian: "ws://localhost:8181/binlogs"};
           omWebsocket.resetSocket();
-          assert.equal(omWebsocket._socket.url, "ws://localhost:8080/binlogs");
+          assert.equal(omWebsocket._socket.url, "ws://localhost:8181/binlogs");
 
-          element.queryParams = {martian: "someOtherUrl.com:1337/path"};
+          element.queryParams = {martian: "ws://someOtherUrl.com:1337/path"};
           omWebsocket.resetSocket();
           assert.equal(omWebsocket._socket.url, "ws://someOtherUrl.com:1337/path");
+        });
+        test('load a marbl log from a url in params', function(done) {
+          let element = fixture('basic');
+          element.queryParams = {martian: "/test/elements/example.marbl"};
+          var ironList = element.querySelector("iron-list");
+          assert(!ironList._itemsRendered, "Messages rendered too soon");
+          element.querySelector("om-message-list")._loadLogsFromUrl();
+          var waitForItemsRendered = function() {
+            if(ironList._itemsRendered) {
+              assert(ironList._itemsRendered); // To get an assertion to show up in any test results
+              done();
+            } else {
+              console.log("items not rendered yet; retrying in 100ms");
+              setTimeout(waitForItemsRendered, 100); // No max retries; wct times out at 10 seconds on its own
+            }
+          };
+          waitForItemsRendered();
         });
       });
     </script>

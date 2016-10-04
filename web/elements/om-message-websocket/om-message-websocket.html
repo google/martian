@@ -24,22 +24,34 @@ request and response modifiers.
     Polymer({
       is: 'om-message-websocket',
       properties: {
-        src: {
+        martian: {
           type: String,
+          value: "",
         },
       },
       created: function() {
         this._reader = new FrameReader();
       },
       resetSocket: function() {
-        this._socket = new WebSocket(this.src);
+        console.log("Checking whether ?martian= param exists"
+            + " and is the url of a running Martian's"
+            + " websocket");
+        if (!this.martian) {
+          console.log("No web socket provided; not attempting to connect");
+          return;
+        }
+        if (this.martian.search("wss?://") != 0) {
+          console.log("Martian url is not a websocket; not connecting");
+          return;
+        }
+        this._socket = new WebSocket(this.martian);
         this._socket.binaryType = 'arraybuffer';
         var _this = this;
         this._socket.onerror = function(error) {
           error.preventDefault();
-          console.log("Couldn't find a Martian proxy at '" + _this.src
+          console.log("Couldn't find a Martian proxy at '" + _this.martian
             + "'. Make sure your query param looks like '?martian=domain:socket/path',"
-            + " (for example '?martian=localhost:8080/binlogs'), and that there's a Martian proxy there.")
+            + " (for example '?martian=localhost:8181/binlogs'), and that there's a Martian proxy there.")
         }.bind(this);
         this._socket.onmessage = function(e) {
           this.fire('message-frame', this._reader.read(e.data));
