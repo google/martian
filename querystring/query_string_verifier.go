@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -56,6 +57,12 @@ func NewVerifier(key, value string) (verify.RequestVerifier, error) {
 // check if the given key is present. An error will be added to the contained
 // *MultiError if the param is unmatched.
 func (v *verifier) ModifyRequest(req *http.Request) error {
+	// skip requests to API
+	ctx := martian.NewContext(req)
+	if ctx.IsAPIRequest() {
+		return nil
+	}
+
 	if err := req.ParseForm(); err != nil {
 		err := fmt.Errorf("request(%v) parsing failed; could not parse query parameters", req.URL)
 		v.err.Add(err)
