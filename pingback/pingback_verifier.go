@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -63,6 +64,12 @@ func NewVerifier(url *url.URL) verify.RequestVerifier {
 // will continue to be nil until the verifier has been reset, regardless of
 // subsequent requests matching.
 func (v *Verifier) ModifyRequest(req *http.Request) error {
+	// skip requests to API
+	ctx := martian.NewContext(req)
+	if ctx.IsAPIRequest() {
+		return nil
+	}
+
 	u := req.URL
 
 	switch {
