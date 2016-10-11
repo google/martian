@@ -158,14 +158,13 @@ request and response modifiers.
       },
       _parseFile: function(file) {
         var reader = new FileReader();
-        var worker = new Worker('/elements/om-message-list/parse-log.js');
+        var worker = new Worker('elements/om-message-list/parse-log.js');
 
         worker.addEventListener('message', function(e) {
           this.fire('message-frame', e.data);
         }.bind(this));
 
         reader.onload = function(e) {
-          console.log('read file, posting to web worker');
           worker.postMessage(e.target.result, [e.target.result]);
         };
 
@@ -176,8 +175,6 @@ request and response modifiers.
         reader.readAsArrayBuffer(file);
       },
       _loadLogsFromUrl: function() {
-        console.log("Checking whether ?martian= param exists"
-            + " and is the url of a .marbl file");
         if (this.martian.search("wss?://") == 0) {
           console.log("Provided martian looks like a websocket; not"
               + " trying to load a flat .marbl file from it");
@@ -187,28 +184,13 @@ request and response modifiers.
           console.log("Not trying to load .marbl from empty url");
           return;
         }
+        console.log("Looks like the url of a .marbl file (" + this.martian + ")");
         var oReq = new XMLHttpRequest();
         oReq.open("GET", this.martian);
         oReq.responseType = "blob";
         var oml = this;
         oReq.onload = function(oEvent) {
-          var reader = new FileReader();
-          var worker = new Worker('/elements/om-message-list/parse-log.js');
-
-          worker.addEventListener('message', function(e) {
-            oml.fire('message-frame', e.data);
-          }.bind(this));
-
-          reader.onload = function(e) {
-            console.log('read file, posting to web worker');
-            worker.postMessage(e.target.result, [e.target.result]);
-          };
-
-          reader.onerror = function(e) {
-            console.log('error reading file', e);
-          };
-
-          reader.readAsArrayBuffer(oReq.response);
+          oml._parseFile(oReq.response);
         };
         oReq.send(null);
       },

@@ -16,7 +16,7 @@
 // Package martian provides an HTTP/1.1 proxy with an API for configurable
 // request and response modifiers.
 
-importScripts('/scripts/frame-reader.js');
+importScripts('../../scripts/frame-reader.js');
 
 self.addEventListener('message', function(e) {
   var reader = new FrameReader();

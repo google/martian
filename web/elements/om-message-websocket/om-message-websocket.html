@@ -33,9 +33,6 @@ request and response modifiers.
         this._reader = new FrameReader();
       },
       resetSocket: function() {
-        console.log("Checking whether ?martian= param exists"
-            + " and is the url of a running Martian's"
-            + " websocket");
         if (!this.martian) {
           console.log("No web socket provided; not attempting to connect");
           return;
@@ -44,6 +41,7 @@ request and response modifiers.
           console.log("Martian url is not a websocket; not connecting");
           return;
         }
+        console.log("Martian url looks like a websocket; connecting");
         this._socket = new WebSocket(this.martian);
         this._socket.binaryType = 'arraybuffer';
         var _this = this;
