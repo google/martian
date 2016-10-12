@@ -21,35 +21,36 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os/signal"
+	"path"
 	"syscall"
 	"time"
 
 	"github.com/google/martian"
+	"github.com/google/martian/fifo"
+	"github.com/google/martian/har"
+	"github.com/google/martian/httpspec"
+	mlog "github.com/google/martian/log"
+	"github.com/google/martian/martianhttp"
+	"github.com/google/martian/mitm"
+	"github.com/google/martian/verify"
+
 	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
 	_ "github.com/google/martian/fifo"
-	"github.com/google/martian/har"
-	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/header"
-	"github.com/google/martian/httpspec"
-	mlog "github.com/google/martian/log"
-	"github.com/google/martian/martianhttp"
-	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
-	"github.com/google/martian/mitm"
-	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/pingback"
 	_ "github.com/google/martian/priority"
 	_ "github.com/google/martian/querystring"
 	_ "github.com/google/martian/skip"
 	_ "github.com/google/martian/status"
-	"github.com/google/martian/verify"
 )
 
 // Martian is a wrapper for the initialized Martian proxy
@@ -60,12 +61,12 @@ type Martian struct {
 }
 
 // Start runs a martian.Proxy on addr
-func Start(proxyAddr string) (*Martian, error) {
-	return StartWithCertificate(proxyAddr, "", "")
+func Start(trafficPort, apiPort int) (*Martian, error) {
+	return StartWithCertificate(trafficPort, apiPort, "", "")
 }
 
 // StartWithCertificate runs a proxy on addr and configures a cert for MITM
-func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, error) {
+func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Martian, error) {
 	flag.Set("logtostderr", "true")
 
 	p := martian.NewProxy()
@@ -97,13 +98,17 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 
 		p.SetMITM(mc)
 
-		mux.Handle("martian.proxy/authority.cer", martianhttp.NewAuthorityHandler(x509c))
-		mlog.Debugf("mobileproxy: install cert from http://martian.proxy/authority.cer")
+		handle(mux, "/authority.cer", apiPort, martianhttp.NewAuthorityHandler(x509c))
 	}
 
+	topg := fifo.NewGroup()
+
 	stack, fg := httpspec.NewStack("martian.mobileproxy")
-	p.SetRequestModifier(stack)
-	p.SetResponseModifier(stack)
+	topg.AddRequestModifier(stack)
+	topg.AddResponseModifier(stack)
+
+	p.SetRequestModifier(topg)
+	p.SetResponseModifier(topg)
 
 	// add HAR logger
 	hl := har.NewLogger()
@@ -114,38 +119,38 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	fg.AddRequestModifier(m)
 	fg.AddResponseModifier(m)
 
-	mlog.Debugf("mobileproxy: set martianhttp modifier")
-
 	// Proxy specific handlers.
 	// These handlers take precendence over proxy traffic and will not be intercepted.
 
 	// Retrieve HAR logs
-	mux.Handle("martian.proxy/logs", har.NewExportHandler(hl))
-	mux.Handle("martian.proxy/logs/reset", har.NewResetHandler(hl))
+	handle(mux, "/logs", apiPort, har.NewExportHandler(hl))
+	handle(mux, "/logs/reset", apiPort, har.NewResetHandler(hl))
 
 	// Update modifiers.
-	mux.Handle("martian.proxy/configure", m)
-	mlog.Debugf("mobileproxy: configure with requests to http://martian.proxy/configure")
+	handle(mux, "/configure", apiPort, m)
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
-	mux.Handle("martian.proxy/verify", vh)
-	mlog.Debugf("mobileproxy: check verifications with requests to http://martian.proxy/verify")
+	handle(mux, "/verify", apiPort, vh)
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	mux.Handle("martian.proxy/verify/reset", rh)
-	mlog.Debugf("mobileproxy: reset verifications with requests to http://martian.proxy/verify/reset")
+	handle(mux, "/verify/reset", apiPort, rh)
 
 	// Ignore SIGPIPE
 	mlog.Debugf("mobileproxy: ignoring SIGPIPE signals")
 	signal.Ignore(syscall.SIGPIPE)
 
-	l, err := net.Listen("tcp", proxyAddr)
+	// start the API server
+	apiAddr := fmt.Sprintf(":%d", apiPort)
+	go http.ListenAndServe(apiAddr, nil)
+	mlog.Infof("mobileproxy: proxy API started on %s", apiAddr)
+
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", apiPort))
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +158,6 @@ func StartWithCertificate(proxyAddr string, cert string, key string) (*Martian, 
 	mlog.Debugf("mobileproxy: started listener: %v", l.Addr())
 	mlog.Infof("mobileproxy: starting proxy")
 	go p.Serve(l)
-	mlog.Infof("mobileproxy: started proxy on listener")
 
 	return &Martian{
 		proxy:    p,
@@ -174,4 +178,17 @@ func (p *Martian) Shutdown() {
 // log calls are displayed in the console
 func SetLogLevel(l int) {
 	mlog.SetLevel(l)
+}
+
+// handle sets up mux to handle requests to match patterns martian.proxy/{pth} and
+// localhost:{apiPort}/{pth}. This assumes that the API server is running at
+// localhost:{apiPort}, and requests to martian.proxy are forwarded there.
+func handle(mux *http.ServeMux, pth string, apiPort int, handler http.Handler) {
+	pattern := path.Join("martian.proxy", pth)
+	mux.Handle(pattern, handler)
+	mlog.Infof("mobileproxy: handler registered for %s", pattern)
+
+	pattern = path.Join(fmt.Sprintf("localhost:%d", apiPort), pth)
+	mux.Handle(pattern, handler)
+	mlog.Infof("mobileproxy: handler registered for %s", pattern)
 }
