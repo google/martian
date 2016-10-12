@@ -75,6 +75,9 @@ func TestNewModifier(t *testing.T) {
 		if got := req.URL.String(); got != tc.want {
 			t.Errorf("%d. req.URL: got %q, want %q", i, got, tc.want)
 		}
+		if got, want := req.Header.Get("X-Forwarded-Url"), "http://www.example.com"; got != want {
+			t.Errorf("req.Header.Get(%q): got %q, want %q", "X-Forwarded-Url", got, want)
+		}
 	}
 }
 
