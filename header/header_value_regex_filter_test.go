@@ -16,11 +16,69 @@ package header
 
 import (
 	"net/http"
+	"regexp"
 	"testing"
 
+	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
+
+func TestValueRegexFilterModifyResponse(t *testing.T) {
+	tt := []struct {
+		expression string
+		name       string
+		value      string
+		want       bool
+	}{
+		{
+			name:       "X-Forwarded-Url",
+			expression: ".*/test",
+			value:      "example.com",
+			want:       false,
+		},
+		{
+			name:       "X-Forwarded-Url",
+			expression: ".*/test",
+			value:      "example.com/test",
+			want:       true,
+		},
+		{
+			name:       "X-Nonexistant-Header",
+			expression: ".*/test",
+			value:      "",
+			want:       false,
+		},
+	}
+
+	for i, tc := range tt {
+		req, err := http.NewRequest("GET", "https://google.com", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+		}
+		req.Header.Add("X-Forwarded-Url", tc.value)
+
+		res := proxyutil.NewResponse(200, nil, req)
+
+		re, err := regexp.Compile(tc.expression)
+		if err != nil {
+			t.Fatalf("%d. regexp.Compile(%q): got %v, want no error", i, tc.expression, err)
+		}
+
+		f := NewValueRegexFilter(re, "X-Forwarded-Url")
+
+		tm := martiantest.NewModifier()
+		f.SetResponseModifier(tm)
+
+		if err := f.ModifyResponse(res); err != nil {
+			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
+		}
+
+		if tm.ResponseModified() != tc.want {
+			t.Errorf("%d. tm.ResponseModified(): got %t, want %t", i, tm.ResponseModified(), tc.want)
+		}
+	}
+}
 
 func TestValueRegexFilterFromJSON(t *testing.T) {
 	msg := []byte(`{

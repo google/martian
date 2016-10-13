@@ -23,6 +23,10 @@ import (
 	"github.com/google/martian/parse"
 )
 
+func init() {
+	parse.Register("header.RegexFilter", headerValueRegexFilterFromJSON)
+}
+
 // ValueRegexFilter executes resmod and reqmod when the header
 // value matches regex.
 type ValueRegexFilter struct {
@@ -37,10 +41,6 @@ type headerValueRegexFilterJSON struct {
 	HeaderName string               `json:"header"`
 	Modifier   json.RawMessage      `json:"modifier"`
 	Scope      []parse.ModifierType `json:"scope"`
-}
-
-func init() {
-	parse.Register("header.RegexFilter", headerValueRegexFilterFromJSON)
 }
 
 // NewValueRegexFilter builds a new header value regex filter.
