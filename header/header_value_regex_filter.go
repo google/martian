@@ -12,21 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package martianurl
+package header
 
 import (
 	"encoding/json"
-	"github.com/google/martian"
-	"github.com/google/martian/parse"
 	"net/http"
 	"regexp"
+
+	"github.com/google/martian"
+	"github.com/google/martian/parse"
 )
 
-var noop = martian.Noop("header.RegexFilter")
-
-//  HeaderValueRegexFilter executes resmod and reqmod when the header
+// ValueRegexFilter executes resmod and reqmod when the header
 // value matches regex.
-type HeaderValueRegexFilter struct {
+type ValueRegexFilter struct {
 	regex  *regexp.Regexp
 	header string
 	reqmod martian.RequestModifier
@@ -44,9 +43,9 @@ func init() {
 	parse.Register("header.RegexFilter", headerValueRegexFilterFromJSON)
 }
 
-// NewHeaderValueRegexFilter builds a new header value regex filter.
-func NewHeaderValueRegexFilter(regex *regexp.Regexp, header string) *HeaderValueRegexFilter {
-	return &HeaderValueRegexFilter{
+// NewValueRegexFilter builds a new header value regex filter.
+func NewValueRegexFilter(regex *regexp.Regexp, header string) *ValueRegexFilter {
+	return &ValueRegexFilter{
 		regex:  regex,
 		header: header,
 		reqmod: noop,
@@ -64,7 +63,7 @@ func headerValueRegexFilterFromJSON(b []byte) (*parse.Result, error) {
 	if err == nil {
 		return nil, err
 	}
-	filter := NewHeaderValueRegexFilter(cr, msg.HeaderName)
+	filter := NewValueRegexFilter(cr, msg.HeaderName)
 
 	r, err := parse.FromJSON(msg.Modifier)
 	if err != nil {
@@ -80,8 +79,8 @@ func headerValueRegexFilterFromJSON(b []byte) (*parse.Result, error) {
 	return parse.NewResult(filter, msg.Scope)
 }
 
-// ModifyRequest runs reqmod iff the value of header matches regex. 
-func (f *HeaderValueRegexFilter) ModifyRequest(req *http.Request) error {
+// ModifyRequest runs reqmod iff the value of header matches regex.
+func (f *ValueRegexFilter) ModifyRequest(req *http.Request) error {
 	hvalue := req.Header.Get(f.header)
 	if hvalue == "" {
 		return nil
@@ -94,8 +93,8 @@ func (f *HeaderValueRegexFilter) ModifyRequest(req *http.Request) error {
 	return nil
 }
 
-// ModifyResponse runs resmod iff the value of request header matches regex. 
-func (f *HeaderValueRegexFilter) ModifyResponse(res *http.Response) error {
+// ModifyResponse runs resmod iff the value of request header matches regex.
+func (f *ValueRegexFilter) ModifyResponse(res *http.Response) error {
 	hvalue := res.Request.Header.Get(f.header)
 	if hvalue == "" {
 		return nil
@@ -109,7 +108,7 @@ func (f *HeaderValueRegexFilter) ModifyResponse(res *http.Response) error {
 }
 
 // SetRequestModifier sets the request modifier of HeaderValueRegexFilter.
-func (f *HeaderValueRegexFilter) SetRequestModifier(reqmod martian.RequestModifier) {
+func (f *ValueRegexFilter) SetRequestModifier(reqmod martian.RequestModifier) {
 	if reqmod == nil {
 		f.reqmod = noop
 		return
@@ -119,7 +118,7 @@ func (f *HeaderValueRegexFilter) SetRequestModifier(reqmod martian.RequestModifi
 }
 
 // SetResponseModifier sets the response modifier of HeaderValueRegexFilter.
-func (f *HeaderValueRegexFilter) SetResponseModifier(resmod martian.ResponseModifier) {
+func (f *ValueRegexFilter) SetResponseModifier(resmod martian.ResponseModifier) {
 	if resmod == nil {
 		f.resmod = noop
 		return
