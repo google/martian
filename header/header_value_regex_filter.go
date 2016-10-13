@@ -60,7 +60,7 @@ func headerValueRegexFilterFromJSON(b []byte) (*parse.Result, error) {
 	}
 
 	cr, err := regexp.Compile(msg.Regex)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 	filter := NewValueRegexFilter(cr, msg.HeaderName)
