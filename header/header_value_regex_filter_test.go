@@ -86,15 +86,15 @@ func TestValueRegexFilterFromJSON(t *testing.T) {
       "scope": ["request", "response"],
 	    "header": "X-Forwarded-Url",
 	    "regex": ".*/test",
-      "modifier": {
-        "header.Modifier" : {
-          "scope": ["request", "response"],
-          "name": "Martian-Testing",
-          "value": "true"
+        "modifier": {
+          "header.Modifier" : {
+            "scope": ["request", "response"],
+            "name": "Martian-Testing",
+            "value": "true"
+          }
         }
       }
-    }
-  }`)
+    }`)
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
