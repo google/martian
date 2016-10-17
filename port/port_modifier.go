@@ -25,6 +25,10 @@ import (
 	"github.com/google/martian/parse"
 )
 
+// Modifier alters the request URL and Host header to explictly
+// use the provided port.  In the case that the provided port is
+// the default port for the schema, the port will be explictly
+// declared.
 type Modifier struct {
 	port int
 }
@@ -34,12 +38,20 @@ type modifierJSON struct {
 	Scope []parse.ModifierType `json:"scope"`
 }
 
+// NewModifier returns a RequestModifier that alters the request URL and Host header to explictly
+// use the provided port.  In the case that the provided port is
+// the default port for the schema, the port will be explictly
+// declared.
 func NewModifier(port int) martian.RequestModifier {
 	return &Modifier{
 		port: port,
 	}
 }
 
+// ModifyRequest alters the request URL and Host header to explictly
+// use the provided port.  In the case that the provided port is
+// the default port for the schema, the port will be explictly
+// declared.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
 	host := req.URL.Host
 	if strings.Contains(host, ":") {
