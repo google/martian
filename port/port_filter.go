@@ -101,6 +101,7 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 		return nil
 	}
 
+	// no port explictly declared - default port
 	if f.port == defaultPort {
 		return f.reqmod.ModifyRequest(req)
 	}

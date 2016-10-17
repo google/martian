@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package martianurl provides utilities for modifying, filtering,
-// and verifying URLs in martian.Proxy.
-
 package port
 
 import (

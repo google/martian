@@ -25,6 +25,10 @@ import (
 	"github.com/google/martian/parse"
 )
 
+func init() {
+	parse.Register("port.Modifier", modifierFromJSON)
+}
+
 // Modifier alters the request URL and Host header to explictly
 // use the provided port.  In the case that the provided port is
 // the default port for the schema, the port will be explictly
