@@ -84,20 +84,24 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 		defaultPort = 443
 	}
 
-	if !strings.Contains(req.URL.Host, ":") && (f.port == defaultPort) {
-		return f.reqmod.ModifyRequest(req)
+	hasPort := strings.Contains(req.URL.Host, ":")
+	if hasPort {
+		_, p, err := net.SplitHostPort(req.URL.Host)
+		if err != nil {
+			return err
+		}
+
+		pt, err := strconv.Atoi(p)
+		if err != nil {
+			return err
+		}
+		if pt == f.port {
+			return f.reqmod.ModifyRequest(req)
+		}
+		return nil
 	}
 
-	_, p, err := net.SplitHostPort(req.URL.Host)
-	if err != nil {
-		return err
-	}
-
-	pt, err := strconv.Atoi(p)
-	if err != nil {
-		return err
-	}
-	if pt == f.port {
+	if f.port == defaultPort {
 		return f.reqmod.ModifyRequest(req)
 	}
 
