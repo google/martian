@@ -19,12 +19,22 @@ api_version: 1
 threadsafe: true
 
 skip_files:
-- ^om/node_modules
+- ^dist.*
+- ^node_modules.*
+- ^test.*
 
 handlers:
-- url: /
-  static_files: om/index.html
-  upload: om/index.html
+- url: /bower_components/(.*\.(js|html))$
+  static_files: bower_components/\1
+  upload: bower_components/.*\.(js|html)$
 
-- url: /
-  static_dir: om
+- url: /elements/(.*\.(js|html))$
+  static_files: elements/\1
+  upload: elements/.*\.(js|html)$
+
+- url: /scripts
+  static_dir: scripts
+
+- url: /.*
+  static_files: index.html
+  upload: index.html
