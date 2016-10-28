@@ -59,27 +59,61 @@ func (f *Filter) SetResponseCondition(rescond ResponseCondition) {
 	f.rescond = rescond
 }
 
+// SetRequestModifier sets the martian.RequestModifier that is executed
+// when the RequestCondition evaluates to True.  This function is provided
+// to maintain backwards compatability with filtering prior to filter.Filter.
+func (f *Filter) SetRequestModifier(reqmod martian.RequestModifier) {
+	f.RequestWhenTrue(reqmod)
+}
+
 // RequestWhenTrue sets the martian.RequestModifier that is executed
 // when the RequestCondition evaluates to True.
 func (f *Filter) RequestWhenTrue(mod martian.RequestModifier) {
+	if mod == nil {
+		f.treqmod = noop
+		return
+	}
+
 	f.treqmod = mod
+}
+
+// SetResponseModifier sets the martian.ResponseModifier that is executed
+// when the ResponseCondition evaluates to True.  This function is provided
+// to maintain backwards compatability with filtering prior to filter.Filter.
+func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
+	f.ResponseWhenTrue(resmod)
 }
 
 // RequestWhenFalse sets the martian.RequestModifier that is executed
 // when the RequestCondition evaluates to False.
 func (f *Filter) RequestWhenFalse(mod martian.RequestModifier) {
+	if mod == nil {
+		f.freqmod = noop
+		return
+	}
+
 	f.freqmod = mod
 }
 
 // ResponseWhenTrue sets the martian.ResponseModifier that is executed
 // when the ResponseCondition evaluates to True.
 func (f *Filter) ResponseWhenTrue(mod martian.ResponseModifier) {
+	if mod == nil {
+		f.tresmod = noop
+		return
+	}
+
 	f.tresmod = mod
 }
 
 // ResponseWhenFalse sets the martian.ResponseModifier that is executed
 // when the ResponseCondition evaluates to False.
 func (f *Filter) ResponseWhenFalse(mod martian.ResponseModifier) {
+	if mod == nil {
+		f.fresmod = noop
+		return
+	}
+
 	f.fresmod = mod
 }
 
