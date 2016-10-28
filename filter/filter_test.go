@@ -195,7 +195,7 @@ func TestResponseWhenFalse(t *testing.T) {
 }
 
 func TestPassThroughVerifyRequests(t *testing.T) {
-	f := NewFilter("Martian-Testing", "true")
+	f := header.NewFilter("Martian-Testing", "true")
 	if err := f.VerifyRequests(); err != nil {
 		t.Fatalf("VerifyRequest(): got %v, want no error", err)
 	}
@@ -212,7 +212,7 @@ func TestPassThroughVerifyRequests(t *testing.T) {
 }
 
 func TestPassThroughVerifyResponses(t *testing.T) {
-	f := NewFilter("Martian-Testing", "true")
+	f := header.NewFilter("Martian-Testing", "true")
 	if err := f.VerifyResponses(); err != nil {
 		t.Fatalf("VerifyResponses(): got %v, want no error", err)
 	}
@@ -229,7 +229,7 @@ func TestPassThroughVerifyResponses(t *testing.T) {
 }
 
 func TestResets(t *testing.T) {
-	f := NewFilter("Martian-Testing", "true")
+	f := header.NewFilter("Martian-Testing", "true")
 
 	tv := &verify.TestVerifier{
 		ResponseError: errors.New("verify response failure"),
