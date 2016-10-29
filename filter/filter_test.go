@@ -13,3 +13,101 @@
 // limitations under the License.
 
 package filter
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/google/martian/martiantest"
+	"github.com/google/martian/proxyutil"
+)
+
+func TestRequestWhenTrueCondition(t *testing.T) {
+	filter := New()
+
+	tmc := NewTestMatcher()
+	tmc.RequestEvaluatesTo(true)
+	filter.SetRequestCondition(tmc)
+
+	tmod := martiantest.NewModifier()
+	filter.RequestWhenTrue(tmod)
+
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := filter.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := tmod.RequestModified(), true; got != want {
+		t.Errorf("tmod.RequestModified(): got %t, want %t", got, want)
+	}
+}
+
+func TestRequestWhenFalseCondition(t *testing.T) {
+	filter := New()
+
+	tmc := NewTestMatcher()
+	tmc.RequestEvaluatesTo(false)
+	filter.SetRequestCondition(tmc)
+
+	tmod := martiantest.NewModifier()
+	filter.RequestWhenFalse(tmod)
+
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := filter.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := tmod.RequestModified(), true; got != want {
+		t.Errorf("tmod.RequestModified(): got %t, want %t", got, want)
+	}
+}
+
+func TestResponseWhenTrueCondition(t *testing.T) {
+	filter := New()
+
+	tmc := NewTestMatcher()
+	tmc.ResponseEvaluatesTo(true)
+	filter.SetResponseCondition(tmc)
+
+	tmod := martiantest.NewModifier()
+	filter.ResponseWhenTrue(tmod)
+
+	res := proxyutil.NewResponse(200, nil, nil)
+
+	if err := filter.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := tmod.ResponseModified(), true; got != want {
+		t.Errorf("tmod.ResponseModified(): got %t, want %t", got, want)
+	}
+}
+
+func TestResponseWhenFalseCondition(t *testing.T) {
+	filter := New()
+
+	tmc := NewTestMatcher()
+	tmc.ResponseEvaluatesTo(false)
+	filter.SetResponseCondition(tmc)
+
+	tmod := martiantest.NewModifier()
+	filter.ResponseWhenFalse(tmod)
+
+	res := proxyutil.NewResponse(200, nil, nil)
+
+	if err := filter.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := tmod.ResponseModified(), true; got != want {
+		t.Errorf("tmod.ResponseModified(): got %t, want %t", got, want)
+	}
+}
