@@ -58,7 +58,7 @@ func NewFilter(name, value string) *Filter {
 //   "scope": ["request", "result"],
 //   "name": "Martian-Testing",
 //   "value": "true",
-//   "modifier": { ... }
+//   "modifier": { ... },
 //   "else": { ... }
 // }
 func filterFromJSON(b []byte) (*parse.Result, error) {

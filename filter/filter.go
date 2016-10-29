@@ -140,19 +140,25 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 // VerifyRequests returns an error containing all the verification errors
 // returned by request verifiers.
 func (f *Filter) VerifyRequests() error {
-	treqv, ok := f.treqmod.(verify.RequestVerifier)
-	if !ok {
-		return nil
-	}
+	merr := verify.NewMultiError()
 
 	freqv, ok := f.freqmod.(verify.RequestVerifier)
-	if !ok {
-		return nil
+	if ok {
+		if ve := freqv.VerifyRequests(); ve != nil {
+			merr.Add(ve)
+		}
 	}
 
-	merr := verify.NewMultiError()
-	merr.Add(treqv.VerifyRequests())
-	merr.Add(freqv.VerifyRequests())
+	treqv, ok := f.treqmod.(verify.RequestVerifier)
+	if ok {
+		if ve := treqv.VerifyRequests(); ve != nil {
+			merr.Add(ve)
+		}
+	}
+
+	if merr.Empty() {
+		return nil
+	}
 
 	return merr
 }
@@ -160,19 +166,25 @@ func (f *Filter) VerifyRequests() error {
 // VerifyResponses returns an error containing all the verification errors
 // returned by response verifiers.
 func (f *Filter) VerifyResponses() error {
+	merr := verify.NewMultiError()
+
 	tresv, ok := f.tresmod.(verify.ResponseVerifier)
-	if !ok {
-		return nil
+	if ok {
+		if ve := tresv.VerifyResponses(); ve != nil {
+			merr.Add(ve)
+		}
 	}
 
 	fresv, ok := f.fresmod.(verify.ResponseVerifier)
-	if !ok {
-		return nil
+	if ok {
+		if ve := fresv.VerifyResponses(); ve != nil {
+			merr.Add(ve)
+		}
 	}
 
-	merr := verify.NewMultiError()
-	merr.Add(tresv.VerifyResponses())
-	merr.Add(fresv.VerifyResponses())
+	if merr.Empty() {
+		return nil
+	}
 
 	return merr
 }

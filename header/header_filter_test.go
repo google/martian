@@ -19,123 +19,35 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/martian/filter"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
 )
 
-func TestModifyRequest(t *testing.T) {
-	f := NewFilter("mARTian-teSTInG", "true")
-	f.SetRequestModifier(nil)
-
-	req, err := http.NewRequest("GET", "http://example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-
-	if err := f.ModifyRequest(req); err != nil {
-		t.Errorf("ModifyRequest(): got %v, want no error", err)
-	}
-
-	tt := []struct {
-		name   string
-		values []string
-		want   bool
-	}{
-		{
-			name:   "Martian-Production",
-			values: []string{"true"},
-			want:   false,
-		},
-		{
-			name:   "Martian-Testing",
-			values: []string{"see-next-value", "true"},
-			want:   true,
-		},
-	}
-
-	for i, tc := range tt {
-		f := NewFilter("mARTian-teSTInG", "true")
-		tm := martiantest.NewModifier()
-		f.SetRequestModifier(tm)
-
-		req, err := http.NewRequest("GET", "http://example.com", nil)
-		if err != nil {
-			t.Fatalf("%d. http.NewRequest(): got %v, want no error", i, err)
-		}
-		req.Header[tc.name] = tc.values
-
-		if err := f.ModifyRequest(req); err != nil {
-			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
-		}
-
-		if tm.RequestModified() != tc.want {
-			t.Errorf("%d. tm.RequestModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
-		}
-	}
-}
-
-func TestModifyResponse(t *testing.T) {
-	f := NewFilter("mARTian-teSTInG", "true")
-	f.SetResponseModifier(nil)
-
-	res := proxyutil.NewResponse(200, nil, nil)
-
-	if err := f.ModifyResponse(res); err != nil {
-		t.Errorf("ModifyResponse(): got %v, want no error", err)
-	}
-
-	tt := []struct {
-		name   string
-		values []string
-		want   bool
-	}{
-		{
-			name:   "Martian-Production",
-			values: []string{"true"},
-			want:   false,
-		},
-		{
-			name:   "Martian-Testing",
-			values: []string{"see-next-value", "true"},
-			want:   true,
-		},
-	}
-
-	for i, tc := range tt {
-		f := NewFilter("mARTian-teSTInG", "true")
-		tm := martiantest.NewModifier()
-		f.SetResponseModifier(tm)
-
-		res := proxyutil.NewResponse(200, nil, nil)
-		res.Header[tc.name] = tc.values
-
-		if err := f.ModifyResponse(res); err != nil {
-			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
-		}
-
-		if tm.ResponseModified() != tc.want {
-			t.Errorf("%d. tm.ResponseModified(): got %t, want %t", i, tm.ResponseModified(), tc.want)
-		}
-	}
-}
-
 func TestFilterFromJSON(t *testing.T) {
 	msg := []byte(`{
-    "header.Filter": {
-      "scope": ["request", "response"],
-      "name": "Martian-Passthrough",
-      "value": "true",
-      "modifier": {
-        "header.Modifier" : {
-          "scope": ["request", "response"],
-          "name": "Martian-Testing",
-          "value": "true"
-        }
-      }
-    }
-  }`)
+		"header.Filter": {
+			"scope": ["request", "response"],
+			"name": "Martian-Passthrough",
+			"value": "true",
+			"modifier": {
+				"header.Modifier" : {
+					"scope": ["request", "response"],
+					"name": "Martian-Testing",
+					"value": "true"
+				}
+			},
+			"else": {
+				"header.Modifier" : {
+					"scope": ["request", "response"],
+					"name": "Martian-Testing",
+					"value": "false"
+				}
+			} 
+		}
+	}`)
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
@@ -173,7 +85,176 @@ func TestFilterFromJSON(t *testing.T) {
 	}
 }
 
-func TestPassThroughVerifyhRequests(t *testing.T) {
+func TestRequestWhenTrueCondition(t *testing.T) {
+	hm := NewMatcher("Martian-Testing", "true")
+
+	tt := []struct {
+		name   string
+		values []string
+		want   bool
+	}{
+		{
+			name:   "Martian-Production",
+			values: []string{"true"},
+			want:   false,
+		},
+		{
+			name:   "Martian-Testing",
+			values: []string{"see-next-value", "true"},
+			want:   true,
+		},
+	}
+
+	for i, tc := range tt {
+		tm := martiantest.NewModifier()
+
+		f := filter.New()
+		f.SetRequestCondition(hm)
+		f.RequestWhenTrue(tm)
+
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+		}
+
+		req.Header[tc.name] = tc.values
+
+		if err := f.ModifyRequest(req); err != nil {
+			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
+		}
+
+		if tm.RequestModified() != tc.want {
+			t.Errorf("%d. tm.RequestModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
+		}
+	}
+}
+
+func TestRequestWhenFalse(t *testing.T) {
+	hm := NewMatcher("Martian-Testing", "true")
+	tt := []struct {
+		name   string
+		values []string
+		want   bool
+	}{
+		{
+			name:   "Martian-Production",
+			values: []string{"true"},
+			want:   true,
+		},
+		{
+			name:   "Martian-Testing",
+			values: []string{"see-next-value", "true"},
+			want:   false,
+		},
+	}
+
+	for i, tc := range tt {
+		tm := martiantest.NewModifier()
+
+		f := filter.New()
+		f.SetRequestCondition(hm)
+		f.RequestWhenFalse(tm)
+
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+		}
+
+		req.Header[tc.name] = tc.values
+
+		if err := f.ModifyRequest(req); err != nil {
+			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
+		}
+
+		if tm.RequestModified() != tc.want {
+			t.Errorf("%d. tm.RequestModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
+		}
+	}
+}
+
+func TestResponseWhenTrue(t *testing.T) {
+	hm := NewMatcher("Martian-Testing", "true")
+
+	tt := []struct {
+		name   string
+		values []string
+		want   bool
+	}{
+		{
+			name:   "Martian-Production",
+			values: []string{"true"},
+			want:   false,
+		},
+		{
+			name:   "Martian-Testing",
+			values: []string{"see-next-value", "true"},
+			want:   true,
+		},
+	}
+
+	for i, tc := range tt {
+		tm := martiantest.NewModifier()
+
+		f := filter.New()
+		f.SetResponseCondition(hm)
+		f.ResponseWhenTrue(tm)
+
+		res := proxyutil.NewResponse(200, nil, nil)
+
+		res.Header[tc.name] = tc.values
+
+		if err := f.ModifyResponse(res); err != nil {
+			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
+		}
+
+		if tm.ResponseModified() != tc.want {
+			t.Errorf("%d. tm.ResponseModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
+		}
+	}
+}
+
+func TestResponseWhenFalse(t *testing.T) {
+	hm := NewMatcher("Martian-Testing", "true")
+
+	tt := []struct {
+		name   string
+		values []string
+		want   bool
+	}{
+		{
+			name:   "Martian-Production",
+			values: []string{"true"},
+			want:   true,
+		},
+		{
+			name:   "Martian-Testing",
+			values: []string{"see-next-value", "true"},
+			want:   false,
+		},
+	}
+
+	for i, tc := range tt {
+		tm := martiantest.NewModifier()
+
+		f := filter.New()
+		f.SetResponseCondition(hm)
+		f.ResponseWhenFalse(tm)
+
+		res := proxyutil.NewResponse(200, nil, nil)
+
+		res.Header[tc.name] = tc.values
+
+		if err := f.ModifyResponse(res); err != nil {
+			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
+		}
+
+		if tm.ResponseModified() != tc.want {
+			t.Errorf("%d. tm.ResponseModified(): got %t, want %t", i, tm.RequestModified(), tc.want)
+		}
+	}
+}
+
+func TestPassThroughVerifyRequests(t *testing.T) {
 	f := NewFilter("Martian-Testing", "true")
 	if err := f.VerifyRequests(); err != nil {
 		t.Fatalf("VerifyRequest(): got %v, want no error", err)
@@ -207,7 +288,7 @@ func TestPassThroughVerifyResponses(t *testing.T) {
 	}
 }
 
-func TestResets(t *testing.T) {
+func TestResetVerifications(t *testing.T) {
 	f := NewFilter("Martian-Testing", "true")
 
 	tv := &verify.TestVerifier{
@@ -230,10 +311,11 @@ func TestResets(t *testing.T) {
 	f.ResetRequestVerifications()
 	f.ResetResponseVerifications()
 
-	if err := f.VerifyRequests(); err != nil {
-		t.Errorf("VerifyRequests(): got %v, want no error", err)
-	}
 	if err := f.VerifyResponses(); err != nil {
 		t.Errorf("VerifyResponses(): got %v, want no error", err)
+	}
+
+	if err := f.VerifyRequests(); err != nil {
+		t.Errorf("VerifyRequests(): got %v, want no error", err)
 	}
 }
