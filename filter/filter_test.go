@@ -15,11 +15,13 @@
 package filter
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/verify"
 )
 
 func TestRequestWhenTrueCondition(t *testing.T) {
@@ -109,5 +111,85 @@ func TestResponseWhenFalseCondition(t *testing.T) {
 
 	if got, want := tmod.ResponseModified(), true; got != want {
 		t.Errorf("tmod.ResponseModified(): got %t, want %t", got, want)
+	}
+}
+
+func TestResetVerifications(t *testing.T) {
+	filter := New()
+
+	tmc := martiantest.NewMatcher()
+	tmc.ResponseEvaluatesTo(true)
+	filter.SetResponseCondition(tmc)
+
+	tv := &verify.TestVerifier{
+		ResponseError: errors.New("verify response failure"),
+	}
+	filter.ResponseWhenTrue(tv)
+
+	tv = &verify.TestVerifier{
+		RequestError: errors.New("verify request failure"),
+	}
+	filter.RequestWhenTrue(tv)
+
+	if err := filter.VerifyRequests(); err == nil {
+		t.Fatal("VerifyRequests(): got nil, want error")
+	}
+	if err := filter.VerifyResponses(); err == nil {
+		t.Fatal("VerifyResponses(): got nil, want error")
+	}
+
+	filter.ResetRequestVerifications()
+	filter.ResetResponseVerifications()
+
+	if err := filter.VerifyResponses(); err != nil {
+		t.Errorf("VerifyResponses(): got %v, want no error", err)
+	}
+
+	if err := filter.VerifyRequests(); err != nil {
+		t.Errorf("VerifyRequests(): got %v, want no error", err)
+	}
+}
+
+func TestPassThroughVerifyRequests(t *testing.T) {
+	filter := New()
+
+	tmc := martiantest.NewMatcher()
+	tmc.RequestEvaluatesTo(true)
+	filter.SetRequestCondition(tmc)
+
+	if err := filter.VerifyRequests(); err != nil {
+		t.Fatalf("VerifyRequest(): got %v, want no error", err)
+	}
+
+	tv := &verify.TestVerifier{
+		RequestError: errors.New("verify request failure"),
+	}
+
+	filter.RequestWhenTrue(tv)
+
+	if got, want := filter.VerifyRequests().Error(), "verify request failure"; got != want {
+		t.Fatalf("VerifyRequests(): got %s, want %s", got, want)
+	}
+}
+
+func TestPassThroughVerifyResponses(t *testing.T) {
+	filter := New()
+
+	tmc := martiantest.NewMatcher()
+	tmc.ResponseEvaluatesTo(true)
+	filter.SetResponseCondition(tmc)
+
+	if err := filter.VerifyResponses(); err != nil {
+		t.Fatalf("VerifyResponses(): got %v, want no error", err)
+	}
+
+	tv := &verify.TestVerifier{
+		ResponseError: errors.New("verify response failure"),
+	}
+
+	filter.ResponseWhenTrue(tv)
+
+	if got, want := filter.VerifyResponses().Error(), "verify response failure"; got != want {
+		t.Fatalf("VerifyResponses(): got %s, want %s", got, want)
 	}
 }
