@@ -25,7 +25,7 @@ import (
 func TestRequestWhenTrueCondition(t *testing.T) {
 	filter := New()
 
-	tmc := NewTestMatcher()
+	tmc := martiantest.NewMatcher()
 	tmc.RequestEvaluatesTo(true)
 	filter.SetRequestCondition(tmc)
 
@@ -49,7 +49,7 @@ func TestRequestWhenTrueCondition(t *testing.T) {
 func TestRequestWhenFalseCondition(t *testing.T) {
 	filter := New()
 
-	tmc := NewTestMatcher()
+	tmc := martiantest.NewMatcher()
 	tmc.RequestEvaluatesTo(false)
 	filter.SetRequestCondition(tmc)
 
@@ -73,7 +73,7 @@ func TestRequestWhenFalseCondition(t *testing.T) {
 func TestResponseWhenTrueCondition(t *testing.T) {
 	filter := New()
 
-	tmc := NewTestMatcher()
+	tmc := martiantest.NewMatcher()
 	tmc.ResponseEvaluatesTo(true)
 	filter.SetResponseCondition(tmc)
 
@@ -94,7 +94,7 @@ func TestResponseWhenTrueCondition(t *testing.T) {
 func TestResponseWhenFalseCondition(t *testing.T) {
 	filter := New()
 
-	tmc := NewTestMatcher()
+	tmc := martiantest.NewMatcher()
 	tmc.ResponseEvaluatesTo(false)
 	filter.SetResponseCondition(tmc)
 

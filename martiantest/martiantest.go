@@ -111,3 +111,35 @@ func (m *Modifier) Reset() {
 	m.reqerr = nil
 	m.reserr = nil
 }
+
+// Matcher is a stubbed matcher used in tests.
+type Matcher struct {
+	resval bool
+	reqval bool
+}
+
+// NewMatcher returns a pointer to martiantest.Matcher with the return values
+// for MatchRequest and MatchResponse intiailized to true.
+func NewMatcher() *Matcher {
+	return &Matcher{resval: true, reqval: true}
+}
+
+// ResponseEvaluatesTo sets the value returned by MatchResponse.
+func (tm *Matcher) ResponseEvaluatesTo(value bool) {
+	tm.resval = value
+}
+
+// RequestEvaluatesTo sets the value returned by MatchRequest.
+func (tm *Matcher) RequestEvaluatesTo(value bool) {
+	tm.reqval = value
+}
+
+// MatchRequest returns the stubbed value in tm.reqval.
+func (tm *Matcher) MatchRequest(*http.Request) bool {
+	return tm.reqval
+}
+
+// MatchResponse returns the stubbed value in tm.resval.
+func (tm *Matcher) MatchResponse(*http.Response) bool {
+	return tm.resval
+}
