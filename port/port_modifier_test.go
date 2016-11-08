@@ -45,7 +45,6 @@ func TestPortModifierOnPort(t *testing.T) {
 	}
 }
 
-// Test that a modifier with no configuration does nothing.
 func TestPortModifierWithNoConfiguration(t *testing.T) {
 	mod := NewModifier()
 

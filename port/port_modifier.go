@@ -54,14 +54,15 @@ func NewModifier() *Modifier {
 	return &Modifier{}
 }
 
-// Explicitly specify 80 for HTTP or 443 for HTTPS ('http://example.com:80'). Do nothing for a scheme that is not 'http' or 'https'.
+// DefaultPortForScheme configures the modifier to explicitly specify 80 for HTTP or 443 for HTTPS ('http://example.com:80').
+// The modifier will not modify requests with a scheme that is not 'http' or 'https'.
 // This overrides any previous configuration for this modifier.
 func (m *Modifier) DefaultPortForScheme() {
 	m.defaultForScheme = true
 	m.remove = false
 }
 
-// Explicitly add the specified port to the host string ('example.com:1234').
+// UsePort configures the modifier to add the specified port to the host string ('example.com:1234').
 // This overrides any previous configuration for this modifier.
 func (m *Modifier) UsePort(port int) {
 	m.port = port
@@ -69,7 +70,7 @@ func (m *Modifier) UsePort(port int) {
 	m.defaultForScheme = false
 }
 
-// Remove the port from the host string ('example.com').
+// RemovePort configures the modifier to remove the port from the host string ('example.com').
 // This overrides any previous configuration for this modifier.
 func (m *Modifier) RemovePort() {
 	m.remove = true
