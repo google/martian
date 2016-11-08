@@ -48,10 +48,8 @@ type modifierJSON struct {
 	Scope            []parse.ModifierType `json:"scope"`
 }
 
-// NewModifier returns a RequestModifier that alters the request URL and Host header to explictly
-// use the provided port.  In the case that the provided port is
-// the default port for the scheme, the port will be explictly
-// declared.
+// NewModifier returns a RequestModifier that can be configured to alter the request URL and Host header's port.
+// One of DefaultPortForScheme, UsePort, or RemovePort should be called to configure this modifier.
 func NewModifier() *Modifier {
 	return &Modifier{}
 }
