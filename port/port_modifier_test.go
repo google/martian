@@ -22,8 +22,9 @@ import (
 	"github.com/google/martian/parse"
 )
 
-func TestPortModifierOnRequest(t *testing.T) {
-	mod := NewModifier(8080)
+func TestPortModifierOnPort(t *testing.T) {
+	mod := NewModifier()
+	mod.UsePort(8080)
 
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -41,6 +42,94 @@ func TestPortModifierOnRequest(t *testing.T) {
 
 	if got, want := port, "8080"; got != want {
 		t.Errorf("port: got %v, want %v", got, want)
+	}
+}
+
+// Test that a modifier with no configuration does nothing.
+func TestPortModifierWithNoConfiguration(t *testing.T) {
+	mod := NewModifier()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.URL.Host, "example.com"; got != want {
+		t.Errorf("req.URL.Host: got %v, want %v", got, want)
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com:80", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.URL.Host, "example.com:80"; got != want {
+		t.Errorf("req.URL.Host: got %v, want %v", got, want)
+	}
+}
+
+func TestPortModifierDefaultForScheme(t *testing.T) {
+	mod := NewModifier()
+	mod.DefaultPortForScheme()
+
+	req, err := http.NewRequest("GET", "HtTp://example.com", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.URL.Host, "example.com:80"; got != want {
+		t.Errorf("req.URL.Host: got %v, want %v", got, want)
+	}
+}
+
+func TestPortModifierRemove(t *testing.T) {
+	mod := NewModifier()
+	mod.RemovePort()
+
+	req, err := http.NewRequest("GET", "http://example.com:8080", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.URL.Host, "example.com"; got != want {
+		t.Errorf("req.URL.Host: got %v, want %v", got, want)
+	}
+}
+
+func TestPortModifierAllFields(t *testing.T) {
+	mod := NewModifier()
+	mod.UsePort(8081)
+	mod.DefaultPortForScheme()
+	mod.RemovePort()
+
+	req, err := http.NewRequest("GET", "http://example.com:8080", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	// Last configuration was to remove.
+	if got, want := req.URL.Host, "example.com"; got != want {
+		t.Errorf("req.URL.Host: got %v, want %v", got, want)
 	}
 }
 
@@ -80,4 +169,48 @@ func TestModiferFromJSON(t *testing.T) {
 		t.Errorf("port: got %v, want %v", got, want)
 	}
 
+}
+
+func TestModiferFromJSONInvalidConfigurations(t *testing.T) {
+	for _, msg := range [][]byte{
+		[]byte(`{
+				"port.Modifier": {
+					"scope": ["request"],
+					"port": 8080,
+					"defaultForScheme": true,
+					"remove": true
+				}
+			}`),
+		[]byte(`{
+				"port.Modifier": {
+					"scope": ["request"],
+					"port": 8080
+					"remove": true
+				}
+			}`),
+		[]byte(`{
+				"port.Modifier": {
+					"scope": ["request"],
+					"port": 8080
+					"defaultForScheme": true,
+				}
+			}`),
+		[]byte(`{
+				"port.Modifier": {
+					"scope": ["request"],
+					"defaultForScheme": true,
+					"remove": true
+				}
+			}`),
+		[]byte(`{
+				"port.Modifier": {
+					"scope": ["request"],
+				}
+			}`),
+	} {
+		_, err := parse.FromJSON(msg)
+		if err == nil {
+			t.Fatalf("parseFromJSON(msg): Got no error, but should have gotten one.")
+		}
+	}
 }

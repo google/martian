@@ -16,12 +16,12 @@ package port
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 )
 
@@ -29,34 +29,56 @@ func init() {
 	parse.Register("port.Modifier", modifierFromJSON)
 }
 
-// Modifier alters the request URL and Host header to explictly
-// use the provided port.  In the case that the provided port is
-// the default port for the schema, the port will be explictly
-// declared.
+// Modifier alters the request URL and Host header to use the provided port.
+// Only one of port, defaultForScheme, or remove may be specified.  Whichever is set last is the one that will take effect.
+// If remove is true, remove the port from the host string ('example.com').
+// If defaultForScheme is true, explicitly specify 80 for HTTP or 443 for HTTPS ('http://example.com:80'). Do nothing for a scheme that is not 'http' or 'https'.
+// If port is specified, explicitly add it to the host string ('example.com:1234').
+// If port is zero and the other fields are false, the request will not be modified.
 type Modifier struct {
-	port int
+	port             int
+	defaultForScheme bool
+	remove           bool
 }
 
 type modifierJSON struct {
-	Port  int                  `json:"port"`
-	Scope []parse.ModifierType `json:"scope"`
+	Port             int                  `json:"port"`
+	DefaultForScheme bool                 `json:"defaultForScheme"`
+	Remove           bool                 `json:"remove"`
+	Scope            []parse.ModifierType `json:"scope"`
 }
 
 // NewModifier returns a RequestModifier that alters the request URL and Host header to explictly
 // use the provided port.  In the case that the provided port is
-// the default port for the schema, the port will be explictly
+// the default port for the scheme, the port will be explictly
 // declared.
-func NewModifier(port int) martian.RequestModifier {
-	return &Modifier{
-		port: port,
-	}
+func NewModifier() *Modifier {
+	return &Modifier{}
 }
 
-// ModifyRequest alters the request URL and Host header to explictly
-// use the provided port.  In the case that the provided port is
-// the default port for the schema, the port will be explictly
-// declared.
+func (m *Modifier) DefaultPortForScheme() {
+	m.defaultForScheme = true
+	m.remove = false
+}
+
+func (m *Modifier) UsePort(port int) {
+	m.port = port
+	m.remove = false
+	m.defaultForScheme = false
+}
+
+func (m *Modifier) RemovePort() {
+	m.remove = true
+	m.defaultForScheme = false
+}
+
+// ModifyRequest alters the request URL and Host header to modify the port as specified.
+// See docs for Modifier for details.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
+	if m.port == 0 && !m.defaultForScheme && !m.remove {
+		return nil
+	}
+
 	host := req.URL.Host
 	if strings.Contains(host, ":") {
 		h, _, err := net.SplitHostPort(host)
@@ -66,6 +88,31 @@ func (m *Modifier) ModifyRequest(req *http.Request) error {
 		host = h
 	}
 
+	if m.remove {
+		req.URL.Host = host
+		req.Header.Set("Host", host)
+		return nil
+	}
+
+	if m.defaultForScheme {
+		switch req.URL.Scheme {
+		case "http":
+			hp := net.JoinHostPort(host, "80")
+			req.URL.Host = hp
+			req.Header.Set("Host", hp)
+			return nil
+		case "https":
+			hp := net.JoinHostPort(host, "443")
+			req.URL.Host = hp
+			req.Header.Set("Host", hp)
+			return nil
+		default:
+			// Unknown scheme, do nothing.
+			return nil
+		}
+	}
+
+	// Not removing or using default for the scheme, so use the provided port number.
 	hp := net.JoinHostPort(host, strconv.Itoa(m.port))
 	req.URL.Host = hp
 	req.Header.Set("Host", hp)
@@ -79,7 +126,29 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	mod := NewModifier(msg.Port)
+	errMsg := fmt.Errorf("Must specify only one of port, defaultForScheme or remove")
+
+	mod := NewModifier()
+	// Check that exactly one field of port, defaultForScheme, and remove is set.
+	switch {
+	case msg.Port != 0:
+		if msg.DefaultForScheme || msg.Remove {
+			return nil, errMsg
+		}
+		mod.UsePort(msg.Port)
+	case msg.DefaultForScheme:
+		if msg.Port != 0 || msg.Remove {
+			return nil, errMsg
+		}
+		mod.DefaultPortForScheme()
+	case msg.Remove:
+		if msg.Port != 0 || msg.DefaultForScheme {
+			return nil, errMsg
+		}
+		mod.RemovePort()
+	default:
+		return nil, errMsg
+	}
 
 	return parse.NewResult(mod, msg.Scope)
 }
