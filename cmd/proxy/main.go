@@ -220,6 +220,7 @@ import (
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"
+	_ "github.com/google/martian/port"
 	_ "github.com/google/martian/priority"
 	_ "github.com/google/martian/querystring"
 	_ "github.com/google/martian/status"
