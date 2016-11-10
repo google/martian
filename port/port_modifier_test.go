@@ -196,12 +196,6 @@ func TestModiferFromJSONInvalidConfigurations(t *testing.T) {
 			}`),
 		[]byte(`{
 				"port.Modifier": {
-					"scope": ["response"],
-					"remove": true
-				}
-			}`),
-		[]byte(`{
-				"port.Modifier": {
 					"scope": ["request"],
 					"defaultForScheme": true,
 					"remove": true
@@ -210,6 +204,12 @@ func TestModiferFromJSONInvalidConfigurations(t *testing.T) {
 		[]byte(`{
 				"port.Modifier": {
 					"scope": ["request"],
+				}
+			}`),
+		[]byte(`{
+				"port.Modifier": {
+					"scope": ["response"],
+					"remove": true
 				}
 			}`),
 	} {
