@@ -2,6 +2,7 @@ package stash
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/google/martian/parse"
@@ -23,18 +24,25 @@ type modifierJSON struct {
 	Scope      []parse.ModifierType `json:"scope"`
 }
 
-// NewModifier returns a RequestModifier that will add a header to the request containing the current state of the URL.
+// NewModifier returns a RequestModifier that write the current URL into a header.
 func NewModifier(headerName string) *Modifier {
 	return &Modifier{headerName: headerName}
 }
 
-// ModifyRequest alters the request
+// ModifyRequest writes the current URL into a header.
 // See docs for Modifier for details.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
 	req.Header.Set(m.headerName, req.URL.String())
 	return nil
 }
 
+// ModifyResponse writes the same header written in the request into the response.
+func (m *Modifier) ModifyResponse(res *http.Response) error {
+	res.Header.Set(m.headerName, res.Request.Header.Get(m.headerName))
+	return nil
+}
+
+// If you would like the saved state of the URL to be written in the response you must specify this modifier's scope as both request and response.
 func modifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &modifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {
@@ -42,5 +50,11 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 	}
 
 	mod := NewModifier(msg.HeaderName)
-	return parse.NewResult(mod, msg.Scope)
+	result, err := parse.NewResult(mod, msg.Scope)
+
+	if result.ResponseModifier() != nil && result.RequestModifier() == nil {
+		return nil, fmt.Errorf("To write header on a response, specify scope as both request and response.")
+	}
+
+	return result, err
 }
