@@ -206,6 +206,12 @@ func TestModiferFromJSONInvalidConfigurations(t *testing.T) {
 					"scope": ["request"],
 				}
 			}`),
+		[]byte(`{
+				"port.Modifier": {
+					"scope": ["response"],
+					"remove": true
+				}
+			}`),
 	} {
 		_, err := parse.FromJSON(msg)
 		if err == nil {
