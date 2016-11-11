@@ -8,6 +8,7 @@ import (
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/port"
+	"github.com/google/martian/proxyutil"
 )
 
 func TestStashRequest(t *testing.T) {
@@ -41,6 +42,48 @@ func TestStashRequest(t *testing.T) {
 
 }
 
+func TestStashRequestResponse(t *testing.T) {
+	headerName := "stashed-url"
+	originalUrl := "http://example.com"
+	fg := fifo.NewGroup()
+	fg.AddRequestModifier(NewModifier(headerName))
+	fg.AddResponseModifier(NewModifier(headerName))
+	pmod := port.NewModifier()
+	pmod.UsePort(8080)
+	fg.AddRequestModifier(pmod)
+
+	req, err := http.NewRequest("GET", originalUrl, nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	if err := fg.ModifyRequest(req); err != nil {
+		t.Fatalf("smod.ModifyRequest(): got %v, want no error", err)
+	}
+
+	_, port, err := net.SplitHostPort(req.URL.Host)
+	if err != nil {
+		t.Fatalf("net.SplitHostPort(%q): got %v, want no error", req.URL.Host, err)
+	}
+
+	if got, want := port, "8080"; got != want {
+		t.Errorf("port: got %v, want %v", got, want)
+	}
+
+	if got, want := req.Header.Get(headerName), originalUrl; got != want {
+		t.Errorf("res.Header.Get(%q): got %v, want %v", headerName, got, want)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := fg.ModifyResponse(res); err != nil {
+		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.Header.Get(headerName), originalUrl; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", headerName, got, want)
+	}
+}
+
 func TestStashInvalidHeaderName(t *testing.T) {
 	mod := NewModifier("invalid-chars-actually-work-;><@")
 
@@ -59,13 +102,15 @@ func TestStashInvalidHeaderName(t *testing.T) {
 }
 
 func TestModiferFromJSON(t *testing.T) {
+	headerName := "stashed-url"
+	originalUrl := "http://example.com"
 	msg := []byte(`{
     "fifo.Group": {
       "scope": ["request", "response"],
       "modifiers": [
         {
           "stash.Modifier": {
-            "scope": ["request"],
+            "scope": ["request", "response"],
             "headerName": "stashed-url"
           }
         },
@@ -89,7 +134,7 @@ func TestModiferFromJSON(t *testing.T) {
 		t.Fatal("reqmod: got nil, want not nil")
 	}
 
-	req, err := http.NewRequest("GET", "http://example.com", nil)
+	req, err := http.NewRequest("GET", originalUrl, nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
@@ -107,8 +152,18 @@ func TestModiferFromJSON(t *testing.T) {
 		t.Errorf("port: got %v, want %v", got, want)
 	}
 
-	if got, want := req.Header.Get("stashed-url"), "http://example.com"; got != want {
-		t.Errorf("stashed-url header: got %v, want %v", got, want)
+	if got, want := req.Header.Get(headerName), originalUrl; got != want {
+		t.Errorf("req.Header.Get(%q) header: got %v, want %v", headerName, got, want)
+	}
+
+	resmod := r.ResponseModifier()
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := resmod.ModifyResponse(res); err != nil {
+		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.Header.Get(headerName), originalUrl; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", headerName, got, want)
 	}
 }
 
