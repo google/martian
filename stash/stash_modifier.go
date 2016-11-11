@@ -11,7 +11,9 @@ func init() {
 	parse.Register("stash.Modifier", modifierFromJSON)
 }
 
-// Modifier alters the request URL and Host header to
+// Modifier adds a header to the request containing the current state of the URL.
+// The header will be named with the value stored in headerName.
+// There will be no validation done on this header name.
 type Modifier struct {
 	headerName string
 }
@@ -21,7 +23,7 @@ type modifierJSON struct {
 	Scope      []parse.ModifierType `json:"scope"`
 }
 
-// NewModifier returns a RequestModifier that can be configured to
+// NewModifier returns a RequestModifier that will add a header to the request containing the current state of the URL.
 func NewModifier(headerName string) *Modifier {
 	return &Modifier{headerName: headerName}
 }
