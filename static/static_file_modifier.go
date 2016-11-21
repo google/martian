@@ -18,6 +18,7 @@ package static
 
 import (
 	"encoding/json"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -59,17 +60,23 @@ func (s *staticModifier) ModifyRequest(req *http.Request) error {
 // path.  In the case that the file cannot be found, the response will be a 404.
 func (s *staticModifier) ModifyResponse(res *http.Response) error {
 	p := filepath.Join(s.rootPath, filepath.Clean(res.Request.URL.Path))
-	file, err := os.Open(p)
-	if err == os.ErrNotExist {
-		res.StatusCode = http.StatusNotFound
-		return nil
-	}
-	if err != nil {
+	f, err := os.Open(p)
+	switch {
+	case os.IsNotExist(err):
+		res.StatusCode = 404
+		return err
+	case os.IsPermission(err):
+		res.StatusCode = 401
+		return err
+	case err != nil:
+		res.StatusCode = 500
 		return err
 	}
 
-	res.Body = file
-	res.StatusCode = http.StatusOK
+	res.Body.Close()
+	res.Body = f
+
+	res.Header.Set("Content-Type", mime.TypeByExtension(filepath.Ext(p)))
 
 	return nil
 }

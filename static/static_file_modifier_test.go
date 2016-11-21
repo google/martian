@@ -26,16 +26,16 @@ import (
 )
 
 func TestStaticModifierOnRequest(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "static_file_modifier_test")
+	tmpdir, err := ioutil.TempDir("", "static_file_modifier_test_")
 	if err != nil {
 		t.Fatalf("ioutil.TempDir(): got %v, want no error", err)
 	}
 
-	if err := ioutil.WriteFile(path.Join(tmpdir, "sfmtest"), []byte("test file"), 0777); err != nil {
+	if err := ioutil.WriteFile(path.Join(tmpdir, "sfmtest.txt"), []byte("test file"), 0777); err != nil {
 		t.Fatalf("ioutil.WriteFile(): got %v, want no error", err)
 	}
 
-	req, err := http.NewRequest("GET", "/sfmtest", nil)
+	req, err := http.NewRequest("GET", "/sfmtest.txt", nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
@@ -55,6 +55,10 @@ func TestStaticModifierOnRequest(t *testing.T) {
 	}
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.Header.Get("Content-Type"), "text/plain; charset=utf-8"; got != want {
+		t.Errorf("res.Header.Get('Content-Type'): got %v, want %v", got, want)
 	}
 
 	got, err := ioutil.ReadAll(res.Body)
