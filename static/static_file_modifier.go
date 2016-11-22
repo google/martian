@@ -56,20 +56,23 @@ func (s *staticModifier) ModifyRequest(req *http.Request) error {
 	return nil
 }
 
-// ModifyResponse reads a the file rooted at rootPath joined with the request URL
+// ModifyResponse reads the file rooted at rootPath joined with the request URL
 // path.  In the case that the file cannot be found, the response will be a 404.
 func (s *staticModifier) ModifyResponse(res *http.Response) error {
 	p := filepath.Join(s.rootPath, filepath.Clean(res.Request.URL.Path))
 	f, err := os.Open(p)
 	switch {
 	case os.IsNotExist(err):
-		res.StatusCode = 404
+		res.StatusCode = http.StatusNotFound
 		return err
 	case os.IsPermission(err):
-		res.StatusCode = 401
+		// This is returning a StatusUnauthorized to reflect that the Martian does
+		// not have the appropriate permissions on the local file system.  This is a
+		// deviation from the standard assumption around an HTTP 401 response.
+		res.StatusCode = http.StatusUnauthorized
 		return err
 	case err != nil:
-		res.StatusCode = 500
+		res.StatusCode = http.StatusInternalServerError
 		return err
 	}
 

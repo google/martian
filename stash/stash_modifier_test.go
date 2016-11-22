@@ -1,3 +1,17 @@
+// Copyright 2015 Google Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package stash
 
 import (
@@ -44,7 +58,7 @@ func TestStashRequest(t *testing.T) {
 
 func TestStashRequestResponse(t *testing.T) {
 	headerName := "stashed-url"
-	originalUrl := "http://example.com"
+	originalURL := "http://example.com"
 	fg := fifo.NewGroup()
 	fg.AddRequestModifier(NewModifier(headerName))
 	fg.AddResponseModifier(NewModifier(headerName))
@@ -52,7 +66,7 @@ func TestStashRequestResponse(t *testing.T) {
 	pmod.UsePort(8080)
 	fg.AddRequestModifier(pmod)
 
-	req, err := http.NewRequest("GET", originalUrl, nil)
+	req, err := http.NewRequest("GET", originalURL, nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
@@ -70,7 +84,7 @@ func TestStashRequestResponse(t *testing.T) {
 		t.Errorf("port: got %v, want %v", got, want)
 	}
 
-	if got, want := req.Header.Get(headerName), originalUrl; got != want {
+	if got, want := req.Header.Get(headerName), originalURL; got != want {
 		t.Errorf("res.Header.Get(%q): got %v, want %v", headerName, got, want)
 	}
 
@@ -79,7 +93,7 @@ func TestStashRequestResponse(t *testing.T) {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 
-	if got, want := res.Header.Get(headerName), originalUrl; got != want {
+	if got, want := res.Header.Get(headerName), originalURL; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", headerName, got, want)
 	}
 }
@@ -103,7 +117,7 @@ func TestStashInvalidHeaderName(t *testing.T) {
 
 func TestModiferFromJSON(t *testing.T) {
 	headerName := "stashed-url"
-	originalUrl := "http://example.com"
+	originalURL := "http://example.com"
 	msg := []byte(`{
     "fifo.Group": {
       "scope": ["request", "response"],
@@ -134,7 +148,7 @@ func TestModiferFromJSON(t *testing.T) {
 		t.Fatal("reqmod: got nil, want not nil")
 	}
 
-	req, err := http.NewRequest("GET", originalUrl, nil)
+	req, err := http.NewRequest("GET", originalURL, nil)
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
@@ -152,7 +166,7 @@ func TestModiferFromJSON(t *testing.T) {
 		t.Errorf("port: got %v, want %v", got, want)
 	}
 
-	if got, want := req.Header.Get(headerName), originalUrl; got != want {
+	if got, want := req.Header.Get(headerName), originalURL; got != want {
 		t.Errorf("req.Header.Get(%q) header: got %v, want %v", headerName, got, want)
 	}
 
@@ -162,7 +176,7 @@ func TestModiferFromJSON(t *testing.T) {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 
-	if got, want := res.Header.Get(headerName), originalUrl; got != want {
+	if got, want := res.Header.Get(headerName), originalURL; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", headerName, got, want)
 	}
 }
