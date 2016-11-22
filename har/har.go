@@ -366,31 +366,10 @@ func (l *Logger) ModifyRequest(req *http.Request) error {
 // RecordRequest logs the HTTP request with the given ID. The ID should be unique
 // per request/response pair.
 func (l *Logger) RecordRequest(id string, req *http.Request) error {
-	hreq := &Request{
-		Method:      req.Method,
-		URL:         req.URL.String(),
-		HTTPVersion: req.Proto,
-		HeadersSize: -1,
-		BodySize:    req.ContentLength,
-		QueryString: []QueryString{},
-		Headers:     headers(proxyutil.RequestHeader(req).Map()),
-		Cookies:     cookies(req.Cookies()),
-	}
-
-	for n, vs := range req.URL.Query() {
-		for _, v := range vs {
-			hreq.QueryString = append(hreq.QueryString, QueryString{
-				Name:  n,
-				Value: v,
-			})
-		}
-	}
-
-	pd, err := postData(req, l.postDataLogging(req))
+	hreq, err := NewRequest(req, l.postDataLogging(req))
 	if err != nil {
 		return err
 	}
-	hreq.PostData = pd
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -404,6 +383,40 @@ func (l *Logger) RecordRequest(id string, req *http.Request) error {
 	}
 
 	return nil
+}
+
+// NewRequest constructs and returns a Request from req. If withBody is true,
+// req.Body is read to EOF and replaced with a copy in a bytes.Buffer. An error
+// is returned (and req.Body may be in an intermediate state) if an error is
+// returned from req.Body.Read.
+func NewRequest(req *http.Request, withBody bool) (*Request, error) {
+	r := &Request{
+		Method:      req.Method,
+		URL:         req.URL.String(),
+		HTTPVersion: req.Proto,
+		HeadersSize: -1,
+		BodySize:    req.ContentLength,
+		QueryString: []QueryString{},
+		Headers:     headers(proxyutil.RequestHeader(req).Map()),
+		Cookies:     cookies(req.Cookies()),
+	}
+
+	for n, vs := range req.URL.Query() {
+		for _, v := range vs {
+			r.QueryString = append(r.QueryString, QueryString{
+				Name:  n,
+				Value: v,
+			})
+		}
+	}
+
+	pd, err := postData(req, withBody)
+	if err != nil {
+		return nil, err
+	}
+	r.PostData = pd
+
+	return r, nil
 }
 
 // ModifyResponse logs responses.
@@ -420,43 +433,9 @@ func (l *Logger) ModifyResponse(res *http.Response) error {
 // RecordResponse logs an HTTP response, associating it with the previously-logged
 // HTTP request with the same ID.
 func (l *Logger) RecordResponse(id string, res *http.Response) error {
-	hres := &Response{
-		HTTPVersion: res.Proto,
-		Status:      res.StatusCode,
-		StatusText:  http.StatusText(res.StatusCode),
-		HeadersSize: -1,
-		BodySize:    res.ContentLength,
-		Headers:     headers(proxyutil.ResponseHeader(res).Map()),
-		Cookies:     cookies(res.Cookies()),
-	}
-
-	if res.StatusCode >= 300 && res.StatusCode < 400 {
-		hres.RedirectURL = res.Header.Get("Location")
-	}
-
-	hres.Content = &Content{
-		Encoding: "base64",
-		MimeType: res.Header.Get("Content-Type"),
-	}
-
-	if l.bodyLogging(res) {
-		mv := messageview.New()
-		if err := mv.SnapshotResponse(res); err != nil {
-			return err
-		}
-
-		br, err := mv.BodyReader(messageview.Decode())
-		if err != nil {
-			return err
-		}
-
-		body, err := ioutil.ReadAll(br)
-		if err != nil {
-			return err
-		}
-
-		hres.Content.Text = body
-		hres.Content.Size = int64(len(body))
+	hres, err := NewResponse(res, l.bodyLogging(res))
+	if err != nil {
+		return err
 	}
 
 	l.mu.Lock()
@@ -468,6 +447,52 @@ func (l *Logger) RecordResponse(id string, res *http.Response) error {
 	}
 
 	return nil
+}
+
+// NewResponse constructs and returns a Response from resp. If withBody is true,
+// resp.Body is read to EOF and replaced with a copy in a bytes.Buffer. An error
+// is returned (and resp.Body may be in an intermediate state) if an error is
+// returned from resp.Body.Read.
+func NewResponse(res *http.Response, withBody bool) (*Response, error) {
+	r := &Response{
+		HTTPVersion: res.Proto,
+		Status:      res.StatusCode,
+		StatusText:  http.StatusText(res.StatusCode),
+		HeadersSize: -1,
+		BodySize:    res.ContentLength,
+		Headers:     headers(proxyutil.ResponseHeader(res).Map()),
+		Cookies:     cookies(res.Cookies()),
+	}
+
+	if res.StatusCode >= 300 && res.StatusCode < 400 {
+		r.RedirectURL = res.Header.Get("Location")
+	}
+
+	r.Content = &Content{
+		Encoding: "base64",
+		MimeType: res.Header.Get("Content-Type"),
+	}
+
+	if withBody {
+		mv := messageview.New()
+		if err := mv.SnapshotResponse(res); err != nil {
+			return nil, err
+		}
+
+		br, err := mv.BodyReader(messageview.Decode())
+		if err != nil {
+			return nil, err
+		}
+
+		body, err := ioutil.ReadAll(br)
+		if err != nil {
+			return nil, err
+		}
+
+		r.Content.Text = body
+		r.Content.Size = int64(len(body))
+	}
+	return r, nil
 }
 
 // Export returns the in-memory log.
