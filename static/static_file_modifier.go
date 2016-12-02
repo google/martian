@@ -43,8 +43,7 @@ func init() {
 	parse.Register("static.Modifier", modifierFromJSON)
 }
 
-// NewModifier constructs a staticModifier that takes a path from which to
-// serve files from as well as an optional mapping of request paths to local
+// NewModifier constructs a staticModifier that takes a path to serve files from, as well as an optional mapping of request paths to local
 // file paths (still rooted at rootPath).
 func NewModifier(rootPath string, explicitPaths map[string]string) martian.RequestResponseModifier {
 	return &staticModifier{
@@ -63,8 +62,9 @@ func (s *staticModifier) ModifyRequest(req *http.Request) error {
 // ModifyResponse reads the file rooted at rootPath joined with the request URL
 // path. In the case that the the request path is a key in s.explicitPaths, ModifyRequest
 // will attempt to open the file located at s.rootPath joined by the value in s.explicitPaths
-// (keyed by res.Request.URL.Path). In the case that the file cannot be found, the response
-// will be a 404.
+// (keyed by res.Request.URL.Path).  In the case that the file cannot be found, the response
+// will be a 404. ModifyResponse will return a 404 for any path that is defined in s.explictPaths
+// and that does not exist locally, even if that file does exist in s.rootPath.
 func (s *staticModifier) ModifyResponse(res *http.Response) error {
 	reqpth := filepath.Clean(res.Request.URL.Path)
 	fpth := filepath.Join(s.rootPath, reqpth)
@@ -77,7 +77,7 @@ func (s *staticModifier) ModifyResponse(res *http.Response) error {
 	switch {
 	case os.IsNotExist(err):
 		res.StatusCode = http.StatusNotFound
-		return err
+		return nil
 	case os.IsPermission(err):
 		// This is returning a StatusUnauthorized to reflect that the Martian does
 		// not have the appropriate permissions on the local file system.  This is a
