@@ -13,7 +13,8 @@
 // limitations under the License.
 
 // Package static provides a modifier that allow Martian to reurn static files
-// local to Martian.
+// local to Martian. The static modifier does not currently support setting
+// explicit path mappings via the JSON API.
 package static
 
 import (
@@ -29,7 +30,8 @@ import (
 )
 
 type staticModifier struct {
-	rootPath string
+	rootPath      string
+	explicitPaths map[string]string
 }
 
 type staticJSON struct {
@@ -42,10 +44,12 @@ func init() {
 }
 
 // NewModifier constructs a staticModifier that takes a path from which to
-// serve files from.
-func NewModifier(rootPath string) martian.RequestResponseModifier {
+// serve files from as well as an optional mapping of request paths to local
+// file paths (still rooted at rootPath).
+func NewModifier(rootPath string, explicitPaths map[string]string) martian.RequestResponseModifier {
 	return &staticModifier{
-		rootPath: path.Clean(rootPath),
+		rootPath:      path.Clean(rootPath),
+		explicitPaths: explicitPaths,
 	}
 }
 
@@ -57,10 +61,19 @@ func (s *staticModifier) ModifyRequest(req *http.Request) error {
 }
 
 // ModifyResponse reads the file rooted at rootPath joined with the request URL
-// path.  In the case that the file cannot be found, the response will be a 404.
+// path. In the case that the the request path is a key in s.explicitPaths, ModifyRequest
+// will attempt to open the file located at s.rootPath joined by the value in s.explicitPaths
+// (keyed by res.Request.URL.Path). In the case that the file cannot be found, the response
+// will be a 404.
 func (s *staticModifier) ModifyResponse(res *http.Response) error {
-	p := filepath.Join(s.rootPath, filepath.Clean(res.Request.URL.Path))
-	f, err := os.Open(p)
+	reqpth := filepath.Clean(res.Request.URL.Path)
+	fpth := filepath.Join(s.rootPath, reqpth)
+
+	if _, ok := s.explicitPaths[reqpth]; ok {
+		fpth = filepath.Join(s.rootPath, s.explicitPaths[reqpth])
+	}
+
+	f, err := os.Open(fpth)
 	switch {
 	case os.IsNotExist(err):
 		res.StatusCode = http.StatusNotFound
@@ -79,7 +92,7 @@ func (s *staticModifier) ModifyResponse(res *http.Response) error {
 	res.Body.Close()
 	res.Body = f
 
-	res.Header.Set("Content-Type", mime.TypeByExtension(filepath.Ext(p)))
+	res.Header.Set("Content-Type", mime.TypeByExtension(filepath.Ext(fpth)))
 
 	return nil
 }
@@ -90,5 +103,5 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	return parse.NewResult(NewModifier(msg.RootPath), msg.Scope)
+	return parse.NewResult(NewModifier(msg.RootPath, nil), msg.Scope)
 }
