@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/api"
+	"github.com/google/martian/cybervillains"
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
@@ -49,6 +50,8 @@ import (
 	_ "github.com/google/martian/priority"
 	_ "github.com/google/martian/querystring"
 	_ "github.com/google/martian/skip"
+	_ "github.com/google/martian/stash"
+	_ "github.com/google/martian/static"
 	_ "github.com/google/martian/status"
 )
 
@@ -62,6 +65,12 @@ type Martian struct {
 // Start runs a martian.Proxy on trafficPort and the API server on apiPort.
 func Start(trafficPort, apiPort int) (*Martian, error) {
 	return StartWithCertificate(trafficPort, apiPort, "", "")
+}
+
+// StartWithCyberVillains runs a martian.Proxy on trafficPort and the API
+// server on apiPort configured to perform MITM with the CyberVillains cert and key.
+func StartWithCyberVillains(trafficPort int, apiPort int) (*Martian, error) {
+	return StartWithCertificate(trafficPort, apiPort, cybervillains.Cert, cybervillains.Key)
 }
 
 // StartWithCertificate runs a martian.Proxy on trafficPort and the API
