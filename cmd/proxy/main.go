@@ -206,6 +206,7 @@ import (
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
+	mlog "github.com/google/martian/log"
 	"github.com/google/martian/marbl"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/martianlog"
@@ -216,13 +217,15 @@ import (
 
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
-	mlog "github.com/google/martian/log"
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"
 	_ "github.com/google/martian/port"
 	_ "github.com/google/martian/priority"
 	_ "github.com/google/martian/querystring"
+	_ "github.com/google/martian/skip"
+	_ "github.com/google/martian/stash"
+	_ "github.com/google/martian/static"
 	_ "github.com/google/martian/status"
 )
 
