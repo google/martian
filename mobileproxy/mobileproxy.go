@@ -127,6 +127,11 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 	proxy.SetRequestModifier(topg)
 	proxy.SetResponseModifier(topg)
 
+	// add HAR logger for unmodified logs.
+	uhl := har.NewLogger()
+	fg.AddRequestModifier(uhl)
+	fg.AddResponseModifier(uhl)
+
 	// add HAR logger
 	hl := har.NewLogger()
 	stack.AddRequestModifier(hl)
@@ -142,6 +147,10 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 	// Update modifiers.
 	handle("/configure", apiPort, m)
 	mlog.Infof("mobileproxy: configure with requests to http://martian.proxy/configure")
+
+	// Retrieve Unmodified HAR logs
+	handle("/logs/original", apiPort, har.NewExportHandler(uhl))
+	handle("/logs/original/reset", apiPort, har.NewResetHandler(uhl))
 
 	// Retrieve HAR logs
 	handle("/logs", apiPort, har.NewExportHandler(hl))
