@@ -149,8 +149,8 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 	mlog.Infof("mobileproxy: configure with requests to http://martian.proxy/configure")
 
 	// Retrieve Unmodified HAR logs
-	handle("/logs/unmodified", apiPort, har.NewExportHandler(uhl))
-	handle("/logs/unmodified/reset", apiPort, har.NewResetHandler(uhl))
+	handle("/logs/original", apiPort, har.NewExportHandler(uhl))
+	handle("/logs/original/reset", apiPort, har.NewResetHandler(uhl))
 
 	// Retrieve HAR logs
 	handle("/logs", apiPort, har.NewExportHandler(hl))
