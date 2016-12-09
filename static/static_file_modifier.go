@@ -29,6 +29,8 @@ import (
 	"github.com/google/martian/parse"
 )
 
+// Modifier is a martian.RequestResponseModifier that routes reqeusts to rootPath
+// and serves the assets there, while skipping the HTTP roundtrip.
 type Modifier struct {
 	rootPath      string
 	explicitPaths map[string]string
