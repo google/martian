@@ -53,11 +53,12 @@ func Test404WhenExplictlyMappedFileDoesNotExist(t *testing.T) {
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
-	mod := NewModifier(tmpdir, map[string]string{"/sfmtest.txt": "/explicit/path/sfmtest.txt"})
+	mod := NewModifier(tmpdir)
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
-
 	}
+	mod.SetExplicitPathMappings(map[string]string{"/sfmtest.txt": "/explicit/path/sfmtest.txt"})
+
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
@@ -98,11 +99,12 @@ func TestFileExistsInBothExplictlyMappedPathAndInferredPath(t *testing.T) {
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
-	mod := NewModifier(tmpdir, map[string]string{"/sfmtest.txt": "/explicit/path/sfmtest.txt"})
+	mod := NewModifier(tmpdir)
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
-
 	}
+	mod.SetExplicitPathMappings(map[string]string{"/sfmtest.txt": "/explicit/path/sfmtest.txt"})
+
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
@@ -150,11 +152,12 @@ func TestStaticModifierExplicitPathMapping(t *testing.T) {
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
-	mod := NewModifier(tmpdir, map[string]string{"/sfmtest.txt": "/explicit/path/sfmtest.txt"})
+	mod := NewModifier(tmpdir)
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
-
 	}
+	mod.SetExplicitPathMappings(map[string]string{"/sfmtest.txt": "/explicit/path/sfmtest.txt"})
+
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
@@ -197,7 +200,7 @@ func TestStaticModifierOnRequest(t *testing.T) {
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
-	mod := NewModifier(tmpdir, nil)
+	mod := NewModifier(tmpdir)
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 

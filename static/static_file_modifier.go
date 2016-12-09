@@ -13,8 +13,8 @@
 // limitations under the License.
 
 // Package static provides a modifier that allow Martian to reurn static files
-// local to Martian. The static modifier does not currently support setting
-// explicit path mappings via the JSON API.
+// local to Martian. The static modifier does not support setting explicit path
+// mappings via the JSON API.
 package static
 
 import (
@@ -29,7 +29,7 @@ import (
 	"github.com/google/martian/parse"
 )
 
-type staticModifier struct {
+type Modifier struct {
 	rootPath      string
 	explicitPaths map[string]string
 }
@@ -43,17 +43,17 @@ func init() {
 	parse.Register("static.Modifier", modifierFromJSON)
 }
 
-// NewModifier constructs a staticModifier that takes a path to serve files from, as well as an optional mapping of request paths to local
+// NewModifier constructs a static.Modifier that takes a path to serve files from, as well as an optional mapping of request paths to local
 // file paths (still rooted at rootPath).
-func NewModifier(rootPath string, explicitPaths map[string]string) martian.RequestResponseModifier {
-	return &staticModifier{
+func NewModifier(rootPath string) *Modifier {
+	return &Modifier{
 		rootPath:      path.Clean(rootPath),
-		explicitPaths: explicitPaths,
+		explicitPaths: make(map[string]string),
 	}
 }
 
 // ModifyRequest marks the context to skip the roundtrip.
-func (s *staticModifier) ModifyRequest(req *http.Request) error {
+func (s *Modifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 	ctx.SkipRoundTrip()
 	return nil
@@ -65,7 +65,7 @@ func (s *staticModifier) ModifyRequest(req *http.Request) error {
 // (keyed by res.Request.URL.Path).  In the case that the file cannot be found, the response
 // will be a 404. ModifyResponse will return a 404 for any path that is defined in s.explictPaths
 // and that does not exist locally, even if that file does exist in s.rootPath.
-func (s *staticModifier) ModifyResponse(res *http.Response) error {
+func (s *Modifier) ModifyResponse(res *http.Response) error {
 	reqpth := filepath.Clean(res.Request.URL.Path)
 	fpth := filepath.Join(s.rootPath, reqpth)
 
@@ -97,11 +97,17 @@ func (s *staticModifier) ModifyResponse(res *http.Response) error {
 	return nil
 }
 
+// SetExplicitPathMappings sets an optional mapping of request paths to local
+// file paths rooted at s.rootPath.
+func (s *Modifier) SetExplicitPathMappings(ep map[string]string) {
+	s.explicitPaths = ep
+}
+
 func modifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &staticJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {
 		return nil, err
 	}
 
-	return parse.NewResult(NewModifier(msg.RootPath, nil), msg.Scope)
+	return parse.NewResult(NewModifier(msg.RootPath), msg.Scope)
 }
