@@ -119,7 +119,6 @@ func (p *Proxy) Close() {
 	log.Infof("martian: closing down proxy")
 
 	atomic.StoreInt32(&p.closing, 1)
-	p.conns.Wait()
 }
 
 // Closing returns whether the proxy is in the closing state.
