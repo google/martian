@@ -190,6 +190,7 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 	}, nil
 }
 
+// IsStarted returns true if the proxy has finished starting up.
 func IsStarted() bool {
 	return started
 }
