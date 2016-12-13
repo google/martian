@@ -55,7 +55,7 @@ import (
 	_ "github.com/google/martian/status"
 )
 
-var started bool = false
+var started = false
 
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
