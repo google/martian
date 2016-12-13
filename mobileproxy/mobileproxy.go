@@ -55,6 +55,8 @@ import (
 	_ "github.com/google/martian/status"
 )
 
+var started bool = false
+
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
 	proxy    *martian.Proxy
@@ -84,6 +86,7 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 
 	mlog.Debugf("mobileproxy: started listener on: %v", listener.Addr())
 	proxy := martian.NewProxy()
+	mux := http.NewServeMux()
 
 	if cert != "" && key != "" {
 		tlsc, err := tls.X509KeyPair([]byte(cert), []byte(key))
@@ -110,7 +113,7 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 
 		proxy.SetMITM(mc)
 
-		handle("/authority.cer", apiPort, martianhttp.NewAuthorityHandler(x509c))
+		handle(mux, "/authority.cer", apiPort, martianhttp.NewAuthorityHandler(x509c))
 	}
 
 	// Forward traffic that pattern matches in http.DefaultServeMux before applying
@@ -145,30 +148,30 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 	// These handlers take precendence over proxy traffic and will not be intercepted.
 
 	// Update modifiers.
-	handle("/configure", apiPort, m)
+	handle(mux, "/configure", apiPort, m)
 	mlog.Infof("mobileproxy: configure with requests to http://martian.proxy/configure")
 
 	// Retrieve Unmodified HAR logs
-	handle("/logs/original", apiPort, har.NewExportHandler(uhl))
-	handle("/logs/original/reset", apiPort, har.NewResetHandler(uhl))
+	handle(mux, "/logs/original", apiPort, har.NewExportHandler(uhl))
+	handle(mux, "/logs/original/reset", apiPort, har.NewResetHandler(uhl))
 
 	// Retrieve HAR logs
-	handle("/logs", apiPort, har.NewExportHandler(hl))
-	handle("/logs/reset", apiPort, har.NewResetHandler(hl))
+	handle(mux, "/logs", apiPort, har.NewExportHandler(hl))
+	handle(mux, "/logs/reset", apiPort, har.NewResetHandler(hl))
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
 
-	handle("/verify", apiPort, vh)
+	handle(mux, "/verify", apiPort, vh)
 	mlog.Infof("mobileproxy: check verifications with requests to http://martian.proxy/verify")
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	handle("/verify/reset", apiPort, rh)
+	handle(mux, "/verify/reset", apiPort, rh)
 	mlog.Infof("mobileproxy: reset verifications with requests to http://martian.proxy/verify/reset")
 
 	mlog.Infof("mobileproxy: starting Martian proxy on listener")
@@ -176,21 +179,28 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 
 	// start the API server
 	apiAddr := fmt.Sprintf(":%d", apiPort)
-	go http.ListenAndServe(apiAddr, nil)
+	go http.ListenAndServe(apiAddr, mux)
 	mlog.Infof("mobileproxy: proxy API started on %s", apiAddr)
+	started = true
 
 	return &Martian{
 		proxy:    proxy,
 		listener: listener,
-		mux:      http.DefaultServeMux,
+		mux:      mux,
 	}, nil
+}
+
+func IsStarted() bool {
+	return started
 }
 
 // Shutdown tells the Proxy to close. The proxy will stay alive until all connections through it
 // have closed or timed out.
 func (p *Martian) Shutdown() {
 	mlog.Infof("mobileproxy: shutting down proxy")
+	p.listener.Close()
 	p.proxy.Close()
+	started = false
 	mlog.Infof("mobileproxy: proxy shut down")
 }
 
@@ -203,11 +213,11 @@ func SetLogLevel(l int) {
 // handle sets up http.DefaultServeMux to handle requests to match patterns martian.proxy/{pth} and
 // localhost:{apiPort}/{pth}. This assumes that the API server is running at localhost:{apiPort}, and
 // requests to martian.proxy are forwarded there.
-func handle(pattern string, apiPort int, handler http.Handler) {
-	http.Handle(pattern, handler)
+func handle(mux *http.ServeMux, pattern string, apiPort int, handler http.Handler) {
+	mux.Handle(pattern, handler)
 	mlog.Infof("mobileproxy: handler registered for %s", pattern)
 
 	lhp := path.Join(fmt.Sprintf("localhost:%d", apiPort), pattern)
-	http.Handle(lhp, handler)
+	mux.Handle(lhp, handler)
 	mlog.Infof("mobileproxy: handler registered for %s", lhp)
 }
