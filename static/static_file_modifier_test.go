@@ -123,6 +123,9 @@ func TestFileExistsInBothExplictlyMappedPathAndInferredPath(t *testing.T) {
 		t.Errorf("res.Body: got %q, want %q", got, want)
 	}
 
+	if got, want := res.ContentLength, int64(len("target")); got != want {
+		t.Errorf("res.ContentLength: got %v, want %v", got, want)
+	}
 }
 
 func TestStaticModifierExplicitPathMapping(t *testing.T) {
@@ -175,6 +178,10 @@ func TestStaticModifierExplicitPathMapping(t *testing.T) {
 	if want := []byte("test file"); !bytes.Equal(got, want) {
 		t.Errorf("res.Body: got %q, want %q", got, want)
 	}
+
+	if got, want := res.ContentLength, int64(len("test file")); got != want {
+		t.Errorf("res.ContentLength: got %v, want %v", got, want)
+	}
 }
 
 func TestStaticModifierOnRequest(t *testing.T) {
@@ -221,5 +228,9 @@ func TestStaticModifierOnRequest(t *testing.T) {
 
 	if want := []byte("test file"); !bytes.Equal(got, want) {
 		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+
+	if got, want := res.ContentLength, int64(len("test file")); got != want {
+		t.Errorf("res.ContentLength: got %v, want %v", got, want)
 	}
 }

@@ -94,6 +94,12 @@ func (s *Modifier) ModifyResponse(res *http.Response) error {
 	res.Body.Close()
 	res.Body = f
 
+	info, err := f.Stat()
+	if err != nil {
+		res.StatusCode = http.StatusInternalServerError
+		return err
+	}
+	res.ContentLength = info.Size()
 	res.Header.Set("Content-Type", mime.TypeByExtension(filepath.Ext(fpth)))
 
 	return nil
