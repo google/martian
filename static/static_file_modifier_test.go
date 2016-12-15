@@ -20,9 +20,11 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/google/martian"
+	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
 
@@ -213,6 +215,80 @@ func TestStaticModifierOnRequest(t *testing.T) {
 
 	}
 	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.Header.Get("Content-Type"), "text/plain; charset=utf-8"; got != want {
+		t.Errorf("res.Header.Get('Content-Type'): got %v, want %v", got, want)
+	}
+
+	got, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	if want := []byte("test file"); !bytes.Equal(got, want) {
+		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+
+	if got, want := res.ContentLength, int64(len("test file")); got != want {
+		t.Errorf("res.ContentLength: got %v, want %v", got, want)
+	}
+}
+
+func TestModifierFromJSON(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "test_static_modifier_on_request_")
+	if err != nil {
+		t.Fatalf("ioutil.TempDir(): got %v, want no error", err)
+	}
+
+	if err := ioutil.WriteFile(path.Join(tmpdir, "sfmtest.txt"), []byte("test file"), 0777); err != nil {
+		t.Fatalf("ioutil.WriteFile(): got %v, want no error", err)
+	}
+
+	jsonStr := `{
+    "static.Modifier": {
+      "scope": ["request", "response"],
+      "rootPath": "<path>"
+    }
+  }`
+
+	msg := []byte(strings.Replace(jsonStr, "<path>", tmpdir, 1))
+
+	r, err := parse.FromJSON(msg)
+	if err != nil {
+		t.Fatalf("parse.FromJSON(): got %v, want no error", err)
+	}
+
+	reqmod := r.RequestModifier()
+	if reqmod == nil {
+		t.Fatal("reqmod: got nil, want not nil")
+	}
+
+	resmod := r.ResponseModifier()
+	if resmod == nil {
+		t.Fatal("resmod: got nil, want not nil")
+	}
+
+	req, err := http.NewRequest("GET", "/sfmtest.txt", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	res := proxyutil.NewResponse(http.StatusOK, nil, req)
+
+	if err := reqmod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 
