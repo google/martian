@@ -16,11 +16,11 @@ package static
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
-	"strings"
 	"testing"
 
 	"github.com/google/martian"
@@ -247,14 +247,12 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("ioutil.WriteFile(): got %v, want no error", err)
 	}
 
-	jsonStr := `{
-    "static.Modifier": {
-      "scope": ["request", "response"],
-      "rootPath": "<path>"
-    }
-  }`
-
-	msg := []byte(strings.Replace(jsonStr, "<path>", tmpdir, 1))
+	msg := []byte(fmt.Sprintf(`{
+		"static.Modifier": {
+			"scope": ["request", "response"],
+			"rootPath": %q
+		}
+	}`, tmpdir))
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
