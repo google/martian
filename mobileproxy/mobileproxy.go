@@ -78,7 +78,7 @@ func StartWithCyberVillains(trafficPort int, apiPort int) (*Martian, error) {
 	return StartWithCertificate(trafficPort, apiPort, cybervillains.Cert, cybervillains.Key)
 }
 
-// Start runs a martian.Proxy on trafficPort and the API server on apiPort,
+// StartWithCORS runs a martian.Proxy on trafficPort and the API server on apiPort,
 // with the allowsCORS flag set to true.
 func StartWithCORS(trafficPort, apiPort int) (*Martian, error) {
 	return StartWithCertificateCORS(trafficPort, apiPort, "", "", true)
@@ -91,7 +91,7 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 	return StartWithCertificateCORS(trafficPort, apiPort, cert, key, false)
 }
 
-// StartWithCertificate runs a martian.Proxy on trafficPort and the API
+// StartWithCertificateCORS runs a martian.Proxy on trafficPort and the API
 // server on apiPort configured to perform MITM with the cert and key provided,
 // and the allowCORS flag set if instructed.
 func StartWithCertificateCORS(trafficPort int, apiPort int, cert, key string, allowsCors bool) (*Martian, error) {
