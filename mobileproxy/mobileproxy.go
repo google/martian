@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/api"
+	"github.com/google/martian/cors"
 	"github.com/google/martian/cybervillains"
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/har"
@@ -64,20 +65,36 @@ type Martian struct {
 	mux      *http.ServeMux
 }
 
-// Start runs a martian.Proxy on trafficPort and the API server on apiPort.
+// Start runs a martian.Proxy on trafficPort and the API server on apiPort,
+// with the allowsCORS flag set to false.
 func Start(trafficPort, apiPort int) (*Martian, error) {
 	return StartWithCertificate(trafficPort, apiPort, "", "")
 }
 
 // StartWithCyberVillains runs a martian.Proxy on trafficPort and the API
-// server on apiPort configured to perform MITM with the CyberVillains cert and key.
+// server on apiPort configured to perform MITM with the CyberVillains cert and key,
+// with the allowsCors flag set to false.
 func StartWithCyberVillains(trafficPort int, apiPort int) (*Martian, error) {
 	return StartWithCertificate(trafficPort, apiPort, cybervillains.Cert, cybervillains.Key)
 }
 
+// Start runs a martian.Proxy on trafficPort and the API server on apiPort,
+// with the allowsCORS flag set to true.
+func StartWithCORS(trafficPort, apiPort int) (*Martian, error) {
+	return StartWithCertificateCORS(trafficPort, apiPort, "", "", true)
+}
+
 // StartWithCertificate runs a martian.Proxy on trafficPort and the API
-// server on apiPort configured to perform MITM with the cert and key provided.
+// server on apiPort configured to perform MITM with the cert and key provided,
+// with the allowsCORS flag set to false.
 func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Martian, error) {
+	return StartWithCertificateCORS(trafficPort, apiPort, cert, key, false)
+}
+
+// StartWithCertificate runs a martian.Proxy on trafficPort and the API
+// server on apiPort configured to perform MITM with the cert and key provided,
+// and the allowCORS flag set if instructed.
+func StartWithCertificateCORS(trafficPort int, apiPort int, cert, key string, allowsCors bool) (*Martian, error) {
 	var err error
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", trafficPort))
 	if err != nil {
@@ -113,7 +130,7 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 
 		proxy.SetMITM(mc)
 
-		handle(mux, "/authority.cer", apiPort, martianhttp.NewAuthorityHandler(x509c))
+		handle(mux, "/authority.cer", apiPort, martianhttp.NewAuthorityHandler(x509c), allowsCors)
 	}
 
 	// Forward traffic that pattern matches in http.DefaultServeMux before applying
@@ -148,30 +165,30 @@ func StartWithCertificate(trafficPort int, apiPort int, cert, key string) (*Mart
 	// These handlers take precendence over proxy traffic and will not be intercepted.
 
 	// Update modifiers.
-	handle(mux, "/configure", apiPort, m)
+	handle(mux, "/configure", apiPort, m, allowsCors)
 	mlog.Infof("mobileproxy: configure with requests to http://martian.proxy/configure")
 
 	// Retrieve Unmodified HAR logs
-	handle(mux, "/logs/original", apiPort, har.NewExportHandler(uhl))
-	handle(mux, "/logs/original/reset", apiPort, har.NewResetHandler(uhl))
+	handle(mux, "/logs/original", apiPort, har.NewExportHandler(uhl), allowsCors)
+	handle(mux, "/logs/original/reset", apiPort, har.NewResetHandler(uhl), allowsCors)
 
 	// Retrieve HAR logs
-	handle(mux, "/logs", apiPort, har.NewExportHandler(hl))
-	handle(mux, "/logs/reset", apiPort, har.NewResetHandler(hl))
+	handle(mux, "/logs", apiPort, har.NewExportHandler(hl), allowsCors)
+	handle(mux, "/logs/reset", apiPort, har.NewResetHandler(hl), allowsCors)
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
 
-	handle(mux, "/verify", apiPort, vh)
+	handle(mux, "/verify", apiPort, vh, allowsCors)
 	mlog.Infof("mobileproxy: check verifications with requests to http://martian.proxy/verify")
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	handle(mux, "/verify/reset", apiPort, rh)
+	handle(mux, "/verify/reset", apiPort, rh, allowsCors)
 	mlog.Infof("mobileproxy: reset verifications with requests to http://martian.proxy/verify/reset")
 
 	mlog.Infof("mobileproxy: starting Martian proxy on listener")
@@ -214,7 +231,10 @@ func SetLogLevel(l int) {
 // handle sets up http.DefaultServeMux to handle requests to match patterns martian.proxy/{pth} and
 // localhost:{apiPort}/{pth}. This assumes that the API server is running at localhost:{apiPort}, and
 // requests to martian.proxy are forwarded there.
-func handle(mux *http.ServeMux, pattern string, apiPort int, handler http.Handler) {
+func handle(mux *http.ServeMux, pattern string, apiPort int, handler http.Handler, allowsCors bool) {
+	if allowsCors == true {
+		handler = cors.NewHandler(handler)
+	}
 	mux.Handle(pattern, handler)
 	mlog.Infof("mobileproxy: handler registered for %s", pattern)
 
@@ -222,3 +242,4 @@ func handle(mux *http.ServeMux, pattern string, apiPort int, handler http.Handle
 	mux.Handle(lhp, handler)
 	mlog.Infof("mobileproxy: handler registered for %s", lhp)
 }
+
