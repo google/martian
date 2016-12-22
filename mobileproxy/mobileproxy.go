@@ -35,7 +35,6 @@ import (
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
 	mlog "github.com/google/martian/log"
-	"github.com/google/martian/martian"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/servemux"
