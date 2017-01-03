@@ -115,6 +115,15 @@ func (s *Session) MarkSecure() {
 	s.secure = true
 }
 
+// MarkInsecure marks the session as insecure.
+func (s *Session) MarkInsecure() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.secure = false
+}
+
+
 // Hijack takes control of the connection from the proxy. No further action
 // will be taken by the proxy and the connection will be closed following the
 // return of the hijacker.
