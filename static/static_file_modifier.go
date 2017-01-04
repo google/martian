@@ -54,10 +54,17 @@ func NewModifier(rootPath string) *Modifier {
 	}
 }
 
-// ModifyRequest marks the context to skip the roundtrip.
+// ModifyRequest marks the context to skip the roundtrip and downgrades any https requests
+// to http.
 func (s *Modifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 	ctx.SkipRoundTrip()
+
+	if req.URL.Scheme == "https" {
+		req.URL.Scheme = "http"
+		ctx.Session().MarkInsecure()
+	}
+
 	return nil
 }
 
