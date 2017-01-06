@@ -297,13 +297,24 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("ioutil.TempDir(): got %v, want no error", err)
 	}
 
+	tmpdir2 := path.Join(tmpdir, "subdir")
+	err = os.Mkdir(tmpdir2, 0777)
+	if err != nil {
+		t.Fatalf("ioutil.TempDir(): got %v, want no error", err)
+	}
+
 	if err := ioutil.WriteFile(path.Join(tmpdir, "sfmtest.txt"), []byte("test file"), 0777); err != nil {
+		t.Fatalf("ioutil.WriteFile(): got %v, want no error", err)
+	}
+
+	if err := ioutil.WriteFile(path.Join(tmpdir2, "sfmtest.txt"), []byte("test file2"), 0777); err != nil {
 		t.Fatalf("ioutil.WriteFile(): got %v, want no error", err)
 	}
 
 	msg := []byte(fmt.Sprintf(`{
 		"static.Modifier": {
 			"scope": ["request", "response"],
+			"explicitPaths": {"/foo/bar.baz": "/subdir/sfmtest.txt"},
 			"rootPath": %q
 		}
 	}`, tmpdir))
@@ -361,4 +372,44 @@ func TestModifierFromJSON(t *testing.T) {
 	if got, want := res.ContentLength, int64(len("test file")); got != want {
 		t.Errorf("res.ContentLength: got %v, want %v", got, want)
 	}
+
+	req, err = http.NewRequest("GET", "/foo/bar.baz", nil)
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err = martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	res = proxyutil.NewResponse(http.StatusOK, nil, req)
+
+	if err := reqmod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if err := resmod.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.Header.Get("Content-Type"), "text/plain; charset=utf-8"; got != want {
+		t.Errorf("res.Header.Get('Content-Type'): got %v, want %v", got, want)
+	}
+
+	got, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	if want := []byte("test file2"); !bytes.Equal(got, want) {
+		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+
+	if got, want := res.ContentLength, int64(len("test file2")); got != want {
+		t.Errorf("res.ContentLength: got %v, want %v", got, want)
+	}
+
 }
