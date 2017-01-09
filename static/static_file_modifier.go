@@ -37,8 +37,9 @@ type Modifier struct {
 }
 
 type staticJSON struct {
-	RootPath string               `json:"rootPath"`
-	Scope    []parse.ModifierType `json:"scope"`
+	ExplicitPaths map[string]string    `json:"explicitPaths"`
+	RootPath      string               `json:"rootPath"`
+	Scope         []parse.ModifierType `json:"scope"`
 }
 
 func init() {
@@ -124,5 +125,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	return parse.NewResult(NewModifier(msg.RootPath), msg.Scope)
+	mod := NewModifier(msg.RootPath)
+	mod.SetExplicitPathMappings(msg.ExplicitPaths)
+	return parse.NewResult(mod, msg.Scope)
 }
