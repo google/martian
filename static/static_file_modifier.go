@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package static provides a modifier that allow Martian to reurn static files
-// local to Martian.
+// Package static provides a modifier that allows Martian to return static files
+// local to Martian. The static modifier does not support setting explicit path
+// mappings via the JSON API.
 package static
 
 import (
