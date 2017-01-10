@@ -253,6 +253,11 @@ func main() {
 
 	p := martian.NewProxy()
 
+	host, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var x509c *x509.Certificate
 	var priv interface{}
 
@@ -289,7 +294,7 @@ func main() {
 
 		// Expose certificate authority.
 		ah := martianhttp.NewAuthorityHandler(x509c)
-		configure("/authority.cer", ah)
+		configure("/authority.cer", ah, host)
 
 		// Start TLS listener for transparent MITM.
 		tl, err := net.Listen("tcp", *tlsAddr)
@@ -335,8 +340,8 @@ func main() {
 		stack.AddRequestModifier(hl)
 		stack.AddResponseModifier(hl)
 
-		configure("/logs", har.NewExportHandler(hl))
-		configure("/logs/reset", har.NewResetHandler(hl))
+		configure("/logs", har.NewExportHandler(hl), host)
+		configure("/logs/reset", har.NewResetHandler(hl), host)
 	}
 
 	logger := martianlog.NewLogger()
@@ -354,19 +359,19 @@ func main() {
 	stack.AddResponseModifier(lsm)
 
 	// Configure modifiers.
-	configure("/configure", m)
+	configure("/configure", m, host)
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
-	configure("/verify", vh)
+	configure("/verify", vh, host)
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	configure("/verify/reset", rh)
+	configure("/verify/reset", rh, host)
 
 	l, err := net.Listen("tcp", *addr)
 	if err != nil {
@@ -376,7 +381,7 @@ func main() {
 	if *trafficShaping {
 		tsl := trafficshape.NewListener(l)
 		tsh := trafficshape.NewHandler(tsl)
-		configure("/shape-traffic", tsh)
+		configure("/shape-traffic", tsh, host)
 
 		l = tsl
 	}
@@ -396,7 +401,7 @@ func main() {
 }
 
 // configure installs a configuration handler at path.
-func configure(pattern string, handler http.Handler) {
+func configure(pattern string, handler http.Handler, host string) {
 	if *allowCORS {
 		handler = cors.NewHandler(handler)
 	}
@@ -407,5 +412,10 @@ func configure(pattern string, handler http.Handler) {
 
 	// register handler for local API server
 	p := path.Join("localhost"+*apiAddr, pattern)
+	http.Handle(p, handler)
+
+	// register handler for machine hostname
+	p = path.Join(host+*apiAddr, pattern)
+	log.Println("the path: ", p)
 	http.Handle(p, handler)
 }
