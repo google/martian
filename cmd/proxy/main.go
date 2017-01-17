@@ -395,6 +395,10 @@ func main() {
 	log.Println("martian: shutting down")
 }
 
+func init() {
+	martian.Init()
+}
+
 // configure installs a configuration handler at path.
 func configure(pattern string, handler http.Handler) {
 	if *allowCORS {

@@ -228,6 +228,10 @@ func SetLogLevel(l int) {
 	mlog.SetLevel(l)
 }
 
+func init() {
+	martian.Init()
+}
+
 // handle sets up http.DefaultServeMux to handle requests to match patterns martian.proxy/{pth} and
 // localhost:{apiPort}/{pth}. This assumes that the API server is running at localhost:{apiPort}, and
 // requests to martian.proxy are forwarded there.
@@ -242,4 +246,3 @@ func handle(mux *http.ServeMux, pattern string, apiPort int, handler http.Handle
 	mux.Handle(lhp, handler)
 	mlog.Infof("mobileproxy: handler registered for %s", lhp)
 }
-
