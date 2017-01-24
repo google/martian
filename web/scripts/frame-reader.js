@@ -83,15 +83,15 @@ FrameReader.prototype.read = function(arraybuffer_view, offset) {
       frame.value = parser.string(valueLength);
 
       break;
-      case 'data-frame':
-        frame.index = parser.uint32();
-        frame.end = parser.uint8();
+    case 'data-frame':
+      frame.index = parser.uint32();
+      frame.end = parser.uint8();
 
-        var dataLength = parser.uint32();
-        frame.data = parser.bytes(dataLength);
+      var dataLength = parser.uint32();
+      frame.data = parser.bytes(dataLength);
 
-        break;
-      default:
+      break;
+    default:
   };
 
   this.n = parser._offset;
