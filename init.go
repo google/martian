@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package init is a single place for any required common initialization code.
 package martian
 
 import (
@@ -25,6 +24,7 @@ var (
 	level = flag.Int("v", 0, "log level")
 )
 
+// Init runs common initialization code for a martian proxy.
 func Init() {
 	flag.Parse()
 	mlog.SetLevel(*level)
