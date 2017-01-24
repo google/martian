@@ -16,9 +16,16 @@
 package martian
 
 import (
-	"log"
+	"flag"
+
+	mlog "github.com/google/martian/log"
+)
+
+var (
+	level = flag.Int("v", 0, "log level")
 )
 
 func Init() {
-	log.Println("init was called, yay")
+	flag.Parse()
+	mlog.SetLevel(*level)
 }
