@@ -206,7 +206,6 @@ import (
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
-	mlog "github.com/google/martian/log"
 	"github.com/google/martian/marbl"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/martianlog"
@@ -230,7 +229,6 @@ import (
 )
 
 var (
-	level          = flag.Int("v", 0, "log level")
 	addr           = flag.String("addr", ":8080", "host:port of the proxy")
 	apiAddr        = flag.String("api-addr", ":8181", "port of the configuration api")
 	tlsAddr        = flag.String("tls-addr", ":4443", "host:port of the proxy over TLS")
@@ -247,10 +245,6 @@ var (
 )
 
 func main() {
-	flag.Parse()
-
-	mlog.SetLevel(*level)
-
 	p := martian.NewProxy()
 
 	var x509c *x509.Certificate
