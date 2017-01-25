@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package mobileproxy instantiates a Martian Proxy.
+// Package mobile instantiates a Martian Proxy.
 // This package is a reference implementation of Martian Proxy intended to
 // be cross compiled with gomobile for use on Android and iOS.
-package mobileproxy
+package mobile
 
 import (
 	"crypto/tls"
@@ -196,6 +196,10 @@ func (m *Martian) Shutdown() {
 // log calls are displayed in the console
 func SetLogLevel(l int) {
 	mlog.SetLevel(l)
+}
+
+func init() {
+	martian.Init()
 }
 
 func (m *Martian) handle(pattern string, handler http.Handler) {
