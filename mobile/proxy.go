@@ -211,6 +211,5 @@ func (m *Martian) handle(pattern string, handler http.Handler) {
 
 	lhp := path.Join(fmt.Sprintf("localhost:%d", m.APIPort), pattern)
 	m.mux.Handle(lhp, handler)
-	// TODO HOSTNAME
 	mlog.Infof("mobileproxy: handler registered for %s", lhp)
 }
