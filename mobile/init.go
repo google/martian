@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package mobile configures and instantiates a Martian Proxy.
+// This package is a reference implementation of Martian Proxy intended to
+// be cross compiled with gomobile for use on Android and iOS.
 package mobile
 
 import (
