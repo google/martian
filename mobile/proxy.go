@@ -61,23 +61,26 @@ type Martian struct {
 	proxy       *martian.Proxy
 	listener    net.Listener
 	mux         *http.ServeMux
+	started     bool
 	TrafficPort int
 	APIPort     int
 	Cert        string
 	Key         string
 	AllowCORS   bool
-	Started     bool
 }
 
+// EnableSybervillains configures Martian to use the Cybervillians certificate.
 func (m *Martian) EnableCybervillains() {
 	m.Cert = cybervillains.Cert
 	m.Key = cybervillains.Key
 }
 
+// NewProxy creates a new Martian struct for configuring and starting a martian.
 func NewProxy() *Martian {
 	return &Martian{}
 }
 
+// Start starts the proxy given the configured values of the Martian struct.
 func (m *Martian) Start() {
 	var err error
 	m.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", m.TrafficPort))
@@ -180,6 +183,11 @@ func (m *Martian) Start() {
 	go http.ListenAndServe(apiAddr, m.mux)
 	mlog.Infof("mobileproxy: proxy API started on %s", apiAddr)
 	m.Started = true
+}
+
+// IsStarted returns true if the proxy has finished starting.
+func (m *Martian) IsStarted() bool {
+	return m.started
 }
 
 // Shutdown tells the Proxy to close. The proxy will stay alive until all connections through it
