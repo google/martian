@@ -43,7 +43,7 @@ func TestFilterFromJSON(t *testing.T) {
 					"name": "Martian-Testing",
 					"value": "false"
 				}
-			} 
+			}
 		}
 	}`)
 
@@ -56,6 +56,7 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatal("reqmod: got nil, want not nil")
 	}
 
+	// Matching condition for request
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -68,6 +69,20 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatalf("req.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
 	}
 
+	// Else condition for request
+	req, err = http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Martian-Passthrough", "false")
+	if err := reqmod.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+	if got, want := req.Header.Get("Martian-Testing"), "false"; got != want {
+		t.Fatalf("req.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
+	}
+
+	// Matching condition for response
 	resmod := r.ResponseModifier()
 	if resmod == nil {
 		t.Fatal("resmod: got nil, want not nil")
@@ -79,6 +94,21 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
 	}
 	if got, want := res.Header.Get("Martian-Testing"), "true"; got != want {
+		t.Fatalf("res.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
+	}
+
+	// Else condition for response
+	resmod = r.ResponseModifier()
+	if resmod == nil {
+		t.Fatal("resmod: got nil, want not nil")
+	}
+
+	res = proxyutil.NewResponse(200, nil, nil)
+	res.Header.Set("Martian-Passthrough", "false")
+	if err := resmod.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+	if got, want := res.Header.Get("Martian-Testing"), "false"; got != want {
 		t.Fatalf("res.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
 	}
 }
