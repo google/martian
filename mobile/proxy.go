@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All rights reserved.
+// Copyright 2017 Google Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package mobile instantiates a Martian Proxy.
+// Package mobile configures and instantiates a Martian Proxy.
 // This package is a reference implementation of Martian Proxy intended to
 // be cross compiled with gomobile for use on Android and iOS.
 package mobile
