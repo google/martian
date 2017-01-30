@@ -37,6 +37,7 @@ import (
 	mlog "github.com/google/martian/log"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
+	"github.com/google/martian/mobile"
 	"github.com/google/martian/servemux"
 	"github.com/google/martian/verify"
 
@@ -229,7 +230,7 @@ func SetLogLevel(l int) {
 }
 
 func init() {
-	martian.Init()
+	mobile.Init()
 }
 
 // handle sets up http.DefaultServeMux to handle requests to match patterns martian.proxy/{pth} and
