@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package mobile configures and instantiates a Martian Proxy.
-// This package is a reference implementation of Martian Proxy intended to
-// be cross compiled with gomobile for use on Android and iOS.
 package mobile
 
 import (
@@ -182,7 +179,7 @@ func (m *Martian) Start() {
 	apiAddr := fmt.Sprintf(":%d", m.APIPort)
 	go http.ListenAndServe(apiAddr, m.mux)
 	mlog.Infof("mobileproxy: proxy API started on %s", apiAddr)
-	m.Started = true
+	m.started = true
 }
 
 // IsStarted returns true if the proxy has finished starting.
@@ -190,13 +187,14 @@ func (m *Martian) IsStarted() bool {
 	return m.started
 }
 
-// Shutdown tells the Proxy to close. The proxy will stay alive until all connections through it
-// have closed or timed out.
+// Shutdown tells the Proxy to close. This function returns immediately, though
+// there may still be connection threads hanging around until they time out
+// depending on how the OS manages them.
 func (m *Martian) Shutdown() {
 	mlog.Infof("mobileproxy: shutting down proxy")
 	m.listener.Close()
 	m.proxy.Close()
-	m.Started = false
+	m.started = false
 	mlog.Infof("mobileproxy: proxy shut down")
 }
 
@@ -207,7 +205,7 @@ func SetLogLevel(l int) {
 }
 
 func init() {
-	martian.Init()
+	Init()
 }
 
 func (m *Martian) handle(pattern string, handler http.Handler) {
