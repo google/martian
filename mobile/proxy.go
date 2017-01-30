@@ -32,6 +32,7 @@ import (
 	"github.com/google/martian/har"
 	"github.com/google/martian/httpspec"
 	mlog "github.com/google/martian/log"
+	"github.com/google/martian/marbl"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/servemux"
@@ -52,6 +53,10 @@ import (
 	_ "github.com/google/martian/static"
 	_ "github.com/google/martian/status"
 )
+
+func init() {
+	Init()
+}
 
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
@@ -85,7 +90,7 @@ func (m *Martian) Start() {
 		log.Fatal(err)
 	}
 
-	mlog.Debugf("mobileproxy: started listener on: %v", m.listener.Addr())
+	mlog.Debugf("mobile: started listener on: %v", m.listener.Addr())
 	m.proxy = martian.NewProxy()
 	m.mux = http.NewServeMux()
 
@@ -95,14 +100,14 @@ func (m *Martian) Start() {
 			log.Fatal(err)
 		}
 
-		mlog.Debugf("mobileproxy: loaded cert and key")
+		mlog.Debugf("mobile: loaded cert and key")
 
 		x509c, err := x509.ParseCertificate(tlsc.Certificate[0])
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		mlog.Debugf("mobileproxy: parsed cert")
+		mlog.Debugf("mobile: parsed cert")
 
 		mc, err := mitm.NewConfig(x509c, tlsc.PrivateKey)
 		if err != nil {
@@ -124,7 +129,7 @@ func (m *Martian) Start() {
 	apif.SetRequestModifier(api.NewForwarder("", m.APIPort))
 	topg.AddRequestModifier(apif)
 
-	stack, fg := httpspec.NewStack("martian.mobileproxy")
+	stack, fg := httpspec.NewStack("martian.mobile")
 	topg.AddRequestModifier(stack)
 	topg.AddResponseModifier(stack)
 
@@ -140,6 +145,14 @@ func (m *Martian) Start() {
 	hl := har.NewLogger()
 	stack.AddRequestModifier(hl)
 	stack.AddResponseModifier(hl)
+
+	lsh := marbl.NewHandler()
+	// retrieve binary marbl logs
+	m.handle("/binlogs", lsh)
+
+	lsm := marbl.NewModifier(lsh)
+	stack.AddRequestModifier(lsm)
+	stack.AddResponseModifier(lsm)
 
 	mod := martianhttp.NewModifier()
 	fg.AddRequestModifier(mod)
@@ -172,13 +185,13 @@ func (m *Martian) Start() {
 	rh.SetResponseVerifier(mod)
 	m.handle("/verify/reset", rh)
 
-	mlog.Infof("mobileproxy: starting Martian proxy on listener")
+	mlog.Infof("mobile: starting Martian proxy on listener")
 	go m.proxy.Serve(m.listener)
 
 	// start the API server
 	apiAddr := fmt.Sprintf(":%d", m.APIPort)
 	go http.ListenAndServe(apiAddr, m.mux)
-	mlog.Infof("mobileproxy: proxy API started on %s", apiAddr)
+	mlog.Infof("mobile: proxy API started on %s", apiAddr)
 	m.started = true
 }
 
@@ -191,11 +204,11 @@ func (m *Martian) IsStarted() bool {
 // there may still be connection threads hanging around until they time out
 // depending on how the OS manages them.
 func (m *Martian) Shutdown() {
-	mlog.Infof("mobileproxy: shutting down proxy")
+	mlog.Infof("mobile: shutting down proxy")
 	m.listener.Close()
 	m.proxy.Close()
 	m.started = false
-	mlog.Infof("mobileproxy: proxy shut down")
+	mlog.Infof("mobile: proxy shut down")
 }
 
 // SetLogLevel sets the Martian log level (Silent = 0, Error, Info, Debug), controlling which Martian
@@ -204,18 +217,14 @@ func SetLogLevel(l int) {
 	mlog.SetLevel(l)
 }
 
-func init() {
-	Init()
-}
-
 func (m *Martian) handle(pattern string, handler http.Handler) {
 	if m.AllowCORS {
 		handler = cors.NewHandler(handler)
 	}
 	m.mux.Handle(pattern, handler)
-	mlog.Infof("mobileproxy: handler registered for %s", pattern)
+	mlog.Infof("mobile: handler registered for %s", pattern)
 
 	lhp := path.Join(fmt.Sprintf("localhost:%d", m.APIPort), pattern)
 	m.mux.Handle(lhp, handler)
-	mlog.Infof("mobileproxy: handler registered for %s", lhp)
+	mlog.Infof("mobile: handler registered for %s", lhp)
 }
