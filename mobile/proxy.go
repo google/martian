@@ -71,7 +71,7 @@ type Martian struct {
 	AllowCORS   bool
 }
 
-// EnableSybervillains configures Martian to use the Cybervillians certificate.
+// EnableCybervillains configures Martian to use the Cybervillians certificate.
 func (m *Martian) EnableCybervillains() {
 	m.Cert = cybervillains.Cert
 	m.Key = cybervillains.Key
