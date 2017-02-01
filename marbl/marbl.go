@@ -139,14 +139,14 @@ func (s *Stream) sendHeader(id string, mt MessageType, key, value string) {
 func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b []byte) {
 	bl := uint32(len(b))
 
-	var ti uint16
+	var ti uint8
 	if terminal {
 		ti = 1
 	}
 
 	f := newFrame(id, DataFrame, mt, 40+bl)
 	f = append(f, byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
-	f = append(f, byte(ti>>8), byte(ti))
+	f = append(f, byte(ti))
 	f = append(f, byte(bl>>24), byte(bl>>16), byte(bl>>8), byte(bl))
 	f = append(f, b...)
 
