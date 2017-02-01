@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/boltdb/bolt"
+	"github.com/google/martian/marbl"
 )
 
 // Recorder is a response modifier that writes responses to a boltdb.
