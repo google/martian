@@ -142,60 +142,22 @@
 //
 // passing the -cors flag will enable CORS support for the endpoints so that they
 // may be called via AJAX
-//
-// The flags are:
-//   -addr=":8080"
-//     host:port of the proxy
-//   -api-addr=":8181"
-//     host:port of the proxy API
-//   -tls-addr=":4443"
-//     host:port of the proxy over TLS
-//   -api="martian.proxy"
-//     hostname that can be used to reference the configuration API when
-//     configuring through the proxy
-//   -cert=""
-//     PEM encoded X.509 CA certificate; if set, it will be set as the
-//     issuer for dynamically-generated certificates during man-in-the-middle
-//   -key=""
-//     PEM encoded private key of cert (RSA or ECDSA); if set, the key will be used
-//     to sign dynamically-generated certificates during man-in-the-middle
-//   -generate-ca-cert=false
-//     generates a CA certificate and private key to use for man-in-the-middle;
-//     the certificate is only valid while the proxy is running and will be
-//     discarded on shutdown
-//   -organization="Martian Proxy"
-//     organization name set on the dynamically-generated certificates during
-//     man-in-the-middle
-//   -validity="1h"
-//     window of time around the time of request that the dynamically-generated
-//     certificate is valid for; the duration is set such that the total valid
-//     timeframe is double the value of validity (1h before & 1h after)
-//   -cors=false
-//     allow the proxy to be configured via CORS requests; such as when
-//     configuring the proxy via AJAX
-//   -har=false
-//     enable logging endpoints for retrieving full request/response logs in
-//     HAR format.
-//   -traffic-shaping=false
-//     enable traffic shaping endpoints for simulating latency and constrained
-//     bandwidth conditions (e.g. mobile, exotic network infrastructure, the
-//     90's)
-//   -skip-tls-verify=false
-//     skip TLS server verification; insecure and intended for testing only
-//   -v=0
-//     log level for console logs; defaults to error only.
 package main
 
 import (
+	"archive/zip"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -242,6 +204,7 @@ var (
 	harLogging     = flag.Bool("har", false, "enable HAR logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
+	replayCache    = flag.String("replayCache", "", "path to the *.replay file used for response record / replay")
 )
 
 func main() {
@@ -361,6 +324,43 @@ func main() {
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
 	configure("/verify/reset", rh)
+
+	if *replayCache != "" {
+		// if the file exists, extract it to /tmp
+		zr, err := zip.OpenReader(*replayCache)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		tmp, err := ioutil.TempDir("", "martian.replay.")
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, f := range zr.File {
+			p := filepath.Join(tmp, f.Name)
+			if f.FileInfo().IsDir() {
+				os.MkdirAll(p, f.Mode())
+				continue
+			}
+
+			tgtf, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			defer tgtf.Close()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			srcf, err := f.Open()
+			defer srcf.Close()
+			if err != nil {
+				log.Fatal(err)
+			}
+			_, err = io.Copy(tgtf, srcf)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+	}
 
 	l, err := net.Listen("tcp", *addr)
 	if err != nil {
