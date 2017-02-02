@@ -15,10 +15,12 @@
 package record
 
 import (
+	"bufio"
 	"bytes"
 	"net/http"
 
 	"github.com/boltdb/bolt"
+	"github.com/google/martian"
 	"github.com/google/martian/marbl"
 )
 
@@ -54,23 +56,21 @@ func (r *Recorder) ModifyResponse(res *http.Response) error {
 	}
 	defer db.Close()
 
-	if res.Header.Get("Content-Length") == "-1" {
-		// chunked response
-
-	}
-
 	err = db.Update(func(tx *bolt.Tx) error {
+		var b bytes.Buffer
+		bw := bufio.NewWriter(&b)
+		m := marbl.NewStream(bw)
+
+		ctx := martian.NewContext(res.Request)
+		m.LogResponse(ctx.ID(), res)
+		m.Close()
+
 		bucket, err := tx.CreateBucketIfNotExists([]byte("responses"))
 		if err != nil {
 			return err
 		}
 
-		key := r.keygen(res.Request)
-
-		var b bytes.Buffer
-		m := marbl.NewStream(b)
-
-		err = bucket.Put(key, value)
+		err = bucket.Put(r.keygen(res.Request), b.Bytes())
 		if err != nil {
 			return err
 		}
