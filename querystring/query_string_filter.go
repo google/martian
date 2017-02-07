@@ -16,7 +16,6 @@ package querystring
 
 import (
 	"encoding/json"
-	"net/http"
 
 	"github.com/google/martian"
 	"github.com/google/martian/filter"
@@ -45,7 +44,7 @@ type filterJSON struct {
 // NewFilter builds a querystring.Filter that filters on name and optionally
 // value.
 func NewFilter(name, value string) *Filter {
-	m := NewMatcher(http.CanonicalHeaderKey(name), value)
+	m := NewMatcher(name, value)
 	f := filter.New()
 	f.SetRequestCondition(m)
 	f.SetResponseCondition(m)
@@ -77,14 +76,16 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 	f.RequestWhenTrue(r.RequestModifier())
 	f.ResponseWhenTrue(r.ResponseModifier())
 
-	em, err := parse.FromJSON(msg.ElseModifier)
-	if err != nil {
-		return nil, err
-	}
+	if len(msg.ElseModifier) > 0 {
+		em, err := parse.FromJSON(msg.ElseModifier)
+		if err != nil {
+			return nil, err
+		}
 
-	if em != nil {
-		f.RequestWhenFalse(em.RequestModifier())
-		f.ResponseWhenFalse(em.ResponseModifier())
+		if em != nil {
+			f.RequestWhenFalse(em.RequestModifier())
+			f.ResponseWhenFalse(em.ResponseModifier())
+		}
 	}
 
 	return parse.NewResult(f, msg.Scope)

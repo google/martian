@@ -297,7 +297,9 @@ func TestVerifyRequests(t *testing.T) {
 
 	f.SetRequestModifier(tv)
 
-	if got, want := f.VerifyRequests(), tv.RequestError; got != want {
+	want := verify.NewMultiError()
+	want.Add(tv.RequestError)
+	if got := f.VerifyRequests(); got.Error() != want.Error() {
 		t.Fatalf("VerifyRequests(): got %v, want %v", got, want)
 	}
 
@@ -321,7 +323,9 @@ func TestVerifyResponses(t *testing.T) {
 
 	f.SetResponseModifier(tv)
 
-	if got, want := f.VerifyResponses(), tv.ResponseError; got != want {
+	want := verify.NewMultiError()
+	want.Add(tv.ResponseError)
+	if got := f.VerifyResponses(); got.Error() != want.Error() {
 		t.Fatalf("VerifyResponses(): got %v, want %v", got, want)
 	}
 
