@@ -145,19 +145,15 @@
 package main
 
 import (
-	"archive/zip"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
-	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -172,6 +168,7 @@ import (
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/martianlog"
 	"github.com/google/martian/mitm"
+	"github.com/google/martian/recording"
 	"github.com/google/martian/servemux"
 	"github.com/google/martian/trafficshape"
 	"github.com/google/martian/verify"
@@ -326,40 +323,8 @@ func main() {
 	configure("/verify/reset", rh)
 
 	if *replayCache != "" {
-		// if the file exists, extract it to /tmp
-		zr, err := zip.OpenReader(*replayCache)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		tmp, err := ioutil.TempDir("", "martian.replay.")
-		if err != nil {
-			log.Fatal(err)
-		}
-		for _, f := range zr.File {
-			p := filepath.Join(tmp, f.Name)
-			if f.FileInfo().IsDir() {
-				os.MkdirAll(p, f.Mode())
-				continue
-			}
-
-			tgtf, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-			defer tgtf.Close()
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			srcf, err := f.Open()
-			defer srcf.Close()
-			if err != nil {
-				log.Fatal(err)
-			}
-			_, err = io.Copy(tgtf, srcf)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
+		r := recording.New(*replayCache)
+		r.Open()
 	}
 
 	l, err := net.Listen("tcp", *addr)

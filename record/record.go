@@ -56,7 +56,7 @@ func (r *Recorder) ModifyResponse(res *http.Response) error {
 	}
 	defer db.Close()
 
-	err = db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *bolt.Tx) error {
 		var b bytes.Buffer
 		bw := bufio.NewWriter(&b)
 		m := marbl.NewStream(bw)
@@ -77,6 +77,4 @@ func (r *Recorder) ModifyResponse(res *http.Response) error {
 
 		return nil
 	})
-
-	return nil
 }
