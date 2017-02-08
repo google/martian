@@ -113,6 +113,27 @@ func TestFilterFromJSON(t *testing.T) {
 	}
 }
 
+func TestFilterFromJSONWithoutElse(t *testing.T) {
+	msg := []byte(`{
+		"header.Filter": {
+			"scope": ["request", "response"],
+			"name": "Martian-Passthrough",
+			"value": "true",
+			"modifier": {
+				"header.Modifier" : {
+					"scope": ["request", "response"],
+					"name": "Martian-Testing",
+					"value": "true"
+				}
+			}
+		}
+	}`)
+	_, err := parse.FromJSON(msg)
+	if err != nil {
+		t.Fatalf("parse.FromJSON(): got %v, want no error", err)
+	}
+}
+
 func TestRequestWhenTrueCondition(t *testing.T) {
 	hm := NewMatcher("Martian-Testing", "true")
 
