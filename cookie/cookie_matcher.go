@@ -19,14 +19,13 @@ import "net/http"
 // Matcher is a conditonal evalutor of request or
 // response cookies to be used in structs that take conditions.
 type Matcher struct {
-	name, value, path string
+	cookie *http.Cookie
 }
 
 // NewMatcher builds a cookie matcher.
-func NewMatcher(name, value, path string) *Matcher {
+func NewMatcher(cookie *http.Cookie) *Matcher {
 	return &Matcher{
-		name:  name,
-		value: value,
+		cookie: cookie,
 	}
 }
 
@@ -34,42 +33,34 @@ func NewMatcher(name, value, path string) *Matcher {
 // the request contains a cookie that matches the provided name, path
 // and value.
 func (m *Matcher) MatchRequest(req *http.Request) (bool, error) {
-	c, err := req.Cookie(m.name)
-	if err != nil {
-		return false, err
-	}
-
-	eval := false
-	if m.value != "" && m.value == c.Value {
-		eval = true
-	}
-
-	if m.path != "" && m.path == c.Path {
-		eval = true
-	}
-
-	return eval, nil
-}
-
-// MatchResponse evaluates a response and returns whether or not
-// the response contains a cookie that matches the provided name, path
-// and value.
-func (m *Matcher) MatchResponse(res *http.Response) (bool, error) {
-	for _, c := range res.Cookies() {
-		if c.Name != c.Name {
-			continue
+	for _, c := range req.Cookies() {
+		if m.match(c) {
+			return true, nil
 		}
-		eval := false
-		if m.value != "" && m.value == c.Value {
-			eval = true
-		}
-
-		if m.path != "" && m.path == c.Path {
-			eval = true
-		}
-
-		return eval, nil
 	}
 
 	return false, nil
+}
+
+// MatchResponse evaluates a response and returns whether or not the response
+// contains a cookie that matches the provided name and value.
+func (m *Matcher) MatchResponse(res *http.Response) (bool, error) {
+	for _, c := range res.Cookies() {
+		if m.match(c) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (m *Matcher) match(cs *http.Cookie) bool {
+	switch {
+	case m.cookie.Name != cs.Name:
+		return false
+	case m.cookie.Value != "" && m.cookie.Value != cs.Value:
+		return false
+	}
+
+	return true
 }

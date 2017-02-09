@@ -16,6 +16,7 @@ package cookie
 
 import (
 	"encoding/json"
+	"net/http"
 
 	"github.com/google/martian"
 	"github.com/google/martian/filter"
@@ -24,15 +25,9 @@ import (
 
 var noop = martian.Noop("cookie.Filter")
 
-// Filter filters requests and responses based on cookie name, path and value.
-type Filter struct {
-	*filter.Filter
-}
-
 type filterJSON struct {
 	Name         string               `json:"name"`
 	Value        string               `json:"value"`
-	Path         string               `json:"path"`
 	Modifier     json.RawMessage      `json:"modifier"`
 	ElseModifier json.RawMessage      `json:"else"`
 	Scope        []parse.ModifierType `json:"scope"`
@@ -43,12 +38,14 @@ func init() {
 }
 
 // NewFilter builds a new cookie filter.
-func NewFilter(name, value, path string) *Filter {
-	m := NewMatcher(name, value, path)
+func NewFilter(cookie *http.Cookie) *filter.Filter {
 	f := filter.New()
+	m := NewMatcher(cookie)
+
 	f.SetRequestCondition(m)
 	f.SetResponseCondition(m)
-	return &Filter{f}
+
+	return f
 }
 
 // filterFromJSON builds a header.Filter from JSON.
@@ -67,7 +64,11 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	filter := NewFilter(msg.Name, msg.Value, msg.Path)
+	cookie := &http.Cookie{
+		Name:  msg.Name,
+		Value: msg.Value,
+	}
+	filter := NewFilter(cookie)
 
 	m, err := parse.FromJSON(msg.Modifier)
 	if err != nil {
@@ -77,12 +78,12 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 	filter.RequestWhenTrue(m.RequestModifier())
 	filter.ResponseWhenTrue(m.ResponseModifier())
 
-	em, err := parse.FromJSON(msg.ElseModifier)
-	if err != nil {
-		return nil, err
-	}
+	if msg.ElseModifier != nil {
+		em, err := parse.FromJSON(msg.ElseModifier)
+		if err != nil {
+			return nil, err
+		}
 
-	if em != nil {
 		filter.RequestWhenFalse(em.RequestModifier())
 		filter.ResponseWhenFalse(em.ResponseModifier())
 	}
