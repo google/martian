@@ -65,14 +65,15 @@ func TestQueryStringFilterWithQuery(t *testing.T) {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
 
+	if !tm.RequestModified() {
+		t.Error("tm.RequestModified(): got false, want true")
+	}
+
 	res := proxyutil.NewResponse(200, nil, req)
 	if err := f.ModifyResponse(res); err != nil {
 		t.Errorf("ModifyResponse(): got %v, want no error", err)
 	}
 
-	if !tm.RequestModified() {
-		t.Error("tm.RequestModified(): got false, want true")
-	}
 	if !tm.ResponseModified() {
 		t.Error("tm.ResponseModified(): got false, want true")
 	}
