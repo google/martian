@@ -32,26 +32,26 @@ func NewMatcher(cookie *http.Cookie) *Matcher {
 // MatchRequest evaluates a request and returns whether or not
 // the request contains a cookie that matches the provided name, path
 // and value.
-func (m *Matcher) MatchRequest(req *http.Request) (bool, error) {
+func (m *Matcher) MatchRequest(req *http.Request) bool {
 	for _, c := range req.Cookies() {
 		if m.match(c) {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 // MatchResponse evaluates a response and returns whether or not the response
 // contains a cookie that matches the provided name and value.
-func (m *Matcher) MatchResponse(res *http.Response) (bool, error) {
+func (m *Matcher) MatchResponse(res *http.Response) bool {
 	for _, c := range res.Cookies() {
 		if m.match(c) {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 func (m *Matcher) match(cs *http.Cookie) bool {

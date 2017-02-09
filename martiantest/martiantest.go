@@ -135,11 +135,11 @@ func (tm *Matcher) RequestEvaluatesTo(value bool) {
 }
 
 // MatchRequest returns the stubbed value in tm.reqval.
-func (tm *Matcher) MatchRequest(*http.Request) (bool, error) {
-	return tm.reqval, nil
+func (tm *Matcher) MatchRequest(*http.Request) bool {
+	return tm.reqval
 }
 
 // MatchResponse returns the stubbed value in tm.resval.
-func (tm *Matcher) MatchResponse(*http.Response) (bool, error) {
-	return tm.resval, nil
+func (tm *Matcher) MatchResponse(*http.Response) bool {
+	return tm.resval
 }

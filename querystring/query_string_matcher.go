@@ -30,27 +30,27 @@ func NewMatcher(name, value string) *Matcher {
 // MatchRequest evaluates a request and returns whether or not
 // the request contains a querystring param that matches the provided name
 // and value.
-func (m *Matcher) MatchRequest(req *http.Request) (bool, error) {
+func (m *Matcher) MatchRequest(req *http.Request) bool {
 	for n, vs := range req.URL.Query() {
 		if m.name == n {
 			if m.value == "" {
-				return true, nil
+				return true
 			}
 
 			for _, v := range vs {
 				if m.value == v {
-					return true, nil
+					return true
 				}
 			}
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 // MatchResponse evaluates a response and returns whether or not
 // the request that resulted in that response contains a querystring param that matches the provided name
 // and value.
-func (m *Matcher) MatchResponse(res *http.Response) (bool, error) {
+func (m *Matcher) MatchResponse(res *http.Response) bool {
 	return m.MatchRequest(res.Request)
 }

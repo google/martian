@@ -20,10 +20,10 @@ import (
 
 // ResponseCondition is the interface that describes matchers for response filters
 type ResponseCondition interface {
-	MatchResponse(*http.Response) (bool, error)
+	MatchResponse(*http.Response) bool
 }
 
 // RequestCondition is the interface that describes matchers for response filters
 type RequestCondition interface {
-	MatchRequest(*http.Request) (bool, error)
+	MatchRequest(*http.Request) bool
 }

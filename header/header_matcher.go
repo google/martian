@@ -37,39 +37,39 @@ func NewMatcher(name, value string) *Matcher {
 // MatchRequest evaluates a request and returns whether or not
 // the request contains a header that matches the provided name
 // and value.
-func (m *Matcher) MatchRequest(req *http.Request) (bool, error) {
+func (m *Matcher) MatchRequest(req *http.Request) bool {
 	h := proxyutil.RequestHeader(req)
 
 	vs, ok := h.All(m.name)
 	if !ok {
-		return false, nil
+		return false
 	}
 
 	for _, v := range vs {
 		if v == m.value {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 // MatchResponse evaluates a response and returns whether or not
 // the response contains a header that matches the provided name
 // and value.
-func (m *Matcher) MatchResponse(res *http.Response) (bool, error) {
+func (m *Matcher) MatchResponse(res *http.Response) bool {
 	h := proxyutil.ResponseHeader(res)
 
 	vs, ok := h.All(m.name)
 	if !ok {
-		return false, nil
+		return false
 	}
 
 	for _, v := range vs {
 		if v == m.value {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
