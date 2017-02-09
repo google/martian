@@ -20,12 +20,12 @@ func (m *Matcher) MatchRequest(req *http.Request) (bool, error) {
 	for n, vs := range req.URL.Query() {
 		if m.name == n {
 			if m.value == "" {
-				return false, nil
+				return true, nil
 			}
 
 			for _, v := range vs {
 				if m.value == v {
-					return false, nil
+					return true, nil
 				}
 			}
 		}
