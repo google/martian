@@ -120,7 +120,8 @@ func (f *Filter) ResponseWhenFalse(mod martian.ResponseModifier) {
 // ModifyRequest evaluates reqcond and executes treqmod iff reqcond evaluates
 // to true; otherwise, freqmod is executed.
 func (f *Filter) ModifyRequest(req *http.Request) error {
-	if f.reqcond.MatchRequest(req) {
+	match := f.reqcond.MatchRequest(req)
+	if match {
 		return f.treqmod.ModifyRequest(req)
 	}
 
@@ -130,7 +131,8 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 // ModifyResponse evaluates rescond and executes tresmod iff rescond evaluates
 // to true; otherwise, fresmod is executed.
 func (f *Filter) ModifyResponse(res *http.Response) error {
-	if f.rescond.MatchResponse(res) {
+	match := f.rescond.MatchResponse(res)
+	if match {
 		return f.tresmod.ModifyResponse(res)
 	}
 

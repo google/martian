@@ -77,14 +77,16 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 	filter.RequestWhenTrue(m.RequestModifier())
 	filter.ResponseWhenTrue(m.ResponseModifier())
 
-	em, err := parse.FromJSON(msg.ElseModifier)
-	if err != nil {
-		return nil, err
-	}
+	if len(msg.ElseModifier) > 0 {
+		em, err := parse.FromJSON(msg.ElseModifier)
+		if err != nil {
+			return nil, err
+		}
 
-	if em != nil {
-		filter.RequestWhenFalse(em.RequestModifier())
-		filter.ResponseWhenFalse(em.ResponseModifier())
+		if em != nil {
+			filter.RequestWhenFalse(em.RequestModifier())
+			filter.ResponseWhenFalse(em.ResponseModifier())
+		}
 	}
 
 	return parse.NewResult(filter, msg.Scope)

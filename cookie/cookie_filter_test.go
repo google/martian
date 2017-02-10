@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All rights reserved.
+// Copyright 2017 Google Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package header
+package cookie
 
 import (
 	"net/http"
 	"testing"
 
 	"github.com/google/martian/filter"
+	_ "github.com/google/martian/header"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
@@ -26,9 +27,9 @@ import (
 
 func TestFilterFromJSON(t *testing.T) {
 	msg := []byte(`{
-		"header.Filter": {
+		"cookie.Filter": {
 			"scope": ["request", "response"],
-			"name": "Martian-Passthrough",
+			"name": "martian-cookie",
 			"value": "true",
 			"modifier": {
 				"header.Modifier" : {
@@ -56,68 +57,82 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatal("reqmod: got nil, want not nil")
 	}
 
-	// Matching condition for request
-	req, err := http.NewRequest("GET", "http://example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-	req.Header.Set("Martian-Passthrough", "true")
-	if err := reqmod.ModifyRequest(req); err != nil {
-		t.Fatalf("ModifyRequest(): got %v, want no error", err)
-	}
-	if got, want := req.Header.Get("Martian-Testing"), "true"; got != want {
-		t.Fatalf("req.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
-	}
-
-	// Else condition for request
-	req, err = http.NewRequest("GET", "http://example.com", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest(): got %v, want no error", err)
-	}
-	req.Header.Set("Martian-Passthrough", "false")
-	if err := reqmod.ModifyRequest(req); err != nil {
-		t.Fatalf("ModifyRequest(): got %v, want no error", err)
-	}
-	if got, want := req.Header.Get("Martian-Testing"), "false"; got != want {
-		t.Fatalf("req.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
-	}
-
-	// Matching condition for response
 	resmod := r.ResponseModifier()
 	if resmod == nil {
 		t.Fatal("resmod: got nil, want not nil")
 	}
 
-	res := proxyutil.NewResponse(200, nil, nil)
-	res.Header.Set("Martian-Passthrough", "true")
-	if err := resmod.ModifyResponse(res); err != nil {
-		t.Fatalf("ModifyResponse(): got %v, want no error", err)
-	}
-	if got, want := res.Header.Get("Martian-Testing"), "true"; got != want {
-		t.Fatalf("res.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
-	}
+	for _, tc := range []struct {
+		name      string
+		wantMatch bool
+		cookie    *http.Cookie
+	}{
+		{
+			name:      "matching name and value",
+			wantMatch: true,
+			cookie: &http.Cookie{
+				Name:  "martian-cookie",
+				Value: "true",
+			},
+		},
+		{
+			name:      "matching name with mismatched value",
+			wantMatch: false,
+			cookie: &http.Cookie{
+				Name:  "martian-cookie",
+				Value: "false",
+			},
+		},
+		{
+			name:      "missing cookie",
+			wantMatch: false,
+		},
+	} {
+		req, err := http.NewRequest("GET", "http://example.com", nil)
+		if err != nil {
+			t.Errorf("%s: http.NewRequest(): got %v, want no error", tc.name, err)
+			continue
+		}
+		if tc.cookie != nil {
+			req.AddCookie(tc.cookie)
+		}
 
-	// Else condition for response
-	resmod = r.ResponseModifier()
-	if resmod == nil {
-		t.Fatal("resmod: got nil, want not nil")
-	}
+		if err := reqmod.ModifyRequest(req); err != nil {
+			t.Errorf("%s: ModifyRequest(): got %v, want no error", tc.name, err)
+			continue
+		}
 
-	res = proxyutil.NewResponse(200, nil, nil)
-	res.Header.Set("Martian-Passthrough", "false")
-	if err := resmod.ModifyResponse(res); err != nil {
-		t.Fatalf("ModifyResponse(): got %v, want no error", err)
-	}
-	if got, want := res.Header.Get("Martian-Testing"), "false"; got != want {
-		t.Fatalf("res.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
+		want := "false"
+		if tc.wantMatch {
+			want = "true"
+		}
+		if got := req.Header.Get("Martian-Testing"); got != want {
+			t.Errorf("%s: req.Header.Get(%q): got %q, want %q", "Martian-Testing", tc.name, got, want)
+			continue
+		}
+
+		res := proxyutil.NewResponse(200, nil, req)
+		if tc.cookie != nil {
+			c := &http.Cookie{Name: tc.cookie.Name, Value: tc.cookie.Value}
+			res.Header.Add("Set-Cookie", c.String())
+		}
+
+		if err := resmod.ModifyResponse(res); err != nil {
+			t.Fatalf("ModifyResponse(): got %v, want no error", err)
+		}
+
+		if got := res.Header.Get("Martian-Testing"); got != want {
+			t.Fatalf("res.Header.Get(%q): got %q, want %q", "Martian-Testing", got, want)
+		}
+
 	}
 }
 
 func TestFilterFromJSONWithoutElse(t *testing.T) {
 	msg := []byte(`{
-		"header.Filter": {
+		"cookie.Filter": {
 			"scope": ["request", "response"],
-			"name": "Martian-Passthrough",
+			"name": "martian-cookie",
 			"value": "true",
 			"modifier": {
 				"header.Modifier" : {
@@ -135,22 +150,22 @@ func TestFilterFromJSONWithoutElse(t *testing.T) {
 }
 
 func TestRequestWhenTrueCondition(t *testing.T) {
-	hm := NewMatcher("Martian-Testing", "true")
+	cm := NewMatcher(&http.Cookie{Name: "Martian-Testing", Value: "true"})
 
 	tt := []struct {
-		name   string
-		values []string
-		want   bool
+		name  string
+		value string
+		want  bool
 	}{
 		{
-			name:   "Martian-Production",
-			values: []string{"true"},
-			want:   false,
+			name:  "Martian-Production",
+			value: "true",
+			want:  false,
 		},
 		{
-			name:   "Martian-Testing",
-			values: []string{"see-next-value", "true"},
-			want:   true,
+			name:  "Martian-Testing",
+			value: "true",
+			want:  true,
 		},
 	}
 
@@ -158,7 +173,7 @@ func TestRequestWhenTrueCondition(t *testing.T) {
 		tm := martiantest.NewModifier()
 
 		f := filter.New()
-		f.SetRequestCondition(hm)
+		f.SetRequestCondition(cm)
 		f.RequestWhenTrue(tm)
 
 		req, err := http.NewRequest("GET", "/", nil)
@@ -166,7 +181,7 @@ func TestRequestWhenTrueCondition(t *testing.T) {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)
 		}
 
-		req.Header[tc.name] = tc.values
+		req.AddCookie(&http.Cookie{Name: tc.name, Value: tc.value})
 
 		if err := f.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
@@ -179,21 +194,21 @@ func TestRequestWhenTrueCondition(t *testing.T) {
 }
 
 func TestRequestWhenFalse(t *testing.T) {
-	hm := NewMatcher("Martian-Testing", "true")
+	cm := NewMatcher(&http.Cookie{Name: "Martian-Testing", Value: "true"})
 	tt := []struct {
-		name   string
-		values []string
-		want   bool
+		name  string
+		value string
+		want  bool
 	}{
 		{
-			name:   "Martian-Production",
-			values: []string{"true"},
-			want:   true,
+			name:  "Martian-Production",
+			value: "true",
+			want:  true,
 		},
 		{
-			name:   "Martian-Testing",
-			values: []string{"see-next-value", "true"},
-			want:   false,
+			name:  "Martian-Testing",
+			value: "true",
+			want:  false,
 		},
 	}
 
@@ -201,7 +216,7 @@ func TestRequestWhenFalse(t *testing.T) {
 		tm := martiantest.NewModifier()
 
 		f := filter.New()
-		f.SetRequestCondition(hm)
+		f.SetRequestCondition(cm)
 		f.RequestWhenFalse(tm)
 
 		req, err := http.NewRequest("GET", "/", nil)
@@ -209,7 +224,7 @@ func TestRequestWhenFalse(t *testing.T) {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)
 		}
 
-		req.Header[tc.name] = tc.values
+		req.AddCookie(&http.Cookie{Name: tc.name, Value: tc.value})
 
 		if err := f.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
@@ -222,22 +237,22 @@ func TestRequestWhenFalse(t *testing.T) {
 }
 
 func TestResponseWhenTrue(t *testing.T) {
-	hm := NewMatcher("Martian-Testing", "true")
+	cm := NewMatcher(&http.Cookie{Name: "Martian-Testing", Value: "true"})
 
 	tt := []struct {
-		name   string
-		values []string
-		want   bool
+		name  string
+		value string
+		want  bool
 	}{
 		{
-			name:   "Martian-Production",
-			values: []string{"true"},
-			want:   false,
+			name:  "Martian-Production",
+			value: "true",
+			want:  false,
 		},
 		{
-			name:   "Martian-Testing",
-			values: []string{"see-next-value", "true"},
-			want:   true,
+			name:  "Martian-Testing",
+			value: "true",
+			want:  true,
 		},
 	}
 
@@ -245,12 +260,13 @@ func TestResponseWhenTrue(t *testing.T) {
 		tm := martiantest.NewModifier()
 
 		f := filter.New()
-		f.SetResponseCondition(hm)
+		f.SetResponseCondition(cm)
 		f.ResponseWhenTrue(tm)
 
 		res := proxyutil.NewResponse(200, nil, nil)
 
-		res.Header[tc.name] = tc.values
+		c := &http.Cookie{Name: tc.name, Value: tc.value}
+		res.Header.Add("Set-Cookie", c.String())
 
 		if err := f.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)
@@ -263,22 +279,22 @@ func TestResponseWhenTrue(t *testing.T) {
 }
 
 func TestResponseWhenFalse(t *testing.T) {
-	hm := NewMatcher("Martian-Testing", "true")
+	cm := NewMatcher(&http.Cookie{Name: "Martian-Testing", Value: "true"})
 
 	tt := []struct {
-		name   string
-		values []string
-		want   bool
+		name  string
+		value string
+		want  bool
 	}{
 		{
-			name:   "Martian-Production",
-			values: []string{"true"},
-			want:   true,
+			name:  "Martian-Production",
+			value: "true",
+			want:  true,
 		},
 		{
-			name:   "Martian-Testing",
-			values: []string{"see-next-value", "true"},
-			want:   false,
+			name:  "Martian-Testing",
+			value: "true",
+			want:  false,
 		},
 	}
 
@@ -286,12 +302,13 @@ func TestResponseWhenFalse(t *testing.T) {
 		tm := martiantest.NewModifier()
 
 		f := filter.New()
-		f.SetResponseCondition(hm)
+		f.SetResponseCondition(cm)
 		f.ResponseWhenFalse(tm)
 
 		res := proxyutil.NewResponse(200, nil, nil)
 
-		res.Header[tc.name] = tc.values
+		c := &http.Cookie{Name: tc.name, Value: tc.value}
+		res.Header.Add("Set-Cookie", c.String())
 
 		if err := f.ModifyResponse(res); err != nil {
 			t.Fatalf("%d. ModifyResponse(): got %v, want no error", i, err)

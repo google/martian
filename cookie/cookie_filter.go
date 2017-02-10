@@ -1,4 +1,4 @@
-// Copyright 2015 Google Inc. All rights reserved.
+// Copyright 2017 Google Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package querystring
+package cookie
 
 import (
 	"encoding/json"
+	"net/http"
 
 	"github.com/google/martian"
 	"github.com/google/martian/filter"
 	"github.com/google/martian/parse"
 )
 
-var noop = martian.Noop("querystring.Filter")
-
-func init() {
-	parse.Register("querystring.Filter", filterFromJSON)
-}
-
-// Filter runs modifiers iff the request query parameter for name matches value.
-type Filter struct {
-	*filter.Filter
-}
+var noop = martian.Noop("cookie.Filter")
 
 type filterJSON struct {
 	Name         string               `json:"name"`
@@ -41,24 +33,30 @@ type filterJSON struct {
 	Scope        []parse.ModifierType `json:"scope"`
 }
 
-// NewFilter builds a querystring.Filter that filters on name and optionally
-// value.
-func NewFilter(name, value string) *Filter {
-	m := NewMatcher(name, value)
-	f := filter.New()
-	f.SetRequestCondition(m)
-	f.SetResponseCondition(m)
-	return &Filter{f}
+func init() {
+	parse.Register("cookie.Filter", filterFromJSON)
 }
 
-// filterFromJSON takes a JSON message and returns a querystring.Filter.
+// NewFilter builds a new cookie filter.
+func NewFilter(cookie *http.Cookie) *filter.Filter {
+	f := filter.New()
+	m := NewMatcher(cookie)
+
+	f.SetRequestCondition(m)
+	f.SetResponseCondition(m)
+
+	return f
+}
+
+// filterFromJSON builds a header.Filter from JSON.
 //
 // Example JSON:
 // {
-//   "name": "param",
-//   "value": "example",
-//   "scope": ["request", "response"],
-//   "modifier": { ... }
+//   "scope": ["request", "result"],
+//   "name": "Martian-Testing",
+//   "value": "true",
+//   "modifier": { ... },
+//   "else": { ... }
 // }
 func filterFromJSON(b []byte) (*parse.Result, error) {
 	msg := &filterJSON{}
@@ -66,27 +64,29 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	f := NewFilter(msg.Name, msg.Value)
+	cookie := &http.Cookie{
+		Name:  msg.Name,
+		Value: msg.Value,
+	}
+	filter := NewFilter(cookie)
 
-	r, err := parse.FromJSON(msg.Modifier)
+	m, err := parse.FromJSON(msg.Modifier)
 	if err != nil {
 		return nil, err
 	}
 
-	f.RequestWhenTrue(r.RequestModifier())
-	f.ResponseWhenTrue(r.ResponseModifier())
+	filter.RequestWhenTrue(m.RequestModifier())
+	filter.ResponseWhenTrue(m.ResponseModifier())
 
-	if len(msg.ElseModifier) > 0 {
+	if msg.ElseModifier != nil {
 		em, err := parse.FromJSON(msg.ElseModifier)
 		if err != nil {
 			return nil, err
 		}
 
-		if em != nil {
-			f.RequestWhenFalse(em.RequestModifier())
-			f.ResponseWhenFalse(em.ResponseModifier())
-		}
+		filter.RequestWhenFalse(em.RequestModifier())
+		filter.ResponseWhenFalse(em.ResponseModifier())
 	}
 
-	return parse.NewResult(f, msg.Scope)
+	return parse.NewResult(filter, msg.Scope)
 }
