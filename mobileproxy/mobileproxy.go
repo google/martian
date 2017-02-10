@@ -37,7 +37,6 @@ import (
 	mlog "github.com/google/martian/log"
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
-	"github.com/google/martian/mobile"
 	"github.com/google/martian/servemux"
 	"github.com/google/martian/verify"
 
@@ -55,6 +54,9 @@ import (
 	_ "github.com/google/martian/stash"
 	_ "github.com/google/martian/static"
 	_ "github.com/google/martian/status"
+
+	// side-effect importing to run mobile.Init()
+	_ "github.com/google/martian/mobile"
 )
 
 var started = false
@@ -227,10 +229,6 @@ func (p *Martian) Shutdown() {
 // log calls are displayed in the console
 func SetLogLevel(l int) {
 	mlog.SetLevel(l)
-}
-
-func init() {
-	mobile.Init()
 }
 
 // handle sets up http.DefaultServeMux to handle requests to match patterns martian.proxy/{pth} and
