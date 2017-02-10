@@ -14,7 +14,11 @@
 
 package cookie
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/google/martian/log"
+)
 
 // Matcher is a conditonal evalutor of request or
 // response cookies to be used in structs that take conditions.
@@ -35,10 +39,12 @@ func NewMatcher(cookie *http.Cookie) *Matcher {
 func (m *Matcher) MatchRequest(req *http.Request) bool {
 	for _, c := range req.Cookies() {
 		if m.match(c) {
+			log.Debugf("cookie.Filter: match on request: %s", req)
 			return true
 		}
 	}
 
+	log.Debugf("cookie.Filter: no match on request: %s", req)
 	return false
 }
 
@@ -47,10 +53,12 @@ func (m *Matcher) MatchRequest(req *http.Request) bool {
 func (m *Matcher) MatchResponse(res *http.Response) bool {
 	for _, c := range res.Cookies() {
 		if m.match(c) {
+			log.Debugf("cookie.Filter: match on response to request: %s", res.Request)
 			return true
 		}
 	}
 
+	log.Debugf("cookie.Filter: no match on response to request: %s", res.Request)
 	return false
 }
 

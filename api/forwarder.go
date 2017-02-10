@@ -42,6 +42,7 @@ func NewForwarder(host string, port int) *Forwarder {
 // ModifyRequest forwards the request to the local API server running at f.port,
 // downgrades the scheme to http and marks the request context for skipped logging.
 func (f *Forwarder) ModifyRequest(req *http.Request) error {
+	log.Debugf("api.Forwarder: request: %s", req)
 	ctx := martian.NewContext(req)
 	ctx.APIRequest()
 	ctx.SkipLogging()
@@ -50,7 +51,7 @@ func (f *Forwarder) ModifyRequest(req *http.Request) error {
 	req.URL.Scheme = "http"
 	req.URL.Host = fmt.Sprintf("%s:%d", "localhost", f.port)
 	out := req.URL.String()
-	log.Infof("api.Forwarder: forwarding %s to %s", in, out)
+	log.Debugf("api.Forwarder: request forwarding from %s to %s", in, out)
 
 	return nil
 }

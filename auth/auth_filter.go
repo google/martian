@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 )
 
 // Filter filters RequestModifiers and ResponseModifiers by auth ID.
@@ -98,14 +99,17 @@ func (f *Filter) ResponseModifier(id string) martian.ResponseModifier {
 // ModifyRequest runs the RequestModifier for the associated auth ID. If no
 // modifier is found for auth ID then auth error is set.
 func (f *Filter) ModifyRequest(req *http.Request) error {
+	log.Debugf("auth.Filter: request: %s", req)
 	ctx := martian.NewContext(req)
 	actx := FromContext(ctx)
 
 	if reqmod, ok := f.reqmods[actx.ID()]; ok {
+		log.Debugf("auth.Filter: request match on ID %s", actx.ID())
 		return reqmod.ModifyRequest(req)
 	}
 
 	if err := f.requireKnownAuth(actx.ID()); err != nil {
+		log.Debugf("auth.Filter: request error on require auth for ID %s", actx.ID())
 		actx.SetError(err)
 	}
 
@@ -115,14 +119,17 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 // ModifyResponse runs the ResponseModifier for the associated auth ID. If no
 // modifier is found for the auth ID then the auth error is set.
 func (f *Filter) ModifyResponse(res *http.Response) error {
+	log.Debugf("auth.Filter: response to request: %s", res.Request)
 	ctx := martian.NewContext(res.Request)
 	actx := FromContext(ctx)
 
 	if resmod, ok := f.resmods[actx.ID()]; ok {
+		log.Debugf("auth.Filter: response match on ID %s", actx.ID())
 		return resmod.ModifyResponse(res)
 	}
 
 	if err := f.requireKnownAuth(actx.ID()); err != nil {
+		log.Debugf("auth.Filter: response error on require auth for ID %s", actx.ID())
 		actx.SetError(err)
 	}
 

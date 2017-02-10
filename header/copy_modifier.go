@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -41,12 +42,17 @@ type copyModifierJSON struct {
 func (m *copyModifier) ModifyRequest(req *http.Request) error {
 	h := proxyutil.RequestHeader(req)
 
+	log.Debugf("header.Copy: request: %s", req)
+	log.Debugf("header.Copy: copying from %s to %s", m.from, m.to)
 	return h.Set(m.to, h.Get(m.from))
 }
 
 // ModifyResponse copies the header in from to the response header for to.
 func (m *copyModifier) ModifyResponse(res *http.Response) error {
 	h := proxyutil.ResponseHeader(res)
+
+	log.Debugf("header.Copy: response to request: %s", res.Request)
+	log.Debugf("header.Copy: copying from %s to %s", m.from, m.to)
 
 	return h.Set(m.to, h.Get(m.from))
 }

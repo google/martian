@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
 
@@ -69,6 +70,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 
 // ModifyRequest sets the Content-Type header and overrides the request body.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
+	log.Debugf("body.Modifier: request: %s", req)
 	req.Body.Close()
 
 	req.Header.Set("Content-Type", m.contentType)
@@ -84,6 +86,7 @@ func (m *Modifier) ModifyRequest(req *http.Request) error {
 
 // ModifyResponse sets the Content-Type header and overrides the response body.
 func (m *Modifier) ModifyResponse(res *http.Response) error {
+	log.Debugf("body.Modifier: response to request: %s", res.Request)
 	// Replace the existing body, close it first.
 	res.Body.Close()
 
