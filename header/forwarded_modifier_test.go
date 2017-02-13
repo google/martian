@@ -23,9 +23,10 @@ func TestSetForwardHeaders(t *testing.T) {
 	xfp := "X-Forwarded-Proto"
 	xff := "X-Forwarded-For"
 	xfh := "X-Forwarded-Host"
+	xfu := "X-Forwarded-URL"
 
 	m := NewForwardedModifier()
-	req, err := http.NewRequest("GET", "http://martian.local", nil)
+	req, err := http.NewRequest("GET", "http://martian.local?key=value", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
@@ -42,6 +43,9 @@ func TestSetForwardHeaders(t *testing.T) {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", xff, got, want)
 	}
 	if got, want := req.Header.Get(xfh), "martian.local"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", xfh, got, want)
+	}
+	if got, want := req.Header.Get(xfu), "http://martian.local?key=value"; got != want {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", xfh, got, want)
 	}
 
