@@ -34,7 +34,7 @@ func NewForwardedModifier() martian.RequestModifier {
 		func(req *http.Request) error {
 			req.Header.Set("X-Forwarded-Proto", req.URL.Scheme)
 			req.Header.Set("X-Forwarded-Host", req.Host)
-			req.Header.Set("X-Forwarded-URL", req.URL.String())
+			req.Header.Set("X-Forwarded-Url", req.URL.String())
 
 			xff, _, err := net.SplitHostPort(req.RemoteAddr)
 			if err != nil {
