@@ -46,7 +46,7 @@ func init() {
 
 // ModifyRequest sets the fields of req.URL to m.Url if they are not the zero value.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
-    modified := false
+	modified := false
 	orig := req.URL.String()
 
 	if m.url.Scheme != "" {
@@ -68,10 +68,6 @@ func (m *Modifier) ModifyRequest(req *http.Request) error {
 	if m.url.Fragment != "" {
 		modified = true
 		req.URL.Fragment = m.url.Fragment
-	}
-
-	if (modified){
-		req.Header.Set("X-Forwarded-Url", orig)
 	}
 
 	return nil
