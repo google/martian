@@ -23,7 +23,7 @@ func TestSetForwardHeaders(t *testing.T) {
 	xfp := "X-Forwarded-Proto"
 	xff := "X-Forwarded-For"
 	xfh := "X-Forwarded-Host"
-	xfu := "X-Forwarded-URL"
+	xfu := "X-Forwarded-Url"
 
 	m := NewForwardedModifier()
 	req, err := http.NewRequest("GET", "http://martian.local?key=value", nil)
