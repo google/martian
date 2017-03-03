@@ -88,13 +88,23 @@ func TestUsingCachedResponset(t *testing.T) {
 		if err := cmd.Start(); err != nil {
 			log.Fatal("Cannot run martian")
 		}
-		<-mch
-		if cmd.ProcessState.Exited() {
-			log.Fatal("Martian exited before test ended.")
-		}
-		err := cmd.Process.Kill()
-		if err != nil {
-			log.Fatalf("Failed to kill martian %v", err)
+
+		ech := make(chan error)
+		go func() {
+			_, err := cmd.Process.Wait()
+			ech <- err
+		}()
+
+		select {
+		case <-mch:
+			err := cmd.Process.Kill()
+			if err != nil {
+				log.Fatalf("Failed to kill martian %v", err)
+			} else {
+				log.Println("Killed martian")
+			}
+		case err := <-ech:
+			log.Fatalf("Martian exited unexpectedly %v", err)
 		}
 		mch <- 1
 	}(8889, 8890)
