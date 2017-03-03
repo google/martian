@@ -64,6 +64,7 @@ type Martian struct {
 	listener    net.Listener
 	mux         *http.ServeMux
 	started     bool
+	harLogging  bool
 	TrafficPort int
 	APIPort     int
 	Cert        string
@@ -75,6 +76,10 @@ type Martian struct {
 func (m *Martian) EnableCybervillains() {
 	m.Cert = cybervillains.Cert
 	m.Key = cybervillains.Key
+}
+
+func (m *Martian) EnableHarLogging() {
+	m.harLogging = true
 }
 
 // NewProxy creates a new Martian struct for configuring and starting a martian.
@@ -136,15 +141,25 @@ func (m *Martian) Start() {
 	m.proxy.SetRequestModifier(topg)
 	m.proxy.SetResponseModifier(topg)
 
-	// add HAR logger for unmodified logs.
-	uhl := har.NewLogger()
-	fg.AddRequestModifier(uhl)
-	fg.AddResponseModifier(uhl)
+	if m.harLogging {
+		// add HAR logger for unmodified logs.
+		uhl := har.NewLogger()
+		fg.AddRequestModifier(uhl)
+		fg.AddResponseModifier(uhl)
 
-	// add HAR logger
-	hl := har.NewLogger()
-	stack.AddRequestModifier(hl)
-	stack.AddResponseModifier(hl)
+		// add HAR logger
+		hl := har.NewLogger()
+		stack.AddRequestModifier(hl)
+		stack.AddResponseModifier(hl)
+
+		// Retrieve Unmodified HAR logs
+		m.handle("/logs/original", har.NewExportHandler(uhl))
+		m.handle("/logs/original/reset", har.NewResetHandler(uhl))
+
+		// Retrieve HAR logs
+		m.handle("/logs", har.NewExportHandler(hl))
+		m.handle("/logs/reset", har.NewResetHandler(hl))
+	}
 
 	lsh := marbl.NewHandler()
 	// retrieve binary marbl logs
@@ -163,14 +178,6 @@ func (m *Martian) Start() {
 
 	// Update modifiers.
 	m.handle("/configure", mod)
-
-	// Retrieve Unmodified HAR logs
-	m.handle("/logs/original", har.NewExportHandler(uhl))
-	m.handle("/logs/original/reset", har.NewResetHandler(uhl))
-
-	// Retrieve HAR logs
-	m.handle("/logs", har.NewExportHandler(hl))
-	m.handle("/logs/reset", har.NewResetHandler(hl))
 
 	// Verify assertions.
 	vh := verify.NewHandler()
