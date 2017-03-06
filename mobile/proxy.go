@@ -78,6 +78,7 @@ func (m *Martian) EnableCybervillains() {
 	m.Key = cybervillains.Key
 }
 
+// EnableHarLogging configures martian to make HAR traffic logs available.
 func (m *Martian) EnableHarLogging() {
 	m.harLogging = true
 }
