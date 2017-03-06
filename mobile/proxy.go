@@ -78,9 +78,9 @@ func (m *Martian) EnableCybervillains() {
 	m.Key = cybervillains.Key
 }
 
-// EnableHarLogging configures martian to make HAR traffic logs available.
-func (m *Martian) EnableHarLogging() {
-	m.harLogging = true
+// SetHarLogging configures martian HAR traffic logging, enabling if true.
+func (m *Martian) SetHarLogging(enable bool) {
+	m.harLogging = enable
 }
 
 // NewProxy creates a new Martian struct for configuring and starting a martian.
