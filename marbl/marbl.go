@@ -184,7 +184,7 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 }
 
 // LogResponse writes an http.Response to Stream with an id unique for the request / response pair.
-func (s *Stream) LogResponse(id string, res *http.Response) error {
+func (s *Stream) LogResponse(id string, res *http.Response, withBody bool) error {
 	s.sendHeader(id, Response, ":proto", res.Proto)
 	s.sendHeader(id, Response, ":status", strconv.Itoa(res.StatusCode))
 	s.sendHeader(id, Response, ":reason", res.Status)
@@ -197,6 +197,10 @@ func (s *Stream) LogResponse(id string, res *http.Response) error {
 		for _, v := range vs {
 			s.sendHeader(id, Response, k, v)
 		}
+	}
+
+	if !withBody {
+		return nil
 	}
 
 	res.Body = &bodyLogger{

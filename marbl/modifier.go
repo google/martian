@@ -17,6 +17,7 @@ package marbl
 import (
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/martian"
 )
@@ -24,7 +25,8 @@ import (
 // Modifier implements the Martian modifier interface so that marbl logs
 // can be captured at any point in a Martian modifier tree.
 type Modifier struct {
-	s *Stream
+	s           *Stream
+	bodyLogging func(*http.Response) bool
 }
 
 // NewModifier returns a marbl.Modifier initialized with a marbl.Stream.
@@ -44,4 +46,43 @@ func (m *Modifier) ModifyRequest(req *http.Request) error {
 func (m *Modifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
 	return m.s.LogResponse(ctx.ID(), res)
+}
+
+// Option is a configurable setting for the logger.
+type Option func(m *Modifier)
+
+// BodyLoggingForContentTypes returns an option that logs response bodies based
+// on opting in to the Content-Type of the response.
+func BodyLoggingForContentTypes(cts ...string) Option {
+	return func(m *Modifier) {
+		m.bodyLogging = func(res *http.Response) bool {
+			rct := res.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return true
+				}
+			}
+
+			return false
+		}
+	}
+}
+
+// SkipBodyLoggingForContentTypes returns an option that logs response bodies based
+// on opting out of the Content-Type of the response.
+func SkipBodyLoggingForContentTypes(cts ...string) Option {
+	return func(m *Modifier) {
+		m.bodyLogging = func(res *http.Response) bool {
+			rct := res.Header.Get("Content-Type")
+
+			for _, ct := range cts {
+				if strings.HasPrefix(strings.ToLower(rct), strings.ToLower(ct)) {
+					return false
+				}
+			}
+
+			return true
+		}
+	}
 }
