@@ -64,7 +64,7 @@ type Martian struct {
 	listener    net.Listener
 	mux         *http.ServeMux
 	started     bool
-	harLogging  bool
+	HarLogging  bool
 	TrafficPort int
 	APIPort     int
 	Cert        string
@@ -76,11 +76,6 @@ type Martian struct {
 func (m *Martian) EnableCybervillains() {
 	m.Cert = cybervillains.Cert
 	m.Key = cybervillains.Key
-}
-
-// SetHarLogging configures martian HAR traffic logging, enabling if true.
-func (m *Martian) SetHarLogging(enable bool) {
-	m.harLogging = enable
 }
 
 // NewProxy creates a new Martian struct for configuring and starting a martian.
@@ -142,7 +137,7 @@ func (m *Martian) Start() {
 	m.proxy.SetRequestModifier(topg)
 	m.proxy.SetResponseModifier(topg)
 
-	if m.harLogging {
+	if m.HarLogging {
 		// add HAR logger for unmodified logs.
 		uhl := har.NewLogger()
 		fg.AddRequestModifier(uhl)
