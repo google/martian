@@ -39,7 +39,7 @@ flag:
 By default, Martian will be running on port 8080, and the Martian API will be running on 8181
 . The port can be specified via flags:
 
-    $GOPATH/bin/proxy -addr=:9999 -api_addr=:9898 
+    $GOPATH/bin/proxy -addr=:9999 -api-addr=:9898 
 
 ### Logging
 For logging of requests and responses a [logging
