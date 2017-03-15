@@ -123,7 +123,6 @@ func (s *Session) MarkInsecure() {
 	s.secure = false
 }
 
-
 // Hijack takes control of the connection from the proxy. No further action
 // will be taken by the proxy and the connection will be closed following the
 // return of the hijacker.
@@ -224,8 +223,8 @@ func (ctx *Context) SkippingRoundTrip() bool {
 
 // SkipLogging skips logging by Martian loggers for the current request.
 func (ctx *Context) SkipLogging() {
-	ctx.mu.RLock()
-	defer ctx.mu.RUnlock()
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
 
 	ctx.skipLogging = true
 }
@@ -240,8 +239,8 @@ func (ctx *Context) SkippingLogging() bool {
 
 // APIRequest marks the requests as a request to the proxy API.
 func (ctx *Context) APIRequest() {
-	ctx.mu.RLock()
-	defer ctx.mu.RUnlock()
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
 
 	ctx.apiRequest = true
 }
