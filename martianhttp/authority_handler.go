@@ -39,5 +39,4 @@ func NewAuthorityHandler(ca *x509.Certificate) http.Handler {
 func (h *authorityHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Content-Type", "application/x-x509-ca-cert")
 	rw.Write(h.cert)
-	rw.WriteHeader(200)
 }

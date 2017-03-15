@@ -140,8 +140,8 @@ func (s *Session) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 // Hijacked returns whether the connection has been hijacked.
 func (s *Session) Hijacked() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	return s.hijacked
 }
