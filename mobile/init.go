@@ -17,11 +17,7 @@
 // be cross compiled with gomobile for use on Android and iOS.
 package mobile
 
-import (
-	"flag"
-)
-
 // Init runs common initialization code for a martian proxy.
 func Init() {
-	flag.Parse()
+	// Add custom code for your environment here.
 }
