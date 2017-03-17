@@ -17,18 +17,7 @@
 // be cross compiled with gomobile for use on Android and iOS.
 package mobile
 
-import (
-	"flag"
-
-	mlog "github.com/google/martian/log"
-)
-
-var (
-	level = flag.Int("v", 0, "log level")
-)
-
 // Init runs common initialization code for a martian proxy.
 func Init() {
-	flag.Parse()
-	mlog.SetLevel(*level)
+	// Add custom code for your environment here.
 }
