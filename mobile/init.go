@@ -19,12 +19,9 @@ package mobile
 
 import (
 	"flag"
-
-	mlog "github.com/google/martian/log"
 )
 
 // Init runs common initialization code for a martian proxy.
 func Init() {
 	flag.Parse()
-	mlog.SetLevel(*level)
 }
