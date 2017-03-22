@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package marbl provides HTTP traffic logs streamed over websockets
-// that can be added to any point within a Maritan modifier tree.
+// that can be added to any point within a Martian modifier tree.
 // Marbl transmits HTTP logs that are serialized based on the following
 // schema:
 //
