@@ -15,103 +15,184 @@
 package marbl
 
 import (
-    "bytes"
-    "io"
-    "net/http"
-    "strconv"
-    "testing"
-    "time"
+	"bytes"
+	"io"
+	"net/http"
+	"strconv"
+	"testing"
+	"time"
 
-    "github.com/google/martian/proxyutil"
+	"github.com/google/martian"
+	"github.com/google/martian/proxyutil"
 )
 
+func TestMarkAPIRequestsWithHeader(t *testing.T) {
+	areq, err := http.NewRequest("POST", "http://localhost:8080/configure", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	ctx, remove, err := martian.TestContext(areq, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	ctx.APIRequest()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, removereq, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer removereq()
+
+	var b bytes.Buffer
+
+	s := NewStream(&b)
+	s.LogRequest("00000000", areq)
+	s.LogRequest("00000001", req)
+	s.Close()
+
+	headers := make(map[string]string)
+	reader := NewReader(&b)
+
+	for {
+		frame, err := reader.ReadFrame()
+		if frame == nil {
+			break
+		}
+		if err != nil && err != io.EOF {
+			t.Fatalf("reader.ReadFrame(): got %v, want no error or io.EOF", err)
+		}
+
+		headerFrame, ok := frame.(Header)
+		if !ok {
+			t.Fatalf("frame.(Header): couldn't convert frame '%v' to a headerFrame", frame)
+		}
+		headers[headerFrame.ID+headerFrame.Name] = headerFrame.Value
+	}
+
+	apih, ok := headers["00000000:api"]
+	if !ok {
+		t.Errorf("headers[00000000:api]: got no such header, want :api (headers were: %v)", headers)
+	}
+
+	if got, want := apih, "true"; got != want {
+		t.Errorf("headers[%q]: got %v, want %q", "00000000:api", got, want)
+	}
+
+	_, ok = headers["00000001:api"]
+	if got, want := ok, false; got != want {
+		t.Error("headers[00000001:api]: got :api header, want no header for non-api requests")
+	}
+}
+
 func TestSendTimestampWithLogRequest(t *testing.T) {
-    req, err := http.NewRequest("POST", "http://example.com", nil)
-    if err != nil {
-        t.Fatalf("http.NewRequest(): got %v, want no error", err)
-    }
-    var b bytes.Buffer
-    s := NewStream(&b)
+	req, err := http.NewRequest("POST", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
 
-    before := time.Now().UnixNano() / 1000 / 1000
-    s.LogRequest("Fake_Id0", req)
-    s.Close()
-    after := time.Now().UnixNano() / 1000 / 1000
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
 
-    headers := make(map[string]string)
-    reader := NewReader(&b)
+	var b bytes.Buffer
+	s := NewStream(&b)
 
-    for {
-    	frame, err := reader.ReadFrame();
-    	if frame == nil {
-    		break
-    	}
-	    if err != nil && err != io.EOF {
-	       t.Fatalf("reader.ReadFrame(): got %v, want no error or io.EOF", err)  
-	    }
+	before := time.Now().UnixNano() / 1000 / 1000
+	s.LogRequest("Fake_Id0", req)
+	s.Close()
+	after := time.Now().UnixNano() / 1000 / 1000
 
-        headerFrame, ok := frame.(Header)
-        if !ok {
-            t.Fatalf("frame.(Header): couldn't convert frame '%v' to a headerFrame", frame)
-        }
-        headers[headerFrame.Name] = headerFrame.Value
-    }
+	headers := make(map[string]string)
+	reader := NewReader(&b)
 
-    timestr, ok := headers[":timestamp"]
-    if !ok {
-        t.Fatalf("headers[:timestamp]: got no such header, want :timestamp (headers were: %v)", headers)
-    }
-    ts, err := strconv.ParseInt(timestr, 10, 64)
-    if err != nil {
-        t.Fatalf("strconv.ParseInt: got %s, want no error. Invalidly formatted timestamp ('%s')", err, timestr)
-    }
-    if ts < before || ts > after {
-        t.Fatalf("headers[:timestamp]: got %d, want timestamp between %d and %d", ts, before, after)
-    }
+	for {
+		frame, err := reader.ReadFrame()
+		if frame == nil {
+			break
+		}
+		if err != nil && err != io.EOF {
+			t.Fatalf("reader.ReadFrame(): got %v, want no error or io.EOF", err)
+		}
+
+		headerFrame, ok := frame.(Header)
+		if !ok {
+			t.Fatalf("frame.(Header): couldn't convert frame '%v' to a headerFrame", frame)
+		}
+		headers[headerFrame.Name] = headerFrame.Value
+	}
+
+	timestr, ok := headers[":timestamp"]
+	if !ok {
+		t.Fatalf("headers[:timestamp]: got no such header, want :timestamp (headers were: %v)", headers)
+	}
+	ts, err := strconv.ParseInt(timestr, 10, 64)
+	if err != nil {
+		t.Fatalf("strconv.ParseInt: got %s, want no error. Invalidly formatted timestamp ('%s')", err, timestr)
+	}
+	if ts < before || ts > after {
+		t.Fatalf("headers[:timestamp]: got %d, want timestamp between %d and %d", ts, before, after)
+	}
 }
 
 func TestSendTimestampWithLogResponse(t *testing.T) {
-    req, err := http.NewRequest("POST", "http://example.com", nil)
-    if err != nil {
-        t.Fatalf("http.NewRequest(): got %v, want no error", err)
-    }
-    res := proxyutil.NewResponse(200, nil, req)
-    var b bytes.Buffer
-    s := NewStream(&b)
+	req, err := http.NewRequest("POST", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
 
-    before := time.Now().UnixNano() / 1000 / 1000
-    s.LogResponse("Fake_Id1", res)
-    s.Close()
-    after := time.Now().UnixNano() / 1000 / 1000
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
 
-    headers := make(map[string]string)
-    reader := NewReader(&b)
+	res := proxyutil.NewResponse(200, nil, req)
+	var b bytes.Buffer
+	s := NewStream(&b)
 
-    for {
-    	frame, err := reader.ReadFrame();
-    	if frame == nil {
-    		break
-    	}
-	    if err != nil && err != io.EOF {
-	       t.Fatalf("reader.ReadFrame(): got %v, want no error or io.EOF", err)  
-	    }
+	before := time.Now().UnixNano() / 1000 / 1000
+	s.LogResponse("Fake_Id1", res)
+	s.Close()
+	after := time.Now().UnixNano() / 1000 / 1000
 
-        headerFrame, ok := frame.(Header)
-        if !ok {
-            t.Fatalf("frame.(Header): couldn't convert frame '%v' to a headerFrame", frame)
-        }
-        headers[headerFrame.Name] = headerFrame.Value
-    }
+	headers := make(map[string]string)
+	reader := NewReader(&b)
 
-    timestr, ok := headers[":timestamp"]
-    if !ok {
-        t.Fatalf("headers[:timestamp]: got no such header, want :timestamp (headers were: %v)", headers)
-    }
-    ts, err := strconv.ParseInt(timestr, 10, 64)
-    if err != nil {
-        t.Fatalf("strconv.ParseInt: got %s, want no error. Invalidly formatted timestamp ('%s')", err, timestr)
-    }
-    if ts < before || ts > after {
-        t.Fatalf("headers[:timestamp]: got %d, want timestamp between %d and %d (headers were: %v)", ts, before, after, headers)
-    }
+	for {
+		frame, err := reader.ReadFrame()
+		if frame == nil {
+			break
+		}
+		if err != nil && err != io.EOF {
+			t.Fatalf("reader.ReadFrame(): got %v, want no error or io.EOF", err)
+		}
+
+		headerFrame, ok := frame.(Header)
+		if !ok {
+			t.Fatalf("frame.(Header): couldn't convert frame '%v' to a headerFrame", frame)
+		}
+		headers[headerFrame.Name] = headerFrame.Value
+	}
+
+	timestr, ok := headers[":timestamp"]
+	if !ok {
+		t.Fatalf("headers[:timestamp]: got no such header, want :timestamp (headers were: %v)", headers)
+	}
+	ts, err := strconv.ParseInt(timestr, 10, 64)
+	if err != nil {
+		t.Fatalf("strconv.ParseInt: got %s, want no error. Invalidly formatted timestamp ('%s')", err, timestr)
+	}
+	if ts < before || ts > after {
+		t.Fatalf("headers[:timestamp]: got %d, want timestamp between %d and %d (headers were: %v)", ts, before, after, headers)
+	}
 }

@@ -43,6 +43,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/martian"
 	"github.com/google/martian/log"
 	"github.com/google/martian/proxyutil"
 )
@@ -165,6 +166,11 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 	ts := strconv.FormatInt(time.Now().UnixNano()/1000/1000, 10)
 	s.sendHeader(id, Request, ":timestamp", ts)
 
+	ctx := martian.NewContext(req)
+	if ctx.IsAPIRequest() {
+		s.sendHeader(id, Request, ":api", "true")
+	}
+
 	h := proxyutil.RequestHeader(req)
 
 	for k, vs := range h.Map() {
@@ -190,6 +196,11 @@ func (s *Stream) LogResponse(id string, res *http.Response) error {
 	s.sendHeader(id, Response, ":reason", res.Status)
 	ts := strconv.FormatInt(time.Now().UnixNano()/1000/1000, 10)
 	s.sendHeader(id, Response, ":timestamp", ts)
+
+	ctx := martian.NewContext(res.Request)
+	if ctx.IsAPIRequest() {
+		s.sendHeader(id, Response, ":api", "true")
+	}
 
 	h := proxyutil.ResponseHeader(res)
 
