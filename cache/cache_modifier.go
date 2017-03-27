@@ -70,9 +70,9 @@ type SerializedHttpResponse struct {
 }
 
 // go binary encoder
-func ToGOB64(m *http.Response) string {
+func EncodeResponse(m *http.Response) string {
 	r := SerializedHttpResponse{}
-	log.Printf("Response in ToGOB64: %v", m)
+	log.Printf("Response in EncodeResponse: %v", m)
 
 	bb, err := ioutil.ReadAll(m.Body)
 	if err != nil {
@@ -96,7 +96,7 @@ func ToGOB64(m *http.Response) string {
 }
 
 // go binary decoder
-func SetFieldsFromGOB64(str string, res *http.Response) error {
+func DecodeResponse(str string, res *http.Response) error {
 	r := SerializedHttpResponse{}
 	err := json.Unmarshal([]byte(str), &r)
 	if err != nil {
@@ -118,6 +118,8 @@ func SetFieldsFromGOB64(str string, res *http.Response) error {
 }
 
 func (m *replayModifier) ModifyRequest(req *http.Request) error {
+	ctx := martian.NewContext(req)
+	ctx.SkipRoundTrip()
 	return nil
 }
 
@@ -128,7 +130,7 @@ func (m *replayModifier) ModifyResponse(res *http.Response) error {
 	if !ok {
 		return errors.New(fmt.Sprintf("Unable to retrieve response for: %v", res.Request.RequestURI))
 	}
-	if err := SetFieldsFromGOB64(s, res); err != nil {
+	if err := DecodeResponse(s, res); err != nil {
 		return err
 	}
 	return nil
@@ -140,7 +142,7 @@ func (m *cacheModifier) ModifyRequest(req *http.Request) error {
 
 // It stores the the key/value map
 func (m *cacheModifier) ModifyResponse(res *http.Response) error {
-	enc := ToGOB64(res)
+	enc := EncodeResponse(res)
 	log.Print("Encoded into:", enc)
 	m.cache_database.DBMap[res.Request.RequestURI] = enc
 
@@ -174,12 +176,12 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	sp := []parse.ModifierType{"response"}
-
 	if msg.Mode == "cache" {
+		sp := []parse.ModifierType{"response"}
 		modifier := NewCacheModifier()
 		return parse.NewResult(modifier, sp)
 	} else if msg.Mode == "replay" {
+		sp := []parse.ModifierType{"request", "response"}
 		modifier := NewReplayModifier()
 		return parse.NewResult(modifier, sp)
 	} else {

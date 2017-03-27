@@ -111,10 +111,10 @@ class TestCacheAndReplay(unittest.TestCase):
     self.assertEquals(3, self._GetNumberThroughProxy())
     self._PostJsonConfigToMartian({"cache.Modifier": {"mode": "replay"}})
     self.assertEquals(3, self._GetNumberThroughProxy())
-    # TODO(xuehuichao): make sure no backend calls
-    # self.assertEquals(4, self._GetCurrentNumberDirectly())
+    # The request does not go to the backend
+    self.assertEquals(4, self._GetCurrentNumberDirectly())
+
 
 
 if __name__ == "__main__":
-  logging.basicConfig(level=logging.DEBUG)
   unittest.main()
