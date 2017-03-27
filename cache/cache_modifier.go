@@ -96,7 +96,7 @@ func ToGOB64(m *http.Response) string {
 }
 
 // go binary decoder
-func FromGOB64(str string) http.Response {
+func SetFieldsFromGOB64(str string, res *http.Response) error {
 	r := SerializedHttpResponse{}
 	err := json.Unmarshal([]byte(str), &r)
 	if err != nil {
@@ -105,7 +105,6 @@ func FromGOB64(str string) http.Response {
 
 	log.Printf("Unmartial result: %v", r)
 
-	var res http.Response
 	res.Body = ioutil.NopCloser(strings.NewReader(r.Body))
 	res.Header = make(map[string][]string)
 	for _, hi := range r.Headers {
@@ -115,7 +114,7 @@ func FromGOB64(str string) http.Response {
 
 	log.Printf("Response in FromGOB64: %v", res)
 
-	return res
+	return nil
 }
 
 func (m *replayModifier) ModifyRequest(req *http.Request) error {
@@ -124,13 +123,14 @@ func (m *replayModifier) ModifyRequest(req *http.Request) error {
 
 // It loads the the key/value map
 func (m *replayModifier) ModifyResponse(res *http.Response) error {
-	log.Printf("ModifyResponse handling requestURI: %v", res.Request.RequestURI)
+	log.Printf("Replay ModifyResponse handling requestURI: %v", res.Request.RequestURI)
 	s, ok := m.cache_database.DBMap[res.Request.RequestURI]
 	if !ok {
 		return errors.New(fmt.Sprintf("Unable to retrieve response for: %v", res.Request.RequestURI))
 	}
-	cr := FromGOB64(s)
-	*res = cr
+	if err := SetFieldsFromGOB64(s, res); err != nil {
+		return err
+	}
 	return nil
 }
 

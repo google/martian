@@ -123,7 +123,6 @@ func (s *Session) MarkInsecure() {
 	s.secure = false
 }
 
-
 // Hijack takes control of the connection from the proxy. No further action
 // will be taken by the proxy and the connection will be closed following the
 // return of the hijacker.
