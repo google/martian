@@ -28,6 +28,7 @@ func (cs *CounterServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func fetchValueByRequest(u, proxy string) (int, error) {
+	log.Printf("Fetching %v using proxy %v", u, proxy)
 	var c *http.Client
 	if proxy != "" {
 		pu, err := url.Parse(proxy)
@@ -43,8 +44,9 @@ func fetchValueByRequest(u, proxy string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	log.Print(r.Header)
+	log.Printf("Headers: %v", r.Header)
 	ct, err := ioutil.ReadAll(r.Body)
+	log.Printf("Body: %v", ct)
 	if err != nil {
 		return 0, err
 	}
@@ -124,12 +126,14 @@ func TestUsingCachedResponset(t *testing.T) {
 	}
 	if v != 0 {
 		t.Error("Expecting 0 as the first response")
+	} else {
+		t.Logf("Got 0 as the first response")
 	}
 
 	// Turn on recording
 	pu := "http://localhost:8889"
 
-	PostJsonConfigToMartian(pu, `{"cache.Modifier": {  "scope": ["response"],  "mode": "cache"}}`)
+	PostJsonConfigToMartian(pu, `{"cache.Modifier": { "mode": "cache"}}`)
 
 	// Send a request, should get 1. It is then also recorded.
 	if v, err = fetchValueByRequest("http://localhost:8891", pu); err != nil {
@@ -139,7 +143,7 @@ func TestUsingCachedResponset(t *testing.T) {
 	}
 
 	// Turn on replay
-	PostJsonConfigToMartian(pu, `{"cache.Modifier": {  "scope": ["response"],  "mode": "replay"}}`)
+	PostJsonConfigToMartian(pu, `{"cache.Modifier": { "mode": "replay"}}`)
 
 	// Send two requests, the backend server gets no requests (when directly get, we get 1)
 	if v, err = fetchValueByRequest("http://localhost:8891", pu); err != nil {
