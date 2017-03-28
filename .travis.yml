@@ -4,6 +4,7 @@ go:
   - tip
 
 install:
+  - go get -t ./...
   - pip install --user portpicker
 
 script:
