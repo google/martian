@@ -33,11 +33,11 @@ class CountingServiceHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     if self.path == "/":
       self.wfile.write("%d" % self._server.count)
+      self._server.count += 1
     else:
       self.wfile.write("%s" % self.path)
 
     self.wfile.close()
-    self._server.count += 1
 
 
 class CountingServer(BaseHTTPServer.HTTPServer):
@@ -131,6 +131,7 @@ class TestCacheAndReplay(unittest.TestCase):
     self._PostJsonConfigToMartian({"cache.Modifier": {"mode": "replay"}})
     self.assertEquals(2, self._GetNumberThroughProxy())
     self.assertEquals("/not_cached", self._GetPathThroughProxy("/not_cached"))
+    self.assertEquals(3, self._GetCurrentNumberDirectly())
 
 
 if __name__ == "__main__":
