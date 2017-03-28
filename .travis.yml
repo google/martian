@@ -3,7 +3,9 @@ language: go
 go:
   - tip
 
+install:
+  - pip install portpicker
+
 script:
   - go test -v ./...
-  - pip install portpicker
   - python regtest.py
