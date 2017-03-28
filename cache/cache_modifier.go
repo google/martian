@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package cache_manager
 
 import (
 	"bytes"
@@ -32,22 +32,8 @@ func init() {
 	parse.Register("cache.Modifier", modifierFromJSON)
 }
 
-type cacheDatabase struct {
-	DBMap map[string]string
-}
-
-var cache_database *cacheDatabase
-
 type modifierJSON struct {
 	Mode string `json:"mode"`
-}
-
-// Singleton cache database
-func getCacheDatabase() *cacheDatabase {
-	if cache_database == nil {
-		cache_database = &cacheDatabase{DBMap: make(map[string]string)}
-	}
-	return cache_database
 }
 
 type cacheModifier struct {
@@ -160,13 +146,13 @@ func (m *cacheModifier) ModifyResponse(res *http.Response) error {
 // exists all values will be overwritten.
 func NewCacheModifier() martian.RequestResponseModifier {
 	return &cacheModifier{
-		cache_database: getCacheDatabase(),
+		cache_database: GetTheCacheDatabase(),
 	}
 }
 
 func NewReplayModifier() martian.RequestResponseModifier {
 	return &replayModifier{
-		cache_database: getCacheDatabase(),
+		cache_database: GetTheCacheDatabase(),
 	}
 }
 
