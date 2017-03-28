@@ -30,7 +30,12 @@ class CountingServiceHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_response(200)
     self.send_header("Content-type", "text/html")
     self.end_headers()
-    self.wfile.write("%d" % self._server.count)
+
+    if self.path == "/":
+      self.wfile.write("%d" % self._server.count)
+    else:
+      self.wfile.write("%s" % self.path)
+
     self.wfile.close()
     self._server.count += 1
 
@@ -45,9 +50,9 @@ class CountingServer(BaseHTTPServer.HTTPServer):
 class TestCacheAndReplay(unittest.TestCase):
 
   def setUp(self):
-    self._martian_port = 8889
-    self._martian_api_port = 8890
-    self._backend_port = 8891
+    self._martian_port = portpicker.pick_unused_port()
+    self._martian_api_port = portpicker.pick_unused_port()
+    self._backend_port = portpicker.pick_unused_port()
 
     self._martian_proc = subprocess.Popen([
         os.path.join(os.getcwd(), "main"), "-addr", ":%d" % self._martian_port,
@@ -69,7 +74,7 @@ class TestCacheAndReplay(unittest.TestCase):
         logging.info("Current http server count is %s", current_count)
         break
       except IOError:
-        logging.info("Server is not ready it...")
+        logging.info("Server is not ready yet...")
         time.sleep(1)
     logging.info("Http server ready.")
 
@@ -85,12 +90,16 @@ class TestCacheAndReplay(unittest.TestCase):
         urllib2.urlopen("http://localhost:%d" % self._backend_port).read())
 
   def _GetNumberThroughProxy(self):
+    return int(self._GetPathThroughProxy())
+
+  def _GetPathThroughProxy(self, path=""):
     proxy = urllib2.ProxyHandler({
         "http": "http://localhost:%d" % self._martian_port
     })
     opener = urllib2.build_opener(proxy)
-    content = opener.open("http://localhost:%d" % self._backend_port).read()
-    return int(content)
+    content = opener.open("http://localhost:%d%s" % (self._backend_port,
+                                                     path)).read()
+    return content
 
   def _PostJsonConfigToMartian(self, config_dict):
     req = urllib2.Request("http://martian.proxy/configure")
@@ -114,6 +123,14 @@ class TestCacheAndReplay(unittest.TestCase):
     # The request does not go to the backend
     self.assertEquals(4, self._GetCurrentNumberDirectly())
 
+  def testReplayNotCachedURL(self):
+    self.assertEquals(1, self._GetCurrentNumberDirectly())
+    self._PostJsonConfigToMartian({"cache.Modifier": {"mode": "cache"}})
+    self.assertEquals(2, self._GetNumberThroughProxy())
+
+    self._PostJsonConfigToMartian({"cache.Modifier": {"mode": "replay"}})
+    self.assertEquals(2, self._GetNumberThroughProxy())
+    self.assertEquals("/not_cached", self._GetPathThroughProxy("/not_cached"))
 
 
 if __name__ == "__main__":

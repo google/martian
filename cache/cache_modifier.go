@@ -118,9 +118,14 @@ func DecodeResponse(str string, res *http.Response) error {
 }
 
 func (m *replayModifier) ModifyRequest(req *http.Request) error {
-	ctx := martian.NewContext(req)
-	ctx.SkipRoundTrip()
-	return nil
+	_, ok := m.cache_database.DBMap[req.RequestURI]
+	if ok {
+		ctx := martian.NewContext(req)
+		ctx.SkipRoundTrip()
+		return nil
+	} else {
+		return nil
+	}
 }
 
 // It loads the the key/value map
@@ -128,7 +133,8 @@ func (m *replayModifier) ModifyResponse(res *http.Response) error {
 	log.Printf("Replay ModifyResponse handling requestURI: %v", res.Request.RequestURI)
 	s, ok := m.cache_database.DBMap[res.Request.RequestURI]
 	if !ok {
-		return errors.New(fmt.Sprintf("Unable to retrieve response for: %v", res.Request.RequestURI))
+		log.Printf("Unable to retrieve response for: %v", res.Request.RequestURI)
+		return nil
 	}
 	if err := DecodeResponse(s, res); err != nil {
 		return err
