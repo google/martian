@@ -46,6 +46,7 @@ func NewResetHandler(l *Logger) http.Handler {
 
 // ServeHTTP writes the log in HAR format to the response body.
 func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	log.Infof("exportHandler.ServeHTTP: request for HAR logs")
 	ctx := martian.NewContext(req)
 	ctx.SkipLogging()
 
@@ -63,6 +64,7 @@ func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // ServeHTTP resets the log, which clears its entries.
 func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	log.Infof("resetHandler.ServeHTTP: request to clear in memory HAR logs")
 	ctx := martian.NewContext(req)
 	ctx.SkipLogging()
 
