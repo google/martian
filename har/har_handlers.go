@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/martian"
 	"github.com/google/martian/log"
 )
 
@@ -45,6 +46,9 @@ func NewResetHandler(l *Logger) http.Handler {
 
 // ServeHTTP writes the log in HAR format to the response body.
 func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	ctx := martian.NewContext(req)
+	ctx.SkipLogging()
+
 	if req.Method != "GET" {
 		rw.Header().Add("Allow", "GET")
 		rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -59,6 +63,9 @@ func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // ServeHTTP resets the log, which clears its entries.
 func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	ctx := martian.NewContext(req)
+	ctx.SkipLogging()
+
 	if !(req.Method == "POST" || req.Method == "DELETE") {
 		rw.Header().Add("Allow", "POST")
 		rw.Header().Add("Allow", "DELETE")
