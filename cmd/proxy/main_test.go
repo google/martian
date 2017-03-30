@@ -16,6 +16,7 @@ package main
 
 import (
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -55,6 +56,16 @@ func getProxiedClient(t *testing.T, proxyUrl string) *http.Client {
 	return &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(pu)}}
 }
 
+// getFreePort returns a port string preceded by a colon, e.g. ":1234"
+func getFreePort(t *testing.T) string {
+	l, err := net.Listen("tcp", ":")
+	if err != nil {
+		t.Fatalf("Could not get free port: %v", err)
+	}
+	defer l.Close()
+	return l.Addr().String()[strings.LastIndex(l.Addr().String(), ":"):]
+}
+
 func TestProxyHttp(t *testing.T) {
 	tempDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
@@ -73,15 +84,19 @@ func TestProxyHttp(t *testing.T) {
 	}
 
 	// Start proxy
-	cmd = exec.Command(binPath, "-addr=:9090", "-api-addr=:9191")
+	proxyPort := getFreePort(t)
+	apiPort := getFreePort(t)
+	t.Logf("proxyPort=%s apiPort=%s", proxyPort, apiPort)
+	cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
+	defer cmd.Wait()
 	defer cmd.Process.Signal(os.Interrupt)
 
-	apiClient := getProxiedClient(t, "http://localhost:9191/")
+	apiClient := getProxiedClient(t, "http://localhost"+apiPort)
 	waitForProxyLive(t, apiClient)
 
 	// Configure modifiers
@@ -111,7 +126,7 @@ func TestProxyHttp(t *testing.T) {
 	}
 
 	// Exercise proxy
-	client := getProxiedClient(t, "http://localhost:9090/")
+	client := getProxiedClient(t, "http://localhost"+proxyPort)
 	res, err = client.Get("http://super.fake.domain/")
 	if err != nil {
 		t.Fatalf("GET request: got error %v, want no error", err)
