@@ -57,9 +57,8 @@ func TestProxyHttp(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	binPath := filepath.Join(tempDir, "proxy")
-
 	// Build proxy binary
+	binPath := filepath.Join(tempDir, "proxy")
 	cmd := exec.Command("go", "build", "-o", binPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -123,12 +122,13 @@ func TestProxyHttp(t *testing.T) {
 		t.Fatalf("url.Parse(%q): got error %v, want no error", proxyUrl, err)
 	}
 	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(pu)}}
-	getUrl := "http://super.fake.domain/"
-	res, err = client.Get(getUrl)
+
+	testUrl := "http://super.fake.domain/"
+	res, err = client.Get(testUrl)
 	if err != nil {
-		t.Fatalf("client.Get(%q): got error %v, want no error", getUrl, err)
+		t.Fatalf("client.Get(%q): got error %v, want no error", testUrl, err)
 	}
 	if got, want := res.StatusCode, http.StatusTeapot; got != want {
-		t.Errorf("client.Get(%q): got status %d, want %d", getUrl, got, want)
+		t.Errorf("client.Get(%q): got status %d, want %d", testUrl, got, want)
 	}
 }
