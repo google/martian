@@ -32,13 +32,9 @@ func waitForProxy(t *testing.T, c *http.Client, apiUrl string) {
 	timeout := 5 * time.Second
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		res, err := c.Get(apiUrl)
-		if err != nil {
+		if res, err := c.Get(apiUrl); err != nil || res.StatusCode != http.StatusOK {
 			time.Sleep(200 * time.Millisecond)
 			continue
-		}
-		if got, want := res.StatusCode, http.StatusOK; got != want {
-			t.Fatalf("c.Get(%q): got status %d, want %d", apiUrl, got, want)
 		}
 		return
 	}
