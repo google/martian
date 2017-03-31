@@ -27,12 +27,8 @@ import (
 	"time"
 )
 
-const (
-	binName = "proxy"
-	timeout = 5 * time.Second
-)
-
-func waitForProxyLive(t *testing.T, c *http.Client) {
+func waitForProxy(t *testing.T, c *http.Client) {
+	timeout := 5 * time.Second
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		res, err := c.Get("http://martian.proxy/configure")
@@ -73,7 +69,7 @@ func TestProxyHttp(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	binPath := filepath.Join(tempDir, binName)
+	binPath := filepath.Join(tempDir, "proxy")
 
 	// Build proxy binary
 	cmd := exec.Command("go", "build", "-o", binPath)
@@ -97,7 +93,7 @@ func TestProxyHttp(t *testing.T) {
 	defer cmd.Process.Signal(os.Interrupt)
 
 	apiClient := getProxiedClient(t, "http://localhost"+apiPort)
-	waitForProxyLive(t, apiClient)
+	waitForProxy(t, apiClient)
 
 	// Configure modifiers
 	configReader := strings.NewReader(`
