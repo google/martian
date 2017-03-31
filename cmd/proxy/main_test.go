@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -27,11 +28,11 @@ import (
 	"time"
 )
 
-func waitForProxy(t *testing.T, c *http.Client) {
+func waitForProxy(t *testing.T, c *http.Client, hostport string) {
 	timeout := 5 * time.Second
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		res, err := c.Get("http://martian.proxy/configure")
+		res, err := c.Get(fmt.Sprintf("http://%s/configure", hostport))
 		if err != nil {
 			time.Sleep(200 * time.Millisecond)
 			continue
@@ -42,14 +43,6 @@ func waitForProxy(t *testing.T, c *http.Client) {
 		return
 	}
 	t.Fatalf("Proxy did not start up within %v seconds", timeout.Seconds())
-}
-
-func getProxiedClient(t *testing.T, proxyUrl string) *http.Client {
-	pu, err := url.Parse(proxyUrl)
-	if err != nil {
-		t.Fatalf("Parse proxy url: got error %v, want no error", err)
-	}
-	return &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(pu)}}
 }
 
 // getFreePort returns a port string preceded by a colon, e.g. ":1234"
@@ -92,8 +85,11 @@ func TestProxyHttp(t *testing.T) {
 	defer cmd.Wait()
 	defer cmd.Process.Signal(os.Interrupt)
 
-	apiClient := getProxiedClient(t, "http://localhost"+apiPort)
-	waitForProxy(t, apiClient)
+	proxyHostPort := "localhost" + proxyPort
+	apiHostPort := "localhost" + apiPort
+
+	apiClient := &http.Client{}
+	waitForProxy(t, apiClient, apiHostPort)
 
 	// Configure modifiers
 	configReader := strings.NewReader(`
@@ -113,7 +109,7 @@ func TestProxyHttp(t *testing.T) {
     ]
   }
 }`)
-	res, err := apiClient.Post("http://martian.proxy/configure", "application/json", configReader)
+	res, err := apiClient.Post(fmt.Sprintf("http://%s/configure", apiHostPort), "application/json", configReader)
 	if err != nil {
 		t.Fatalf("POST config: got error %v, want no error", err)
 	}
@@ -122,7 +118,11 @@ func TestProxyHttp(t *testing.T) {
 	}
 
 	// Exercise proxy
-	client := getProxiedClient(t, "http://localhost"+proxyPort)
+	proxyUrl, err := url.Parse("http://" + proxyHostPort)
+	if err != nil {
+		t.Fatalf("Parse proxy url: got error %v, want no error", err)
+	}
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
 	res, err = client.Get("http://super.fake.domain/")
 	if err != nil {
 		t.Fatalf("GET request: got error %v, want no error", err)
