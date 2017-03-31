@@ -15,7 +15,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -81,27 +80,17 @@ func TestProxyHttp(t *testing.T) {
 	defer cmd.Wait()
 	defer cmd.Process.Signal(os.Interrupt)
 
-	proxyUrl := fmt.Sprintf("http://localhost%s/", proxyPort)
-	apiUrl := fmt.Sprintf("http://localhost%s/configure", apiPort)
+	proxyUrl := "http://localhost" + proxyPort
+	apiUrl := "http://localhost" + apiPort
+	configureUrl := "http://martian.proxy/configure"
 
-	//DEBUG
-	ifs, err := net.Interfaces()
+	au, err := url.Parse(apiUrl)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("url.Parse(%q): got error %v, want no error", apiUrl, err)
 	}
-	for _, ifi := range ifs {
-		t.Logf("interface %q", ifi.Name)
-		addrs, err := ifi.Addrs()
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, addr := range addrs {
-			t.Logf("  %s=%s", addr.Network(), addr.String())
-		}
-	}
-
-	apiClient := &http.Client{}
-	waitForProxy(t, apiClient, apiUrl)
+	// TODO: Make using API hostport directly work on Travis.
+	apiClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(au)}}
+	waitForProxy(t, apiClient, configureUrl)
 
 	// Configure modifiers
 	config := strings.NewReader(`
@@ -121,12 +110,12 @@ func TestProxyHttp(t *testing.T) {
     ]
   }
 }`)
-	res, err := apiClient.Post(apiUrl, "application/json", config)
+	res, err := apiClient.Post(configureUrl, "application/json", config)
 	if err != nil {
-		t.Fatalf("apiClient.Post(%q): got error %v, want no error", apiUrl, err)
+		t.Fatalf("apiClient.Post(%q): got error %v, want no error", configureUrl, err)
 	}
 	if got, want := res.StatusCode, http.StatusOK; got != want {
-		t.Fatalf("apiClient.Post(%q): got status %d, want %d", apiUrl, got, want)
+		t.Fatalf("apiClient.Post(%q): got status %d, want %d", configureUrl, got, want)
 	}
 
 	// Exercise proxy
