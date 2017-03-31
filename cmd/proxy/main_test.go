@@ -15,7 +15,7 @@
 package main
 
 import (
-	"fmt"
+	// "fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -81,9 +81,16 @@ func TestProxyHttp(t *testing.T) {
 	defer cmd.Wait()
 	defer cmd.Process.Signal(os.Interrupt)
 
-	apiUrl := fmt.Sprintf("http://localhost%s/configure", apiPort)
+	// apiUrl := fmt.Sprintf("http://localhost%s/configure", apiPort)
+	apiUrl := "http://martian.proxy/configure"
 
-	apiClient := &http.Client{}
+	apipu, err := url.Parse("http://localhost" + proxyPort)
+	if err != nil {
+		// t.Fatalf("url.Parse(%q): got error %v, want no error", proxyUrl, err)
+		t.Fatal("stuff")
+	}
+	apiClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(apipu)}}
+	// apiClient := &http.Client{}
 	waitForProxy(t, apiClient, apiUrl)
 
 	// Configure modifiers
