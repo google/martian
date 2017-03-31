@@ -85,20 +85,20 @@ func TestProxyHttp(t *testing.T) {
 	apiUrl := fmt.Sprintf("http://localhost%s/configure", apiPort)
 
 	//DEBUG
-	// ifs, err := net.Interfaces()
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// for _, ifi := range ifs {
-	// 	t.Logf("interface %q", ifi.Name)
-	// 	addrs, err := ifi.Addrs()
-	// 	if err != nil {
-	// 		t.Fatal(err)
-	// 	}
-	// 	for _, addr := range addrs {
-	// 		t.Logf("  %s=%s", addr.Network(), addr.String())
-	// 	}
-	// }
+	ifs, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ifi := range ifs {
+		t.Logf("interface %q", ifi.Name)
+		addrs, err := ifi.Addrs()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, addr := range addrs {
+			t.Logf("  %s=%s", addr.Network(), addr.String())
+		}
+	}
 
 	apiClient := &http.Client{}
 	waitForProxy(t, apiClient, apiUrl)
