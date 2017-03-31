@@ -210,16 +210,23 @@ func TestFilterModifyResponse(t *testing.T) {
 func TestFilterFromJSON(t *testing.T) {
 	msg := []byte(`{
 		"url.Filter": {
-      "scope": ["request", "response"],
-      "scheme": "https",
-      "modifier": {
-        "header.Modifier": {
           "scope": ["request", "response"],
-          "name": "Mod-Run",
-          "value": "true"
+          "scheme": "https",
+          "modifier": {
+            "header.Modifier": {
+              "scope": ["request", "response"],
+              "name": "Mod-Run",
+              "value": "true"
+            } 
+		  },
+		  "else": {
+            "header.Modifier": {
+              "scope": ["request", "response"],
+              "name": "Else-Run",
+              "value": "true"
+            } 
+          }
         }
-      }
-    }
 	}`)
 
 	r, err := parse.FromJSON(msg)
@@ -258,6 +265,25 @@ func TestFilterFromJSON(t *testing.T) {
 	if got, want := res.Header.Get("Mod-Run"), "true"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
 	}
+
+	// test else conditional modifier with scheme of http
+	req, err = http.NewRequest("GET", "http://martian.test", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := reqmod.ModifyRequest(req); err != nil {
+		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.Header.Get("Mod-Run"), ""; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	}
+
+	if got, want := req.Header.Get("Else-Run"), "true"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	}
+
 }
 
 func TestPassThroughVerifyRequests(t *testing.T) {

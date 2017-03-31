@@ -16,12 +16,11 @@ package martianurl
 
 import (
 	"encoding/json"
-	"net/http"
 	"net/url"
 
 	"github.com/google/martian"
+	"github.com/google/martian/filter"
 	"github.com/google/martian/parse"
-	"github.com/google/martian/verify"
 )
 
 var noop = martian.Noop("url.Filter")
@@ -32,64 +31,27 @@ func init() {
 
 // Filter runs modifiers iff the request URL matches all of the segments in url.
 type Filter struct {
-	reqmod martian.RequestModifier
-	resmod martian.ResponseModifier
-	url    *url.URL
+	*filter.Filter
 }
 
 type filterJSON struct {
-	Scheme   string               `json:"scheme"`
-	Host     string               `json:"host"`
-	Path     string               `json:"path"`
-	Query    string               `json:"query"`
-	Modifier json.RawMessage      `json:"modifier"`
-	Scope    []parse.ModifierType `json:"scope"`
+	Scheme       string               `json:"scheme"`
+	Host         string               `json:"host"`
+	Path         string               `json:"path"`
+	Query        string               `json:"query"`
+	Modifier     json.RawMessage      `json:"modifier"`
+	ElseModifier json.RawMessage      `json:"else"`
+	Scope        []parse.ModifierType `json:"scope"`
 }
 
 // NewFilter constructs a filter that applies the modifer when the
 // request URL matches all of the provided URL segments.
 func NewFilter(u *url.URL) *Filter {
-	return &Filter{
-		url:    u,
-		reqmod: noop,
-		resmod: noop,
-	}
-}
-
-// SetRequestModifier sets the request modifier.
-func (f *Filter) SetRequestModifier(reqmod martian.RequestModifier) {
-	if reqmod == nil {
-		reqmod = noop
-	}
-
-	f.reqmod = reqmod
-}
-
-// SetResponseModifier sets the response modifier.
-func (f *Filter) SetResponseModifier(resmod martian.ResponseModifier) {
-	if resmod == nil {
-		resmod = noop
-	}
-
-	f.resmod = resmod
-}
-
-// ModifyRequest runs the modifier if the URL matches all provided matchers.
-func (f *Filter) ModifyRequest(req *http.Request) error {
-	if f.matches(req.URL) {
-		return f.reqmod.ModifyRequest(req)
-	}
-
-	return nil
-}
-
-// ModifyResponse runs the modifier if the request URL matches urlMatcher.
-func (f *Filter) ModifyResponse(res *http.Response) error {
-	if f.matches(res.Request.URL) {
-		return f.resmod.ModifyResponse(res)
-	}
-
-	return nil
+	m := NewMatcher(u)
+	f := filter.New()
+	f.SetRequestCondition(m)
+	f.SetResponseCondition(m)
+	return &Filter{f}
 }
 
 // filterFromJSON takes a JSON message as a byte slice and returns a
@@ -104,6 +66,7 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 //   "query": "q=value",
 //   "scope": ["request", "response"],
 //   "modifier": { ... }
+//   "else": { ... }
 // }
 func filterFromJSON(b []byte) (*parse.Result, error) {
 	msg := &filterJSON{}
@@ -118,75 +81,25 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 		RawQuery: msg.Query,
 	})
 
-	r, err := parse.FromJSON(msg.Modifier)
+	m, err := parse.FromJSON(msg.Modifier)
 	if err != nil {
 		return nil, err
 	}
 
-	reqmod := r.RequestModifier()
-	if err != nil {
-		return nil, err
-	}
-	if reqmod != nil {
-		filter.SetRequestModifier(reqmod)
-	}
+	filter.RequestWhenTrue(m.RequestModifier())
+	filter.ResponseWhenTrue(m.ResponseModifier())
 
-	resmod := r.ResponseModifier()
-	if resmod != nil {
-		filter.SetResponseModifier(resmod)
+	if len(msg.ElseModifier) > 0 {
+		em, err := parse.FromJSON(msg.ElseModifier)
+		if err != nil {
+			return nil, err
+		}
+
+		if em != nil {
+			filter.RequestWhenFalse(em.RequestModifier())
+			filter.ResponseWhenFalse(em.ResponseModifier())
+		}
 	}
 
 	return parse.NewResult(filter, msg.Scope)
-}
-
-// matches forces all non-empty URL segments to match or it returns false.
-func (f *Filter) matches(u *url.URL) bool {
-	switch {
-	case f.url.Scheme != "" && f.url.Scheme != u.Scheme:
-		return false
-	case f.url.Host != "" && !MatchHost(u.Host, f.url.Host):
-		return false
-	case f.url.Path != "" && f.url.Path != u.Path:
-		return false
-	case f.url.RawQuery != "" && f.url.RawQuery != u.RawQuery:
-		return false
-	case f.url.Fragment != "" && f.url.Fragment != u.Fragment:
-		return false
-	}
-
-	return true
-}
-
-// VerifyRequests returns an error containing all the verification errors
-// returned by request verifiers.
-func (f *Filter) VerifyRequests() error {
-	if reqv, ok := f.reqmod.(verify.RequestVerifier); ok {
-		return reqv.VerifyRequests()
-	}
-
-	return nil
-}
-
-// VerifyResponses returns an error containing all the verification errors
-// returned by response verifiers.
-func (f *Filter) VerifyResponses() error {
-	if resv, ok := f.resmod.(verify.ResponseVerifier); ok {
-		return resv.VerifyResponses()
-	}
-
-	return nil
-}
-
-// ResetRequestVerifications resets the state of the contained request verifiers.
-func (f *Filter) ResetRequestVerifications() {
-	if reqv, ok := f.reqmod.(verify.RequestVerifier); ok {
-		reqv.ResetRequestVerifications()
-	}
-}
-
-// ResetResponseVerifications resets the state of the contained response verifiers.
-func (f *Filter) ResetResponseVerifications() {
-	if resv, ok := f.resmod.(verify.ResponseVerifier); ok {
-		resv.ResetResponseVerifications()
-	}
 }
