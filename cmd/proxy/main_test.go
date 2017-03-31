@@ -28,28 +28,28 @@ import (
 	"time"
 )
 
-func waitForProxy(t *testing.T, c *http.Client, hostport string) {
+func waitForProxy(t *testing.T, c *http.Client, apiUrl string) {
 	timeout := 5 * time.Second
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		res, err := c.Get(fmt.Sprintf("http://%s/configure", hostport))
+		res, err := c.Get(apiUrl)
 		if err != nil {
 			time.Sleep(200 * time.Millisecond)
 			continue
 		}
 		if got, want := res.StatusCode, http.StatusOK; got != want {
-			t.Fatalf("GET config: got status code %d, want %d", got, want)
+			t.Fatalf("c.Get(%q): got status %d, want %d", apiUrl, got, want)
 		}
 		return
 	}
-	t.Fatalf("Proxy did not start up within %v seconds", timeout.Seconds())
+	t.Fatalf("waitForProxy: did not start up within %.1f seconds", timeout.Seconds())
 }
 
 // getFreePort returns a port string preceded by a colon, e.g. ":1234"
 func getFreePort(t *testing.T) string {
 	l, err := net.Listen("tcp", ":")
 	if err != nil {
-		t.Fatalf("Could not get free port: %v", err)
+		t.Fatalf("getFreePort(): could not get free port: %v", err)
 	}
 	defer l.Close()
 	return l.Addr().String()[strings.LastIndex(l.Addr().String(), ":"):]
@@ -75,7 +75,6 @@ func TestProxyHttp(t *testing.T) {
 	// Start proxy
 	proxyPort := getFreePort(t)
 	apiPort := getFreePort(t)
-	t.Logf("proxyPort=%s apiPort=%s", proxyPort, apiPort)
 	cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -85,14 +84,13 @@ func TestProxyHttp(t *testing.T) {
 	defer cmd.Wait()
 	defer cmd.Process.Signal(os.Interrupt)
 
-	proxyHostPort := "localhost" + proxyPort
-	apiHostPort := "localhost" + apiPort
+	apiUrl := fmt.Sprintf("http://localhost%s/configure", apiPort)
 
 	apiClient := &http.Client{}
-	waitForProxy(t, apiClient, apiHostPort)
+	waitForProxy(t, apiClient, apiUrl)
 
 	// Configure modifiers
-	configReader := strings.NewReader(`
+	config := strings.NewReader(`
 {
   "fifo.Group": {
     "scope": ["request", "response"],
@@ -109,25 +107,27 @@ func TestProxyHttp(t *testing.T) {
     ]
   }
 }`)
-	res, err := apiClient.Post(fmt.Sprintf("http://%s/configure", apiHostPort), "application/json", configReader)
+	res, err := apiClient.Post(apiUrl, "application/json", config)
 	if err != nil {
-		t.Fatalf("POST config: got error %v, want no error", err)
+		t.Fatalf("apiClient.Post(%q): got error %v, want no error", apiUrl, err)
 	}
 	if got, want := res.StatusCode, http.StatusOK; got != want {
-		t.Fatalf("POST config: got status code %d, want %d", got, want)
+		t.Fatalf("apiClient.Post(%q): got status %d, want %d", apiUrl, got, want)
 	}
 
 	// Exercise proxy
-	proxyUrl, err := url.Parse("http://" + proxyHostPort)
+	proxyUrl := "http://localhost" + proxyPort
+	pu, err := url.Parse(proxyUrl)
 	if err != nil {
-		t.Fatalf("Parse proxy url: got error %v, want no error", err)
+		t.Fatalf("url.Parse(%q): got error %v, want no error", proxyUrl, err)
 	}
-	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
-	res, err = client.Get("http://super.fake.domain/")
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(pu)}}
+	getUrl := "http://super.fake.domain/"
+	res, err = client.Get(getUrl)
 	if err != nil {
-		t.Fatalf("GET request: got error %v, want no error", err)
+		t.Fatalf("client.Get(%q): got error %v, want no error", getUrl, err)
 	}
 	if got, want := res.StatusCode, http.StatusTeapot; got != want {
-		t.Errorf("GET request: got status code %d, want %d", got, want)
+		t.Errorf("client.Get(%q): got status %d, want %d", getUrl, got, want)
 	}
 }
