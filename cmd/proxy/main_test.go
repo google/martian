@@ -39,7 +39,7 @@ func waitForProxy(t *testing.T, c *http.Client, apiUrl string) {
 		}
 		return
 	}
-	// t.Fatalf("waitForProxy: did not start up within %.1f seconds", timeout.Seconds())
+	t.Fatalf("waitForProxy: did not start up within %.1f seconds", timeout.Seconds())
 }
 
 // getFreePort returns a port string preceded by a colon, e.g. ":1234"
@@ -83,6 +83,22 @@ func TestProxyHttp(t *testing.T) {
 
 	proxyUrl := fmt.Sprintf("http://localhost%s/", proxyPort)
 	apiUrl := fmt.Sprintf("http://localhost%s/configure", apiPort)
+
+	//DEBUG
+	// ifs, err := net.Interfaces()
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// for _, ifi := range ifs {
+	// 	t.Logf("interface %q", ifi.Name)
+	// 	addrs, err := ifi.Addrs()
+	// 	if err != nil {
+	// 		t.Fatal(err)
+	// 	}
+	// 	for _, addr := range addrs {
+	// 		t.Logf("  %s=%s", addr.Network(), addr.String())
+	// 	}
+	// }
 
 	apiClient := &http.Client{}
 	waitForProxy(t, apiClient, apiUrl)
