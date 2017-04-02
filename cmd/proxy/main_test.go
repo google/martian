@@ -31,9 +31,14 @@ func waitForProxy(t *testing.T, c *http.Client, apiUrl string) {
 	timeout := 5 * time.Second
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if res, err := c.Get(apiUrl); err != nil || res.StatusCode != http.StatusOK {
+		res, err := c.Get(apiUrl)
+		if err != nil {
 			time.Sleep(200 * time.Millisecond)
 			continue
+		}
+		defer res.Body.Close()
+		if got, want := res.StatusCode, http.StatusOK; got != want {
+			t.Fatalf("waitForProxy: c.Get(%q): got status %d, want %d", apiUrl, got, want)
 		}
 		return
 	}
@@ -44,7 +49,7 @@ func waitForProxy(t *testing.T, c *http.Client, apiUrl string) {
 func getFreePort(t *testing.T) string {
 	l, err := net.Listen("tcp", ":")
 	if err != nil {
-		t.Fatalf("getFreePort(): could not get free port: %v", err)
+		t.Fatalf("getFreePort: could not get free port: %v", err)
 	}
 	defer l.Close()
 	return l.Addr().String()[strings.LastIndex(l.Addr().String(), ":"):]
@@ -92,26 +97,27 @@ func TestProxyHttp(t *testing.T) {
 
 	// Configure modifiers
 	config := strings.NewReader(`
-{
-  "fifo.Group": {
-    "scope": ["request", "response"],
-    "modifiers": [
-      {
-        "status.Modifier": {
-          "scope": ["response"],
-          "statusCode": 418
-        }
-      },
-      {
-        "skip.RoundTrip": {}
-      }
-    ]
-  }
-}`)
+		{
+		  "fifo.Group": {
+		    "scope": ["request", "response"],
+		    "modifiers": [
+		      {
+		        "status.Modifier": {
+		          "scope": ["response"],
+		          "statusCode": 418
+		        }
+		      },
+		      {
+		        "skip.RoundTrip": {}
+		      }
+		    ]
+		  }
+		}`)
 	res, err := apiClient.Post(configureUrl, "application/json", config)
 	if err != nil {
 		t.Fatalf("apiClient.Post(%q): got error %v, want no error", configureUrl, err)
 	}
+	defer res.Body.Close()
 	if got, want := res.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("apiClient.Post(%q): got status %d, want %d", configureUrl, got, want)
 	}
@@ -128,6 +134,7 @@ func TestProxyHttp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("client.Get(%q): got error %v, want no error", testUrl, err)
 	}
+	defer res.Body.Close()
 	if got, want := res.StatusCode, http.StatusTeapot; got != want {
 		t.Errorf("client.Get(%q): got status %d, want %d", testUrl, got, want)
 	}
