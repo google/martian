@@ -17,6 +17,8 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -170,14 +172,14 @@ func TestProxy(t *testing.T) {
 		waitForProxy(t, apiClient, configureUrl)
 
 		// Configure modifiers
-		config := strings.NewReader(`
+		config := strings.NewReader(fmt.Sprintf(`
 			{
-			  "fifo.Group": {
-			    "scope": ["request", "response"],
-			    "modifiers": [
-			    ]
+			  "body.Modifier": {
+			    "scope": ["response"],
+			    "contentType": "text/plain",
+			    "body": "%s"
 			  }
-			}`)
+			}`, base64.StdEncoding.EncodeToString([]byte("茶壺"))))
 		res, err := apiClient.Post(configureUrl, "application/json", config)
 		if err != nil {
 			t.Fatalf("apiClient.Post(%q): got error %v, want no error", configureUrl, err)
@@ -187,19 +189,19 @@ func TestProxy(t *testing.T) {
 			t.Fatalf("apiClient.Post(%q): got status %d, want %d", configureUrl, got, want)
 		}
 
-		// Install CA cert to http client
-		certUrl := "http://martian.proxy/authority.cer"
-		res, err = apiClient.Get(certUrl)
+		// Install CA cert into http client
+		caCertUrl := "http://martian.proxy/authority.cer"
+		res, err = apiClient.Get(caCertUrl)
 		if err != nil {
-			t.Fatalf("apiClient.Get(%q): got error %v, want no error", certUrl, err)
+			t.Fatalf("apiClient.Get(%q): got error %v, want no error", caCertUrl, err)
 		}
 		defer res.Body.Close()
-		cert, err := ioutil.ReadAll(res.Body)
+		caCert, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("ioutil.ReadAll(res.Body): got error %v, want no error", err)
 		}
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM(cert)
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
 
 		// Exercise proxy
 		pu, err := url.Parse(proxyUrl)
@@ -209,7 +211,7 @@ func TestProxy(t *testing.T) {
 		client := &http.Client{Transport: &http.Transport{
 			Proxy: http.ProxyURL(pu),
 			TLSClientConfig: &tls.Config{
-				RootCAs: certPool,
+				RootCAs: caCertPool,
 			},
 		}}
 
@@ -219,9 +221,15 @@ func TestProxy(t *testing.T) {
 			t.Fatalf("client.Get(%q): got error %v, want no error", testUrl, err)
 		}
 		defer res.Body.Close()
-		if got, want := res.StatusCode, http.StatusNoContent; got != want {
-			t.Errorf("client.Get(%q): got status %d, want %d", testUrl, got, want)
+		if got, want := res.StatusCode, http.StatusOK; got != want {
+			t.Fatalf("client.Get(%q): got status %d, want %d", testUrl, got, want)
 		}
-
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("ioutil.ReadAll(res.Body): got error %v, want no error", err)
+		}
+		if got, want := string(body), "茶壺"; got != want {
+			t.Fatalf("modified response body: got %s, want %s", got, want)
+		}
 	})
 }
