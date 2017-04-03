@@ -27,7 +27,9 @@ func TestModifyRequest(t *testing.T) {
 
 	f := NewFilter(mux)
 	tm := martiantest.NewModifier()
-	f.SetRequestModifier(tm)
+	f.RequestWhenTrue(tm)
+	fm := martiantest.NewModifier()
+	f.RequestWhenFalse(fm)
 
 	req, err := http.NewRequest("GET", "http://example.com/test", nil)
 	if err != nil {
@@ -38,11 +40,16 @@ func TestModifyRequest(t *testing.T) {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
 
-	if !tm.RequestModified() {
-		t.Error("tm.RequestModified(): got false, want true")
+	if got, want := tm.RequestModified(), true; got != want {
+		t.Errorf("tm.RequestModified(): got %v, want %v", got, want)
+	}
+
+	if got, want := fm.RequestModified(), false; got != want {
+		t.Errorf("fm.RequestModified(): got %v, want %v", got, want)
 	}
 
 	tm.Reset()
+	fm.Reset()
 
 	req, err = http.NewRequest("GET", "http://example.com/nomatch", nil)
 	if err != nil {
@@ -53,8 +60,12 @@ func TestModifyRequest(t *testing.T) {
 		t.Errorf("ModifyRequest(): got %v, want no error", err)
 	}
 
-	if tm.RequestModified() != false {
-		t.Errorf("tm.RequestModified(): got %t, want %t", tm.RequestModified(), false)
+	if got, want := tm.RequestModified(), false; got != want {
+		t.Errorf("tm.RequestModified(): got %v, want %v", got, want)
+	}
+
+	if got, want := fm.RequestModified(), true; got != want {
+		t.Errorf("fm.RequestModified(): got %v, want %v", got, want)
 	}
 }
 
@@ -64,7 +75,9 @@ func TestModifyResponse(t *testing.T) {
 
 	f := NewFilter(mux)
 	tm := martiantest.NewModifier()
-	f.SetResponseModifier(tm)
+	f.ResponseWhenTrue(tm)
+	fm := martiantest.NewModifier()
+	f.ResponseWhenFalse(fm)
 
 	req, err := http.NewRequest("GET", "http://example.com/restest", nil)
 	if err != nil {
@@ -76,11 +89,16 @@ func TestModifyResponse(t *testing.T) {
 		t.Errorf("ModifyResponse(): got %v, want no error", err)
 	}
 
-	if !tm.ResponseModified() {
-		t.Errorf("tm.RequestModified(): got false, want true")
+	if got, want := tm.ResponseModified(), true; got != want {
+		t.Errorf("tm.ResponseModified(): got %v, want %v", got, want)
+	}
+
+	if got, want := fm.ResponseModified(), false; got != want {
+		t.Errorf("fm.ResponseModified(): got %v, want %v", got, want)
 	}
 
 	tm.Reset()
+	fm.Reset()
 
 	req, err = http.NewRequest("GET", "http://example.com/nomatch", nil)
 	if err != nil {
@@ -94,5 +112,13 @@ func TestModifyResponse(t *testing.T) {
 
 	if tm.ResponseModified() != false {
 		t.Errorf("tm.ResponseModified(): got %t, want %t", tm.ResponseModified(), false)
+	}
+
+	if got, want := tm.ResponseModified(), false; got != want {
+		t.Errorf("tm.ResponseModified(): got %v, want %v", got, want)
+	}
+
+	if got, want := fm.ResponseModified(), true; got != want {
+		t.Errorf("fm.ResponseModified(): got %v, want %v", got, want)
 	}
 }
