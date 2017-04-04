@@ -42,5 +42,5 @@ func NewFilter(mux *http.ServeMux) *Filter {
 	f := filter.New()
 	f.SetRequestCondition(m)
 	f.SetResponseCondition(m)
-	return &Filter{f}
+	return &Filter{Filter: f}
 }

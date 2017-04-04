@@ -136,10 +136,10 @@ func StartWithCertificateCORS(trafficPort int, apiPort int, cert, key string, al
 		handle(mux, "/authority.cer", apiPort, martianhttp.NewAuthorityHandler(x509c), allowsCors)
 	}
 
-	// Forward traffic that pattern matches in http.DefaultServeMux before applying
+	// Forward traffic that pattern matches in mux before applying
 	// httpspec modifiers (via modifier, specifically)
 	topg := fifo.NewGroup()
-	apif := servemux.NewFilter(nil)
+	apif := servemux.NewFilter(mux)
 	apif.SetRequestModifier(api.NewForwarder("", apiPort))
 	topg.AddRequestModifier(apif)
 
