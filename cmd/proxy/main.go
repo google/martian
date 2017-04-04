@@ -246,8 +246,6 @@ var (
 
 func main() {
 	p := martian.NewProxy()
-	defer p.Close()
-
 	mux := http.NewServeMux()
 
 	var x509c *x509.Certificate
