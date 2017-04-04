@@ -247,6 +247,7 @@ var (
 
 func main() {
 	p := martian.NewProxy()
+	mux := http.NewServeMux()
 
 	var x509c *x509.Certificate
 	var priv interface{}
@@ -284,7 +285,7 @@ func main() {
 
 		// Expose certificate authority.
 		ah := martianhttp.NewAuthorityHandler(x509c)
-		configure("/authority.cer", ah)
+		configure("/authority.cer", ah, mux)
 
 		// Start TLS listener for transparent MITM.
 		tl, err := net.Listen("tcp", *tlsAddr)
@@ -311,7 +312,7 @@ func main() {
 		}
 
 		// Forward traffic that pattern matches in http.DefaultServeMux
-		apif := servemux.NewFilter(nil)
+		apif := servemux.NewFilter(mux)
 		apif.SetRequestModifier(mapi.NewForwarder("", port))
 		topg.AddRequestModifier(apif)
 	}
@@ -336,8 +337,8 @@ func main() {
 		stack.AddRequestModifier(muxf)
 		stack.AddResponseModifier(muxf)
 
-		configure("/logs", har.NewExportHandler(hl))
-		configure("/logs/reset", har.NewResetHandler(hl))
+		configure("/logs", har.NewExportHandler(hl), mux)
+		configure("/logs/reset", har.NewResetHandler(hl), mux)
 	}
 
 	logger := martianlog.NewLogger()
@@ -345,6 +346,7 @@ func main() {
 
 	stack.AddRequestModifier(logger)
 	stack.AddResponseModifier(logger)
+
 
 	if *marblLogging {
 		lsh := marbl.NewHandler()
@@ -360,19 +362,19 @@ func main() {
 	}
 
 	// Configure modifiers.
-	configure("/configure", m)
+	configure("/configure", m, mux)
 
 	// Verify assertions.
 	vh := verify.NewHandler()
 	vh.SetRequestVerifier(m)
 	vh.SetResponseVerifier(m)
-	configure("/verify", vh)
+	configure("/verify", vh, mux)
 
 	// Reset verifications.
 	rh := verify.NewResetHandler()
 	rh.SetRequestVerifier(m)
 	rh.SetResponseVerifier(m)
-	configure("/verify/reset", rh)
+	configure("/verify/reset", rh, mux)
 
 	l, err := net.Listen("tcp", *addr)
 	if err != nil {
@@ -382,16 +384,21 @@ func main() {
 	if *trafficShaping {
 		tsl := trafficshape.NewListener(l)
 		tsh := trafficshape.NewHandler(tsl)
-		configure("/shape-traffic", tsh)
+		configure("/shape-traffic", tsh, mux)
 
 		l = tsl
 	}
 
-	log.Println("martian: proxy started on:", l.Addr())
+	lApi, err := net.Listen("tcp", *apiAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("martian: starting proxy on %s and api on %s", l.Addr().String(), lApi.Addr().String())
 
 	go p.Serve(l)
 
-	go http.ListenAndServe(*apiAddr, nil)
+	go http.Serve(lApi, mux)
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, os.Kill)
@@ -406,16 +413,16 @@ func init() {
 }
 
 // configure installs a configuration handler at path.
-func configure(pattern string, handler http.Handler) {
+func configure(pattern string, handler http.Handler, mux *http.ServeMux) {
 	if *allowCORS {
 		handler = cors.NewHandler(handler)
 	}
 
 	// register handler for martian.proxy to be forwarded to
 	// local API server
-	http.Handle(path.Join(*api, pattern), handler)
+	mux.Handle(path.Join(*api, pattern), handler)
 
 	// register handler for local API server
 	p := path.Join("localhost"+*apiAddr, pattern)
-	http.Handle(p, handler)
+	mux.Handle(p, handler)
 }
