@@ -54,7 +54,7 @@ type Proxy struct {
 	mitm         *mitm.Config
 	proxyURL     *url.URL
 	conns        *sync.WaitGroup
-	closed       chan bool
+	closing      chan bool
 
 	reqmod RequestModifier
 	resmod ResponseModifier
@@ -77,7 +77,7 @@ func NewProxy() *Proxy {
 		},
 		timeout: 5 * time.Minute,
 		conns:   &sync.WaitGroup{},
-		closed:  make(chan bool),
+		closing: make(chan bool),
 		reqmod:  noop,
 		resmod:  noop,
 	}
@@ -117,7 +117,7 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 func (p *Proxy) Close() {
 	log.Infof("martian: closing down proxy")
 
-	close(p.closed)
+	close(p.closing)
 
 	log.Infof("martian: waiting for connections to close")
 	p.conns.Wait()
@@ -127,7 +127,7 @@ func (p *Proxy) Close() {
 // Closing returns whether the proxy is in the closing state.
 func (p *Proxy) Closing() bool {
 	select {
-	case <-p.closed:
+	case <-p.closing:
 		return true
 	default:
 		return false
@@ -252,7 +252,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	case req = <-reqC:
 		defer req.Body.Close()
 		break
-	case <-p.closed:
+	case <-p.closing:
 		return errClose
 	}
 
