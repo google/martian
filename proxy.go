@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/martian/log"
@@ -55,7 +54,6 @@ type Proxy struct {
 	mitm         *mitm.Config
 	proxyURL     *url.URL
 	conns        *sync.WaitGroup
-	closing      int32 // atomic
 	closed       chan bool
 
 	reqmod RequestModifier
@@ -115,22 +113,10 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
 }
 
-// Shutdown sets the proxy to the closing state and waits for all connections to resolve or timeout.
-func (p *Proxy) Shutdown() {
-	log.Infof("martian: shutting down proxy")
-
-	atomic.StoreInt32(&p.closing, 1)
-
-	log.Infof("martian: waiting for connections to close")
-	p.conns.Wait()
-	log.Infof("martian: all connections closed")
-}
-
 // Close sets the proxy to the closing state, finishes inflight requests, and actively closes all connections.
 func (p *Proxy) Close() {
 	log.Infof("martian: closing down proxy")
 
-	atomic.StoreInt32(&p.closing, 1)
 	close(p.closed)
 
 	log.Infof("martian: waiting for connections to close")
