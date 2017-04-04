@@ -240,6 +240,7 @@ var (
 	validity       = flag.Duration("validity", time.Hour, "window of time that MITM certificates are valid")
 	allowCORS      = flag.Bool("cors", false, "allow CORS requests to configure the proxy")
 	harLogging     = flag.Bool("har", false, "enable HAR logging API")
+	marblLogging   = flag.Bool("marbl", false, "enable MARBL logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
 )
@@ -326,8 +327,14 @@ func main() {
 
 	if *harLogging {
 		hl := har.NewLogger()
-		stack.AddRequestModifier(hl)
-		stack.AddResponseModifier(hl)
+		muxf := servemux.NewFilter(nil)
+		// Only append to HAR logs when the requests are not API requests,
+		// that is, they are not matched in http.DefaultServeMux
+		muxf.RequestWhenFalse(hl)
+		muxf.ResponseWhenFalse(hl)
+
+		stack.AddRequestModifier(muxf)
+		stack.AddResponseModifier(muxf)
 
 		configure("/logs", har.NewExportHandler(hl))
 		configure("/logs/reset", har.NewResetHandler(hl))
@@ -339,13 +346,18 @@ func main() {
 	stack.AddRequestModifier(logger)
 	stack.AddResponseModifier(logger)
 
-	lsh := marbl.NewHandler()
-	// retrieve binary marbl logs
-	http.Handle("/binlogs", lsh)
+	if *marblLogging {
+		lsh := marbl.NewHandler()
+		lsm := marbl.NewModifier(lsh)
+		muxf := servemux.NewFilter(nil)
+		muxf.RequestWhenFalse(lsm)
+		muxf.ResponseWhenFalse(lsm)
+		stack.AddRequestModifier(muxf)
+		stack.AddResponseModifier(muxf)
 
-	lsm := marbl.NewModifier(lsh)
-	stack.AddRequestModifier(lsm)
-	stack.AddResponseModifier(lsm)
+		// retrieve binary marbl logs
+		http.Handle("/binlogs", lsh)
+	}
 
 	// Configure modifiers.
 	configure("/configure", m)
