@@ -122,7 +122,6 @@ func (p *Proxy) Close() {
 
 	atomic.StoreInt32(&p.closing, 1)
 	p.closed <- true
-	defer close(p.closed)
 
 	log.Infof("martian: waiting for connections to close")
 	p.conns.Wait()
@@ -229,9 +228,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	var req *http.Request
 	chReq := make(chan *http.Request, 1)
-	defer close(chReq)
 	chErr := make(chan error, 1)
-	defer close(chErr)
 	go func() {
 		r, err := http.ReadRequest(brw.Reader)
 		if err != nil {
