@@ -143,6 +143,9 @@
 // passing the -cors flag will enable CORS support for the endpoints so that they
 // may be called via AJAX
 //
+// sending a sigint will cause the proxy to finish processing inflight requests
+// and close the connections
+//
 // The flags are:
 //   -addr=":8080"
 //     host:port of the proxy
@@ -246,6 +249,8 @@ var (
 
 func main() {
 	p := martian.NewProxy()
+	defer p.Close()
+
 	mux := http.NewServeMux()
 
 	var x509c *x509.Certificate
