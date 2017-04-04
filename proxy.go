@@ -79,7 +79,7 @@ func NewProxy() *Proxy {
 		},
 		timeout: 5 * time.Minute,
 		conns:   &sync.WaitGroup{},
-		closed:  make(chan bool, 1),
+		closed:  make(chan bool),
 		reqmod:  noop,
 		resmod:  noop,
 	}
@@ -115,13 +115,23 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
 }
 
-// Close sets the proxying to the closing state and waits for all connections
-// to resolve.
+// Shutdown sets the proxy to the closing state and waits for all connections to resolve or timeout.
+func (p *Proxy) Shutdown() {
+	log.Infof("martian: shutting down proxy")
+
+	atomic.StoreInt32(&p.closing, 1)
+
+	log.Infof("martian: waiting for connections to close")
+	p.conns.Wait()
+	log.Infof("martian: all connections closed")
+}
+
+// Close sets the proxy to the closing state, finishes inflight requests, and actively closes all connections.
 func (p *Proxy) Close() {
 	log.Infof("martian: closing down proxy")
 
 	atomic.StoreInt32(&p.closing, 1)
-	p.closed <- true
+	close(p.closed)
 
 	log.Infof("martian: waiting for connections to close")
 	p.conns.Wait()
@@ -130,7 +140,12 @@ func (p *Proxy) Close() {
 
 // Closing returns whether the proxy is in the closing state.
 func (p *Proxy) Closing() bool {
-	return atomic.LoadInt32(&p.closing) == 1
+	select {
+	case <-p.closed:
+		return true
+	default:
+		return false
+	}
 }
 
 // SetRequestModifier sets the request modifier.
@@ -227,18 +242,18 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 
 	var req *http.Request
-	chReq := make(chan *http.Request, 1)
-	chErr := make(chan error, 1)
+	reqC := make(chan *http.Request, 1)
+	errC := make(chan error, 1)
 	go func() {
 		r, err := http.ReadRequest(brw.Reader)
 		if err != nil {
-			chErr <- err
+			errC <- err
 			return
 		}
-		chReq <- r
+		reqC <- r
 	}()
 	select {
-	case err := <-chErr:
+	case err := <-errC:
 		if isCloseable(err) {
 			log.Debugf("martian: connection closed prematurely: %v", err)
 		} else {
@@ -248,11 +263,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
 
 		return errClose
-	case req = <-chReq:
+	case req = <-reqC:
 		defer req.Body.Close()
 		break
-	case c := <-p.closed:
-		p.closed <- c
+	case <-p.closed:
 		return errClose
 	}
 
