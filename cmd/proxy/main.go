@@ -143,8 +143,9 @@
 // passing the -cors flag will enable CORS support for the endpoints so that they
 // may be called via AJAX
 //
-// sending a sigint will cause the proxy to finish processing inflight requests,
-// close all connections, and wait for connections to close before exiting
+// Sending a sigint will cause the proxy to stop receiving new connections,
+// finish processing any inflight requests, and close existing connections without
+// reading anymore requests from them.
 //
 // The flags are:
 //   -addr=":8080"

@@ -113,7 +113,9 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
 }
 
-// Close sets the proxy to the closing state, finishes inflight requests, and actively closes all connections.
+// Close sets the proxy to the closing state so it stops receiving new connections,
+// finishes processing any inflight requests, and closes existing connections without
+// reading anymore requests from them.
 func (p *Proxy) Close() {
 	log.Infof("martian: closing down proxy")
 
@@ -228,18 +230,18 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 
 	var req *http.Request
-	reqC := make(chan *http.Request, 1)
-	errC := make(chan error, 1)
+	reqc := make(chan *http.Request, 1)
+	errc := make(chan error, 1)
 	go func() {
 		r, err := http.ReadRequest(brw.Reader)
 		if err != nil {
-			errC <- err
+			errc <- err
 			return
 		}
-		reqC <- r
+		reqc <- r
 	}()
 	select {
-	case err := <-errC:
+	case err := <-errc:
 		if isCloseable(err) {
 			log.Debugf("martian: connection closed prematurely: %v", err)
 		} else {
@@ -249,17 +251,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
 
 		return errClose
-	case req = <-reqC:
-		defer req.Body.Close()
-		break
+	case req = <-reqc:
 	case <-p.closing:
 		return errClose
 	}
+	defer req.Body.Close()
 
 	session := ctx.Session()
-
-	var err error
-	ctx, err = withSession(session)
+	ctx, err := withSession(session)
 	if err != nil {
 		log.Errorf("martian: failed to build new context: %v", err)
 		return err
