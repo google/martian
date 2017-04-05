@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/martian/log"
@@ -55,7 +54,7 @@ type Proxy struct {
 	mitm         *mitm.Config
 	proxyURL     *url.URL
 	conns        *sync.WaitGroup
-	closing      int32 // atomic
+	closing      chan bool
 
 	reqmod RequestModifier
 	resmod ResponseModifier
@@ -78,6 +77,7 @@ func NewProxy() *Proxy {
 		},
 		timeout: 5 * time.Minute,
 		conns:   &sync.WaitGroup{},
+		closing: make(chan bool),
 		reqmod:  noop,
 		resmod:  noop,
 	}
@@ -113,17 +113,27 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
 }
 
-// Close sets the proxying to the closing state and waits for all connections
-// to resolve.
+// Close sets the proxy to the closing state so it stops receiving new connections,
+// finishes processing any inflight requests, and closes existing connections without
+// reading anymore requests from them.
 func (p *Proxy) Close() {
 	log.Infof("martian: closing down proxy")
 
-	atomic.StoreInt32(&p.closing, 1)
+	close(p.closing)
+
+	log.Infof("martian: waiting for connections to close")
+	p.conns.Wait()
+	log.Infof("martian: all connections closed")
 }
 
 // Closing returns whether the proxy is in the closing state.
 func (p *Proxy) Closing() bool {
-	return atomic.LoadInt32(&p.closing) == 1
+	select {
+	case <-p.closing:
+		return true
+	default:
+		return false
+	}
 }
 
 // SetRequestModifier sets the request modifier.
@@ -219,8 +229,19 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error {
 	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 
-	req, err := http.ReadRequest(brw.Reader)
-	if err != nil {
+	var req *http.Request
+	reqc := make(chan *http.Request, 1)
+	errc := make(chan error, 1)
+	go func() {
+		r, err := http.ReadRequest(brw.Reader)
+		if err != nil {
+			errc <- err
+			return
+		}
+		reqc <- r
+	}()
+	select {
+	case err := <-errc:
 		if isCloseable(err) {
 			log.Debugf("martian: connection closed prematurely: %v", err)
 		} else {
@@ -230,12 +251,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
 
 		return errClose
+	case req = <-reqc:
+	case <-p.closing:
+		return errClose
 	}
 	defer req.Body.Close()
 
 	session := ctx.Session()
-
-	ctx, err = withSession(session)
+	ctx, err := withSession(session)
 	if err != nil {
 		log.Errorf("martian: failed to build new context: %v", err)
 		return err
