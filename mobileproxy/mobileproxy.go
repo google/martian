@@ -152,13 +152,19 @@ func StartWithCertificateCORS(trafficPort int, apiPort int, cert, key string, al
 
 	// add HAR logger for unmodified logs.
 	uhl := har.NewLogger()
-	fg.AddRequestModifier(uhl)
-	fg.AddResponseModifier(uhl)
+	uhmuxf := servemux.NewFilter(mux)
+	uhmuxf.RequestWhenFalse(uhl)
+	uhmuxf.ResponseWhenFalse(uhl)
+	fg.AddRequestModifier(uhmuxf)
+	fg.AddResponseModifier(uhmuxf)
 
 	// add HAR logger
 	hl := har.NewLogger()
-	stack.AddRequestModifier(hl)
-	stack.AddResponseModifier(hl)
+	hmuxf := servemux.NewFilter(mux)
+	hmuxf.RequestWhenFalse(hl)
+	hmuxf.ResponseWhenFalse(hl)
+	stack.AddRequestModifier(hmuxf)
+	stack.AddResponseModifier(hmuxf)
 
 	m := martianhttp.NewModifier()
 	fg.AddRequestModifier(m)

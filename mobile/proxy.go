@@ -140,13 +140,19 @@ func (m *Martian) Start() {
 	if m.HarLogging {
 		// add HAR logger for unmodified logs.
 		uhl := har.NewLogger()
-		fg.AddRequestModifier(uhl)
-		fg.AddResponseModifier(uhl)
+		uhmuxf := servemux.NewFilter(m.mux)
+		uhmuxf.RequestWhenFalse(uhl)
+		uhmuxf.ResponseWhenFalse(uhl)
+		fg.AddRequestModifier(uhmuxf)
+		fg.AddResponseModifier(uhmuxf)
 
 		// add HAR logger
 		hl := har.NewLogger()
-		stack.AddRequestModifier(hl)
-		stack.AddResponseModifier(hl)
+		hmuxf := servemux.NewFilter(m.mux)
+		hmuxf.RequestWhenFalse(hl)
+		hmuxf.ResponseWhenFalse(hl)
+		stack.AddRequestModifier(hmuxf)
+		stack.AddResponseModifier(hmuxf)
 
 		// Retrieve Unmodified HAR logs
 		m.handle("/logs/original", har.NewExportHandler(uhl))
@@ -162,8 +168,11 @@ func (m *Martian) Start() {
 	m.handle("/binlogs", lsh)
 
 	lsm := marbl.NewModifier(lsh)
-	stack.AddRequestModifier(lsm)
-	stack.AddResponseModifier(lsm)
+	muxf := servemux.NewFilter(m.mux)
+	muxf.RequestWhenFalse(lsm)
+	muxf.ResponseWhenFalse(lsm)
+	stack.AddRequestModifier(muxf)
+	stack.AddResponseModifier(muxf)
 
 	mod := martianhttp.NewModifier()
 	fg.AddRequestModifier(mod)
