@@ -113,6 +113,16 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
 }
 
+// SetSkipTLSVerify configures whether the proxy skips verification of server certificates.
+func (p *Proxy) SetSkipTLSVerify(skip bool) {
+	if tr, ok := p.roundTripper.(*http.Transport); ok {
+		if tr.TLSClientConfig == nil {
+			tr.TLSClientConfig = &tls.Config{}
+		}
+		tr.TLSClientConfig.InsecureSkipVerify = skip
+	}
+}
+
 // Close sets the proxy to the closing state so it stops receiving new connections,
 // finishes processing any inflight requests, and closes existing connections without
 // reading anymore requests from them.

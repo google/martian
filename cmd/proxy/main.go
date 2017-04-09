@@ -255,6 +255,10 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	if *skipTLSVerify {
+		p.SetSkipTLSVerify(true)
+	}
+
 	var x509c *x509.Certificate
 	var priv interface{}
 
@@ -352,7 +356,6 @@ func main() {
 
 	stack.AddRequestModifier(logger)
 	stack.AddResponseModifier(logger)
-
 
 	if *marblLogging {
 		lsh := marbl.NewHandler()

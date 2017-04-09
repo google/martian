@@ -29,6 +29,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/martian/mitm"
 )
 
 func waitForProxy(t *testing.T, c *http.Client, apiURL string) {
@@ -87,7 +89,7 @@ func TestProxy(t *testing.T) {
 		// Start proxy
 		proxyPort := getFreePort(t)
 		apiPort := getFreePort(t)
-		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-v=3")
+		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {
@@ -145,12 +147,42 @@ func TestProxy(t *testing.T) {
 		}
 	})
 
-	t.Run("Https", func(t *testing.T) {
+	t.Run("HttpsGenerateCert", func(t *testing.T) {
+		// Create test certificate for test TLS server
+		certName := "martian.proxy"
+		certOrg := "Martian Authority"
+		certExpiry := 90 * time.Minute
+		servCert, servPriv, err := mitm.NewAuthority(certName, certOrg, certExpiry)
+		if err != nil {
+			t.Fatalf("mitm.NewAuthority(%q, %q, %q): got error %v, want no error", certName, certOrg, certExpiry, err)
+		}
+		mc, err := mitm.NewConfig(servCert, servPriv)
+		if err != nil {
+			t.Fatalf("mitm.NewConfig(%p, %q): got error %v, want no error", servCert, servPriv, err)
+		}
+		sc := mc.TLS()
+
+		// Configure and start test TLS server
+		servPort := getFreePort(t)
+		l, err := tls.Listen("tcp", servPort, sc)
+		if err != nil {
+			t.Fatalf("tls.Listen(\"tcp\", %q, %p): got error %v, want no error", servPort, sc, err)
+		}
+		defer l.Close()
+
+		server := &http.Server{
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+				w.Write([]byte("Hello!"))
+			}),
+		}
+		go server.Serve(l)
+		defer server.Close()
+
 		// Start proxy
 		proxyPort := getFreePort(t)
 		apiPort := getFreePort(t)
-		tlsPort := getFreePort(t)
-		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-tls-addr="+tlsPort, "-generate-ca-cert", "-v=3")
+		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-generate-ca-cert", "-skip-tls-verify")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {
@@ -185,7 +217,7 @@ func TestProxy(t *testing.T) {
 			t.Fatalf("apiClient.Post(%q): got status %d, want %d", configureURL, got, want)
 		}
 
-		// Install CA cert into http client
+		// Install proxy's CA cert into http client
 		caCertUrl := "http://martian.proxy/authority.cer"
 		res, err = apiClient.Get(caCertUrl)
 		if err != nil {
@@ -207,13 +239,13 @@ func TestProxy(t *testing.T) {
 			},
 		}}
 
-		testUrl := "https://www.google.com/"
+		testUrl := "https://localhost" + servPort
 		res, err = client.Get(testUrl)
 		if err != nil {
 			t.Fatalf("client.Get(%q): got error %v, want no error", testUrl, err)
 		}
 		defer res.Body.Close()
-		if got, want := res.StatusCode, http.StatusOK; got != want {
+		if got, want := res.StatusCode, http.StatusTeapot; got != want {
 			t.Fatalf("client.Get(%q): got status %d, want %d", testUrl, got, want)
 		}
 		body, err := ioutil.ReadAll(res.Body)
