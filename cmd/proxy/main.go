@@ -255,9 +255,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	if *skipTLSVerify {
-		p.SetSkipTLSVerify(true)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: *skipTLSVerify,
+		},
 	}
+	p.SetRoundTripper(tr)
 
 	var x509c *x509.Certificate
 	var priv interface{}
