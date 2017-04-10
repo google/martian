@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package fifo provides Group, which is a list of modifiers that are executed
+// consecutively. By default, when an error is returned by a modifier, the
+// execution of the modifiers is halted, and the error is returned. Optionally,
+// when errror aggregation is enabled (by calling SetAggretateErrors(true)), modifier
+// execution is not halted, and errors are aggretated and returned after all
+// modifiers have been executed.
 package fifo
 
 import (
