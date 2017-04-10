@@ -253,14 +253,14 @@ func main() {
 	p := martian.NewProxy()
 	defer p.Close()
 
-	mux := http.NewServeMux()
-
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: *skipTLSVerify,
 		},
 	}
 	p.SetRoundTripper(tr)
+
+	mux := http.NewServeMux()
 
 	var x509c *x509.Certificate
 	var priv interface{}
