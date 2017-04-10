@@ -34,7 +34,7 @@ func TestGroupFromJSON(t *testing.T) {
 	msg := []byte(`{
     "fifo.Group": {
       "scope": ["request", "response"],
-	  "aggregateErrors": true,
+      "aggregateErrors": true,
       "modifiers": [
         {
           "header.Modifier": {
