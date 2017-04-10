@@ -32,11 +32,14 @@ type Group struct {
 
 	resmu   sync.RWMutex
 	resmods []martian.ResponseModifier
+
+	aggregateErrors bool
 }
 
 type groupJSON struct {
-	Modifiers []json.RawMessage    `json:"modifiers"`
-	Scope     []parse.ModifierType `json:"scope"`
+	Modifiers       []json.RawMessage    `json:"modifiers"`
+	Scope           []parse.ModifierType `json:"scope"`
+	AggregateErrors bool                 `json:"aggregateErrors"`
 }
 
 func init() {
@@ -46,6 +49,16 @@ func init() {
 // NewGroup returns a modifier group.
 func NewGroup() *Group {
 	return &Group{}
+}
+
+// SetAggregateErrors sets the error behavior for the Group. When true, the Group will
+// continue to execute consecutive modifiers when a modifier in the group encounters an
+// error. The Group will then return all errors returned by each modifier after all
+// modifiers have been executed.  When false, if an error is returned by a modifier, the
+// error is returned by ModifyRequest/Response and no further modifiers are run.
+// By default, error aggregation is disabled.
+func (g *Group) SetAggregateErrors(aggerr bool) {
+	g.aggregateErrors = aggerr
 }
 
 // AddRequestModifier adds a RequestModifier to the group's list of request modifiers.
@@ -64,34 +77,60 @@ func (g *Group) AddResponseModifier(resmod martian.ResponseModifier) {
 	g.resmods = append(g.resmods, resmod)
 }
 
-// ModifyRequest modifies the request. If an error is returned by a
-// RequestModifier the error is returned and no further modifiers are run.
+// ModifyRequest modifies the request. By default, aggregateErrors is false; if an error is
+// returned by a RequestModifier the error is returned and no further modifiers are run. When
+// aggregateErrors is set to true, the errors returned by each modifier in the group are
+// aggregated.
 func (g *Group) ModifyRequest(req *http.Request) error {
 	g.reqmu.RLock()
 	defer g.reqmu.RUnlock()
 
+	merr := verify.NewMultiError()
+
 	for _, reqmod := range g.reqmods {
 		if err := reqmod.ModifyRequest(req); err != nil {
+			if g.aggregateErrors {
+				merr.Add(err)
+				continue
+			}
+
 			return err
 		}
 	}
 
-	return nil
+	if merr.Empty() {
+		return nil
+	}
+
+	return merr
 }
 
-// ModifyResponse modifies the request. If an error is returned by a
-// ResponseModifier the error is returned and no further modifiers are run.
+// ModifyResponse modifies the request. By default, aggregateErrors is false; if an error is
+// returned by a RequestModifier the error is returned and no further modifiers are run. When
+// aggregateErrors is set to true, the errors returned by each modifier in the group are
+// aggregated.
 func (g *Group) ModifyResponse(res *http.Response) error {
 	g.resmu.RLock()
 	defer g.resmu.RUnlock()
 
+	merr := verify.NewMultiError()
+
 	for _, resmod := range g.resmods {
 		if err := resmod.ModifyResponse(res); err != nil {
+			if g.aggregateErrors {
+				merr.Add(err)
+				continue
+			}
+
 			return err
 		}
 	}
 
-	return nil
+	if merr.Empty() {
+		return nil
+	}
+
+	return merr
 }
 
 // VerifyRequests returns a MultiError containing all the
@@ -187,6 +226,9 @@ func groupFromJSON(b []byte) (*parse.Result, error) {
 	}
 
 	g := NewGroup()
+	if msg.AggregateErrors {
+		g.SetAggregateErrors(true)
+	}
 
 	for _, m := range msg.Modifiers {
 		r, err := parse.FromJSON(m)
