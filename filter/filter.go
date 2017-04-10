@@ -142,7 +142,7 @@ func (f *Filter) ModifyResponse(res *http.Response) error {
 // VerifyRequests returns an error containing all the verification errors
 // returned by request verifiers.
 func (f *Filter) VerifyRequests() error {
-	merr := verify.NewMultiError()
+	merr := martian.NewMultiError()
 
 	freqv, ok := f.freqmod.(verify.RequestVerifier)
 	if ok {
@@ -168,7 +168,7 @@ func (f *Filter) VerifyRequests() error {
 // VerifyResponses returns an error containing all the verification errors
 // returned by response verifiers.
 func (f *Filter) VerifyResponses() error {
-	merr := verify.NewMultiError()
+	merr := martian.NewMultiError()
 
 	tresv, ok := f.tresmod.(verify.ResponseVerifier)
 	if ok {

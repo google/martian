@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
@@ -43,7 +44,7 @@ func TestVerifyRequestsBlankValue(t *testing.T) {
 		}
 	}
 
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
+	merr, ok := v.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyRequests(): got no error, want *verify.MultiError")
 	}
@@ -141,7 +142,7 @@ func TestVerifyRequests(t *testing.T) {
 		}
 	}
 
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
+	merr, ok := v.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyRequests(): got no error, want *verify.MultiError")
 	}
@@ -185,7 +186,7 @@ func TestVerifyResponsesBlankValue(t *testing.T) {
 		}
 	}
 
-	merr, ok := v.VerifyResponses().(*verify.MultiError)
+	merr, ok := v.VerifyResponses().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyResponses(): got no error, want *verify.MultiError")
 	}
@@ -233,7 +234,7 @@ func TestVerifyResponses(t *testing.T) {
 		}
 	}
 
-	merr, ok := v.VerifyResponses().(*verify.MultiError)
+	merr, ok := v.VerifyResponses().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyResponses(): got no error, want *verify.MultiError")
 	}

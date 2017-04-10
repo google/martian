@@ -38,7 +38,7 @@ func init() {
 // Verifier verifies the structure of URLs.
 type Verifier struct {
 	url *url.URL
-	err *verify.MultiError
+	err *martian.MultiError
 }
 
 type verifierJSON struct {
@@ -53,7 +53,7 @@ type verifierJSON struct {
 func NewVerifier(url *url.URL) verify.RequestVerifier {
 	return &Verifier{
 		url: url,
-		err: verify.NewMultiError(),
+		err: martian.NewMultiError(),
 	}
 }
 
@@ -100,7 +100,7 @@ func (v *Verifier) ModifyRequest(req *http.Request) error {
 }
 
 // VerifyRequests returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
+// If an error is returned it will be of type *martian.MultiError.
 func (v *Verifier) VerifyRequests() error {
 	if v.err.Empty() {
 		return nil
@@ -111,7 +111,7 @@ func (v *Verifier) VerifyRequests() error {
 
 // ResetRequestVerifications clears all failed request verifications.
 func (v *Verifier) ResetRequestVerifications() {
-	v.err = verify.NewMultiError()
+	v.err = martian.NewMultiError()
 }
 
 // verifierFromJSON builds a martianurl.Verifier from JSON.

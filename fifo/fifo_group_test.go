@@ -154,7 +154,7 @@ func TestModifyRequestAggregatesErrors(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	merr := verify.NewMultiError()
+	merr := martian.NewMultiError()
 	merr.Add(reqerr1)
 	merr.Add(reqerr2)
 
@@ -232,7 +232,7 @@ func TestModifyResponseAggregatesErrors(t *testing.T) {
 
 	res := proxyutil.NewResponse(200, nil, req)
 
-	merr := verify.NewMultiError()
+	merr := martian.NewMultiError()
 	merr.Add(reserr1)
 	merr.Add(reserr2)
 
@@ -264,7 +264,7 @@ func TestVerifyRequests(t *testing.T) {
 		errs = append(errs, err)
 	}
 
-	merr, ok := fg.VerifyRequests().(*verify.MultiError)
+	merr, ok := fg.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyRequests(): got nil, want *verify.MultiError")
 	}
@@ -293,7 +293,7 @@ func TestVerifyResponses(t *testing.T) {
 		errs = append(errs, err)
 	}
 
-	merr, ok := fg.VerifyResponses().(*verify.MultiError)
+	merr, ok := fg.VerifyResponses().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyResponses(): got nil, want *verify.MultiError")
 	}

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
@@ -298,7 +299,7 @@ func TestVerifyRequests(t *testing.T) {
 
 	f.SetRequestModifier(tv)
 
-	want := verify.NewMultiError()
+	want := martian.NewMultiError()
 	want.Add(tv.RequestError)
 	if got := f.VerifyRequests(); got.Error() != want.Error() {
 		t.Fatalf("VerifyRequests(): got %v, want %v", got, want)
@@ -324,7 +325,7 @@ func TestVerifyResponses(t *testing.T) {
 
 	f.SetResponseModifier(tv)
 
-	want := verify.NewMultiError()
+	want := martian.NewMultiError()
 	want.Add(tv.ResponseError)
 	if got := f.VerifyResponses(); got.Error() != want.Error() {
 		t.Fatalf("VerifyResponses(): got %v, want %v", got, want)

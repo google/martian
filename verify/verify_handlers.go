@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/martian"
 	"github.com/google/martian/log"
 )
 
@@ -96,7 +97,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func appendError(vres *verifyResponse, err error) {
-	merr, ok := err.(*MultiError)
+	merr, ok := err.(*martian.MultiError)
 	if !ok {
 		vres.Errors = append(vres.Errors, verifyError{Message: err.Error()})
 		return

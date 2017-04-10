@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 	"github.com/google/martian/verify"
@@ -34,8 +35,8 @@ const (
 
 type verifier struct {
 	name, value string
-	reqerr      *verify.MultiError
-	reserr      *verify.MultiError
+	reqerr      *martian.MultiError
+	reserr      *martian.MultiError
 }
 
 type verifierJSON struct {
@@ -53,8 +54,8 @@ func NewVerifier(name, value string) verify.RequestResponseVerifier {
 	return &verifier{
 		name:   name,
 		value:  value,
-		reqerr: verify.NewMultiError(),
-		reserr: verify.NewMultiError(),
+		reqerr: martian.NewMultiError(),
+		reserr: martian.NewMultiError(),
 	}
 }
 
@@ -111,7 +112,7 @@ func (v *verifier) ModifyResponse(res *http.Response) error {
 }
 
 // VerifyRequests returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
+// If an error is returned it will be of type *martian.MultiError.
 func (v *verifier) VerifyRequests() error {
 	if v.reqerr.Empty() {
 		return nil
@@ -121,7 +122,7 @@ func (v *verifier) VerifyRequests() error {
 }
 
 // VerifyResponses returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
+// If an error is returned it will be of type *martian.MultiError.
 func (v *verifier) VerifyResponses() error {
 	if v.reserr.Empty() {
 		return nil
@@ -132,12 +133,12 @@ func (v *verifier) VerifyResponses() error {
 
 // ResetRequestVerifications clears all failed request verifications.
 func (v *verifier) ResetRequestVerifications() {
-	v.reqerr = verify.NewMultiError()
+	v.reqerr = martian.NewMultiError()
 }
 
 // ResetResponseVerifications clears all failed response verifications.
 func (v *verifier) ResetResponseVerifications() {
-	v.reserr = verify.NewMultiError()
+	v.reserr = martian.NewMultiError()
 }
 
 // verifierFromJSON builds a header.Verifier from JSON.

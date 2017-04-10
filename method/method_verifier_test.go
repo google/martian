@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -103,7 +104,7 @@ func TestVerifyPostRequestFailsWithMultiFail(t *testing.T) {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
 
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
+	merr, ok := v.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatalf("VerifyRequests(): got nil, want *verify.MultiError")
 	}

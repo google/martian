@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
 
 type verifier struct {
 	method string
-	err    *verify.MultiError
+	err    *martian.MultiError
 }
 
 type verifierJSON struct {
@@ -45,7 +46,7 @@ func NewVerifier(method string) (verify.RequestVerifier, error) {
 	}
 	return &verifier{
 		method: method,
-		err:    verify.NewMultiError(),
+		err:    martian.NewMultiError(),
 	}, nil
 }
 
@@ -65,7 +66,7 @@ func (v *verifier) ModifyRequest(req *http.Request) error {
 }
 
 // VerifyRequests returns an error if verification for any request failed.
-// If an error is returned it will be of type *verify.MultiError.
+// If an error is returned it will be of type *martian.MultiError.
 func (v *verifier) VerifyRequests() error {
 	if v.err.Empty() {
 		return nil
@@ -76,7 +77,7 @@ func (v *verifier) VerifyRequests() error {
 
 // ResetRequestVerifications clears all failed request verifications.
 func (v *verifier) ResetRequestVerifications() {
-	v.err = verify.NewMultiError()
+	v.err = martian.NewMultiError()
 }
 
 // verifierFromJSON builds a method.Verifier from JSON.

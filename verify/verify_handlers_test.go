@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/google/martian"
 )
 
 func TestHandlerServeHTTPUnsupportedMethod(t *testing.T) {
@@ -58,7 +60,7 @@ func TestHandlerServeHTTPNoVerifiers(t *testing.T) {
 }
 
 func TestHandlerServeHTTP(t *testing.T) {
-	merr := NewMultiError()
+	merr := martian.NewMultiError()
 	merr.Add(fmt.Errorf("first response verification failure"))
 	merr.Add(fmt.Errorf("second response verification failure"))
 
