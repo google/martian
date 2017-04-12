@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/martian"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
@@ -33,6 +34,7 @@ func TestGroupFromJSON(t *testing.T) {
 	msg := []byte(`{
     "fifo.Group": {
       "scope": ["request", "response"],
+      "aggregateErrors": true,
       "modifiers": [
         {
           "header.Modifier": {
@@ -133,6 +135,41 @@ func TestModifyRequestHaltsOnError(t *testing.T) {
 	}
 }
 
+func TestModifyRequestAggregatesErrors(t *testing.T) {
+	fg := NewGroup()
+	fg.SetAggregateErrors(true)
+
+	reqerr1 := errors.New("1. request error")
+	tm := martiantest.NewModifier()
+	tm.RequestError(reqerr1)
+	fg.AddRequestModifier(tm)
+
+	tm2 := martiantest.NewModifier()
+	reqerr2 := errors.New("2. request error")
+	tm2.RequestError(reqerr2)
+	fg.AddRequestModifier(tm2)
+
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	merr := martian.NewMultiError()
+	merr.Add(reqerr1)
+	merr.Add(reqerr2)
+
+	if err := fg.ModifyRequest(req); err == nil {
+		t.Fatalf("fg.ModifyRequest(): got %v, want not nil", err)
+	}
+	if err := fg.ModifyRequest(req); err.Error() != merr.Error() {
+		t.Fatalf("fg.ModifyRequest(): got %v, want %v", err, merr)
+	}
+
+	if err, want := fg.ModifyRequest(req), "1. request error\n2. request error"; err.Error() != want {
+		t.Fatalf("fg.ModifyRequest(): got %v, want %v", err, want)
+	}
+}
+
 func TestModifyResponse(t *testing.T) {
 	fg := NewGroup()
 	tm := martiantest.NewModifier()
@@ -169,6 +206,45 @@ func TestModifyResponseHaltsOnError(t *testing.T) {
 	}
 }
 
+func TestModifyResponseAggregatesErrors(t *testing.T) {
+	fg := NewGroup()
+	fg.SetAggregateErrors(true)
+
+	reserr1 := errors.New("1. response error")
+	tm := martiantest.NewModifier()
+	tm.ResponseError(reserr1)
+	fg.AddResponseModifier(tm)
+
+	tm2 := martiantest.NewModifier()
+	reserr2 := errors.New("2. response error")
+	tm2.ResponseError(reserr2)
+	fg.AddResponseModifier(tm2)
+
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	res := proxyutil.NewResponse(200, nil, req)
+
+	merr := martian.NewMultiError()
+	merr.Add(reserr1)
+	merr.Add(reserr2)
+
+	if err := fg.ModifyResponse(res); err == nil {
+		t.Fatalf("fg.ModifyResponse(): got %v, want %v", err, merr)
+	}
+
+	if err := fg.ModifyResponse(res); err.Error() != merr.Error() {
+		t.Fatalf("fg.ModifyResponse(): got %v, want %v", err, merr)
+	}
+}
+
 func TestVerifyRequests(t *testing.T) {
 	fg := NewGroup()
 
@@ -188,7 +264,7 @@ func TestVerifyRequests(t *testing.T) {
 		errs = append(errs, err)
 	}
 
-	merr, ok := fg.VerifyRequests().(*verify.MultiError)
+	merr, ok := fg.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyRequests(): got nil, want *verify.MultiError")
 	}
@@ -217,7 +293,7 @@ func TestVerifyResponses(t *testing.T) {
 		errs = append(errs, err)
 	}
 
-	merr, ok := fg.VerifyResponses().(*verify.MultiError)
+	merr, ok := fg.VerifyResponses().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyResponses(): got nil, want *verify.MultiError")
 	}

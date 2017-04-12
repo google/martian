@@ -87,7 +87,7 @@ func TestFailureWithMissingKey(t *testing.T) {
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
+	merr, ok := v.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyRequests(): got nil, want *verify.MultiError")
 	}
@@ -125,7 +125,7 @@ func TestFailureWithMultiFail(t *testing.T) {
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
+	merr, ok := v.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatalf("VerifyRequests(): got nil, want *verify.MultiError")
 	}

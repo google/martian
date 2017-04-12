@@ -91,7 +91,7 @@ func TestVerifyRequests(t *testing.T) {
 		}
 	}
 
-	merr, ok := v.VerifyRequests().(*verify.MultiError)
+	merr, ok := v.VerifyRequests().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyRequests(): got nil, want *verify.MultiError")
 	}

@@ -54,7 +54,7 @@ func TestVerifyResponses(t *testing.T) {
 		}
 	}
 
-	merr, ok := v.VerifyResponses().(*verify.MultiError)
+	merr, ok := v.VerifyResponses().(*martian.MultiError)
 	if !ok {
 		t.Fatal("VerifyResponses(): got nil, want *verify.MultiError")
 	}

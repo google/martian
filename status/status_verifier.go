@@ -29,7 +29,7 @@ const errFormat = "response(%s) status code verify failure: got %d, want %d"
 // Verifier verifies the status codes of all responses.
 type Verifier struct {
 	statusCode int
-	err        *verify.MultiError
+	err        *martian.MultiError
 }
 
 type verifierJSON struct {
@@ -45,7 +45,7 @@ func init() {
 func NewVerifier(statusCode int) verify.ResponseVerifier {
 	return &Verifier{
 		statusCode: statusCode,
-		err:        verify.NewMultiError(),
+		err:        martian.NewMultiError(),
 	}
 }
 
@@ -66,7 +66,7 @@ func (v *Verifier) ModifyResponse(res *http.Response) error {
 
 // VerifyResponses returns an error if verification for any
 // request failed.
-// If an error is returned it will be of type *verify.MultiError.
+// If an error is returned it will be of type *martian.MultiError.
 func (v *Verifier) VerifyResponses() error {
 	if v.err.Empty() {
 		return nil
@@ -77,7 +77,7 @@ func (v *Verifier) VerifyResponses() error {
 
 // ResetResponseVerifications clears all failed response verifications.
 func (v *Verifier) ResetResponseVerifications() {
-	v.err = verify.NewMultiError()
+	v.err = martian.NewMultiError()
 }
 
 // verifierFromJSON builds a status.Verifier from JSON.
