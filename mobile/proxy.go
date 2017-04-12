@@ -126,7 +126,7 @@ func (m *Martian) Start() {
 	// Forward traffic that pattern matches in http.DefaultServeMux before applying
 	// httpspec modifiers (via modifier, specifically)
 	topg := fifo.NewGroup()
-	apif := servemux.NewFilter(nil)
+	apif := servemux.NewFilter(m.mux)
 	apif.SetRequestModifier(api.NewForwarder("", m.APIPort))
 	topg.AddRequestModifier(apif)
 
