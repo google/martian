@@ -123,10 +123,10 @@ func (m *Martian) Start() {
 		m.handle("/authority.cer", martianhttp.NewAuthorityHandler(x509c))
 	}
 
-	// Forward traffic that pattern matches in http.DefaultServeMux before applying
+	// Forward traffic that pattern matches in m.mux before applying
 	// httpspec modifiers (via modifier, specifically)
 	topg := fifo.NewGroup()
-	apif := servemux.NewFilter(nil)
+	apif := servemux.NewFilter(m.mux)
 	apif.SetRequestModifier(api.NewForwarder("", m.APIPort))
 	topg.AddRequestModifier(apif)
 

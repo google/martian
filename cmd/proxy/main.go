@@ -334,7 +334,7 @@ func main() {
 
 	if *harLogging {
 		hl := har.NewLogger()
-		muxf := servemux.NewFilter(nil)
+		muxf := servemux.NewFilter(mux)
 		// Only append to HAR logs when the requests are not API requests,
 		// that is, they are not matched in http.DefaultServeMux
 		muxf.RequestWhenFalse(hl)
@@ -356,14 +356,14 @@ func main() {
 	if *marblLogging {
 		lsh := marbl.NewHandler()
 		lsm := marbl.NewModifier(lsh)
-		muxf := servemux.NewFilter(nil)
+		muxf := servemux.NewFilter(mux)
 		muxf.RequestWhenFalse(lsm)
 		muxf.ResponseWhenFalse(lsm)
 		stack.AddRequestModifier(muxf)
 		stack.AddResponseModifier(muxf)
 
 		// retrieve binary marbl logs
-		http.Handle("/binlogs", lsh)
+		mux.Handle("/binlogs", lsh)
 	}
 
 	// Configure modifiers.
