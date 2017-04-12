@@ -394,16 +394,16 @@ func main() {
 		l = tsl
 	}
 
-	lApi, err := net.Listen("tcp", *apiAddr)
+	lAPI, err := net.Listen("tcp", *apiAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("martian: starting proxy on %s and api on %s", l.Addr().String(), lApi.Addr().String())
+	log.Printf("martian: starting proxy on %s and api on %s", l.Addr().String(), lAPI.Addr().String())
 
 	go p.Serve(l)
 
-	go http.Serve(lApi, mux)
+	go http.Serve(lAPI, mux)
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, os.Kill)
