@@ -32,10 +32,14 @@ func NewMatcher(url *url.URL) *Matcher {
 	}
 }
 
+// MatchRequest retuns true if all non-empty URL segments in m.url match the
+// request URL.
 func (m *Matcher) MatchRequest(req *http.Request) bool {
 	return m.matches(req.URL)
 }
 
+// MatchResponse retuns true if all non-empty URL segments in m.url match the
+// request URL.
 func (m *Matcher) MatchResponse(res *http.Response) bool {
 	return m.matches(res.Request.URL)
 }
