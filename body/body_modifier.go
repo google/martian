@@ -26,6 +26,7 @@ import (
 
 func init() {
 	parse.Register("body.Modifier", modifierFromJSON)
+	parse.Register("body.FromFileModifier", fromFileModifierFromJSON)
 }
 
 // Modifier substitutes the body on an HTTP response.
@@ -40,6 +41,12 @@ type modifierJSON struct {
 	Scope       []parse.ModifierType `json:"scope"`
 }
 
+type fromFileModifierJSON struct {
+	ContentType string               `json:"contentType"`
+	Path        string               `json:"path"` // Path is a path local to the proxy.
+	Scope       []parse.ModifierType `json:"scope"`
+}
+
 // NewModifier constructs and returns a body.Modifier.
 func NewModifier(b []byte, contentType string) *Modifier {
 	return &Modifier{
@@ -48,10 +55,58 @@ func NewModifier(b []byte, contentType string) *Modifier {
 	}
 }
 
+// NewFromFileModifier returns a body.Modifier that substitutes the body on an
+// HTTP response with bytes read from a file local to the proxy.
+func NewFromFileModifier(path string, contentType string) (*Modifier, error) {
+	p, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+
+	public := filepath.Join("martian", "public")
+
+	if !p.Contains(filepath.Join("public", "martian")) {
+		return nil, errors.New("file must be inside a directory named %q", pub)
+	}
+
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Modifier{
+		contentType: contentType,
+		body:        b,
+	}, nil
+}
+
 // modifierFromJSON takes a JSON message as a byte slice and returns a
 // body.Modifier and an error.
 //
-// Example JSON Configuration message:
+// Example JSON Configuration message providing a local file:
+// {
+//   "scope": ["request", "response"],
+//   "contentType": "text/plain",
+//   "path": "some/local/path/to/a/file.json/" // Path local to the proxy
+// }
+func fromFileModifierFromJSON(b []byte) (*parse.Result, error) {
+	msg := &fromFileModifierJSON{}
+	if err := json.Unmarshal(b, msg); err != nil {
+		return nil, err
+	}
+
+	mod, err := NewFromFileModifier(msg.Path, msg.ContentType)
+	if err != nil {
+		return nil, err
+	}
+
+	return parse.NewResult(mod, msg.Scope)
+}
+
+// modifierFromJSON takes a JSON message as a byte slice and returns a
+// body.Modifier and an error.
+//
+// Example JSON Configuration message providing Base64 encoded body:
 // {
 //   "scope": ["request", "response"],
 //   "contentType": "text/plain",
@@ -64,6 +119,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 	}
 
 	mod := NewModifier(msg.Body, msg.ContentType)
+
 	return parse.NewResult(mod, msg.Scope)
 }
 
