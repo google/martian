@@ -253,6 +253,19 @@ func main() {
 	p := martian.NewProxy()
 	defer p.Close()
 
+	tr := &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: *skipTLSVerify,
+		},
+	}
+	p.SetRoundTripper(tr)
+
 	mux := http.NewServeMux()
 
 	var x509c *x509.Certificate
