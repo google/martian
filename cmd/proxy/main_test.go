@@ -69,7 +69,7 @@ func parseURL(t *testing.T, u string) *url.URL {
 	return p
 }
 
-func TestProxy(t *testing.T) {
+func TestProxyMain(t *testing.T) {
 	tempDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
