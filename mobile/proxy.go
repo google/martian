@@ -41,6 +41,7 @@ import (
 	// side-effect importing to register with JSON API
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
+	_ "github.com/google/martian/failure"
 	_ "github.com/google/martian/header"
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
