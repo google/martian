@@ -186,6 +186,8 @@
 //     90's)
 //   -skip-tls-verify=false
 //     skip TLS server verification; insecure and intended for testing only
+//   -cache=""
+//     when set, will load and/or dump cache into this location
 //   -v=0
 //     log level for console logs; defaults to error only.
 package main
@@ -206,6 +208,7 @@ import (
 
 	"github.com/google/martian"
 	mapi "github.com/google/martian/api"
+	"github.com/google/martian/cache"
 	"github.com/google/martian/cors"
 	"github.com/google/martian/fifo"
 	"github.com/google/martian/har"
@@ -219,6 +222,7 @@ import (
 	"github.com/google/martian/verify"
 
 	_ "github.com/google/martian/body"
+	_ "github.com/google/martian/cache"
 	_ "github.com/google/martian/cookie"
 	_ "github.com/google/martian/failure"
 	_ "github.com/google/martian/martianurl"
@@ -248,6 +252,7 @@ var (
 	marblLogging   = flag.Bool("marbl", false, "enable MARBL logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
+	cache          = flag.String("cache", "", "Location of the cache file")
 )
 
 func main() {
@@ -314,6 +319,10 @@ func main() {
 		}
 
 		go p.Serve(tls.NewListener(tl, mc.TLS()))
+	}
+
+	if *cache != "" {
+		cache_manager.GetTheCacheDatabase().LoadFromDisk(*cache)
 	}
 
 	stack, fg := httpspec.NewStack("martian")
@@ -424,6 +433,10 @@ func main() {
 
 	<-sigc
 
+	if *cache != "" {
+		log.Println("martian: serializing to %v", *cache)
+		cache_manager.GetTheCacheDatabase().SerializeToDisk(*cache)
+	}
 	log.Println("martian: shutting down")
 }
 

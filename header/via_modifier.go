@@ -16,8 +16,10 @@ package header
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
+	"runtime/debug"
 	"strings"
 
 	"github.com/google/martian"
@@ -70,6 +72,11 @@ func (m *viaModifier) ModifyRequest(req *http.Request) error {
 // detected in the request.
 func (m *viaModifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
+
+	if ctx == nil {
+		debug.PrintStack()
+		log.Fatalf("Cannot locate context for request %v, whose response is %v.", res.Request, res)
+	}
 
 	if err, _ := ctx.Get(viaLoopKey); err != nil {
 		res.StatusCode = 400

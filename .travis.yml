@@ -2,3 +2,11 @@ language: go
 
 go:
   - tip
+
+install:
+  - go get -t ./...
+  - pip install --user portpicker
+
+script:
+  - go test -v ./...
+  - python regtest.py
