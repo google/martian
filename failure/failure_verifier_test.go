@@ -82,11 +82,11 @@ func TestFailureWithMultiFail(t *testing.T) {
 
 func TestVerifierFromJSON(t *testing.T) {
 	msg := []byte(`{
-    	"failure.Verifier": {
-      		"scope": ["request"],
-      		"message": "foo"
-    		}
-  		}`)
+		"failure.Verifier": {
+			"scope": ["request"],
+			"message": "foo"
+		}
+	}`)
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
