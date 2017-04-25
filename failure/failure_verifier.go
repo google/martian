@@ -82,7 +82,6 @@ func (v *verifier) ResetRequestVerifications() {
 //     "message": "Request passed a filter it should not have"
 //   }
 // }
-
 func verifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &verifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {
