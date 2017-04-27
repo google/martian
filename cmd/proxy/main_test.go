@@ -69,7 +69,7 @@ func parseURL(t *testing.T, u string) *url.URL {
 	return p
 }
 
-func TestProxy(t *testing.T) {
+func TestProxyMain(t *testing.T) {
 	tempDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestProxy(t *testing.T) {
 		// Start proxy
 		proxyPort := getFreePort(t)
 		apiPort := getFreePort(t)
-		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort)
+		cmd := exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {
@@ -182,7 +182,7 @@ func TestProxy(t *testing.T) {
 		// Start proxy
 		proxyPort := getFreePort(t)
 		apiPort := getFreePort(t)
-		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-generate-ca-cert", "-skip-tls-verify")
+		cmd := exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-generate-ca-cert", "-skip-tls-verify")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {
@@ -247,6 +247,127 @@ func TestProxy(t *testing.T) {
 		defer res.Body.Close()
 		if got, want := res.StatusCode, http.StatusTeapot; got != want {
 			t.Fatalf("client.Get(%q): got status %d, want %d", testUrl, got, want)
+		}
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("ioutil.ReadAll(res.Body): got error %v, want no error", err)
+		}
+		if got, want := string(body), "茶壺"; got != want {
+			t.Fatalf("modified response body: got %s, want %s", got, want)
+		}
+	})
+
+	t.Run("DownstreamProxy", func(t *testing.T) {
+		// Start downstream proxy
+		dsProxyPort := getFreePort(t)
+		dsApiPort := getFreePort(t)
+		cmd := exec.Command(binPath, "-addr="+dsProxyPort, "-api-addr="+dsApiPort)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer cmd.Wait()
+		defer cmd.Process.Signal(os.Interrupt)
+
+		dsProxyUrl := "http://localhost" + dsProxyPort
+		dsApiUrl := "http://localhost" + dsApiPort
+		configureUrl := "http://martian.proxy/configure"
+
+		// TODO: Make using API hostport directly work on Travis.
+		dsApiClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(parseURL(t, dsApiUrl))}}
+		waitForProxy(t, dsApiClient, configureUrl)
+
+		// Configure modifiers
+		config := strings.NewReader(`
+			{
+			  "fifo.Group": {
+			    "scope": ["request", "response"],
+			    "modifiers": [
+			      {
+			        "status.Modifier": {
+			          "scope": ["response"],
+			          "statusCode": 418
+			        }
+			      },
+			      {
+			        "skip.RoundTrip": {}
+			      }
+			    ]
+			  }
+			}`)
+		res, err := dsApiClient.Post(configureUrl, "application/json", config)
+		if err != nil {
+			t.Fatalf("dsApiClient.Post(%q): got error %v, want no error", configureUrl, err)
+		}
+		defer res.Body.Close()
+		if got, want := res.StatusCode, http.StatusOK; got != want {
+			t.Fatalf("dsApiClient.Post(%q): got status %d, want %d", configureUrl, got, want)
+		}
+
+		// Start main proxy
+		proxyPort := getFreePort(t)
+		apiPort := getFreePort(t)
+		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-downstream-proxy-url="+dsProxyUrl)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer cmd.Wait()
+		defer cmd.Process.Signal(os.Interrupt)
+
+		proxyUrl := "http://localhost" + proxyPort
+		apiUrl := "http://localhost" + apiPort
+
+		// TODO: Make using API hostport directly work on Travis.
+		apiClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(parseURL(t, apiUrl))}}
+		waitForProxy(t, apiClient, configureUrl)
+
+		// Configure modifiers
+		// Setting a different Via header value to circumvent loop detection.
+		config = strings.NewReader(fmt.Sprintf(`
+			{
+			  "fifo.Group": {
+			    "scope": ["request", "response"],
+			    "modifiers": [
+			      {
+			        "header.Modifier": {
+			          "scope": ["request"],
+			          "name": "Via",
+			          "value": "martian_1"
+			        }
+			      },
+			      {
+			        "body.Modifier": {
+			          "scope": ["response"],
+			          "contentType": "text/plain",
+			          "body": "%s"
+			        }
+			      }
+			    ]
+			  }
+			}`, base64.StdEncoding.EncodeToString([]byte("茶壺"))))
+		res, err = apiClient.Post(configureUrl, "application/json", config)
+		if err != nil {
+			t.Fatalf("apiClient.Post(%q): got error %v, want no error", configureUrl, err)
+		}
+		defer res.Body.Close()
+		if got, want := res.StatusCode, http.StatusOK; got != want {
+			t.Fatalf("apiClient.Post(%q): got status %d, want %d", configureUrl, got, want)
+		}
+
+		// Exercise proxy
+		client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(parseURL(t, proxyUrl))}}
+
+		testUrl := "http://super.fake.domain/"
+		res, err = client.Get(testUrl)
+		if err != nil {
+			t.Fatalf("client.Get(%q): got error %v, want no error", testUrl, err)
+		}
+		defer res.Body.Close()
+		if got, want := res.StatusCode, http.StatusTeapot; got != want {
+			t.Errorf("client.Get(%q): got status %d, want %d", testUrl, got, want)
 		}
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {

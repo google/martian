@@ -197,6 +197,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -248,6 +249,7 @@ var (
 	marblLogging   = flag.Bool("marbl", false, "enable MARBL logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
+	dsProxyURL     = flag.String("downstream-proxy-url", "", "URL of downstream proxy")
 )
 
 func main() {
@@ -266,6 +268,14 @@ func main() {
 		},
 	}
 	p.SetRoundTripper(tr)
+
+	if *dsProxyURL != "" {
+		u, err := url.Parse(*dsProxyURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		p.SetDownstreamProxy(u)
+	}
 
 	mux := http.NewServeMux()
 
