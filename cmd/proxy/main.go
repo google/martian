@@ -197,6 +197,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -220,6 +221,7 @@ import (
 
 	_ "github.com/google/martian/body"
 	_ "github.com/google/martian/cookie"
+	_ "github.com/google/martian/failure"
 	_ "github.com/google/martian/martianurl"
 	_ "github.com/google/martian/method"
 	_ "github.com/google/martian/pingback"
@@ -247,11 +249,33 @@ var (
 	marblLogging   = flag.Bool("marbl", false, "enable MARBL logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
+	dsProxyURL     = flag.String("downstream-proxy-url", "", "URL of downstream proxy")
 )
 
 func main() {
 	p := martian.NewProxy()
 	defer p.Close()
+
+	tr := &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: *skipTLSVerify,
+		},
+	}
+	p.SetRoundTripper(tr)
+
+	if *dsProxyURL != "" {
+		u, err := url.Parse(*dsProxyURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		p.SetDownstreamProxy(u)
+	}
 
 	mux := http.NewServeMux()
 
