@@ -18,9 +18,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"time"
 
@@ -65,9 +67,10 @@ type Martian struct {
 	listener    net.Listener
 	mux         *http.ServeMux
 	started     bool
-	HarLogging  bool
+	HARLogging  bool
 	TrafficPort int
 	APIPort     int
+	APIOverTLS  bool
 	Cert        string
 	Key         string
 	AllowCORS   bool
@@ -138,7 +141,7 @@ func (m *Martian) Start() {
 	m.proxy.SetRequestModifier(topg)
 	m.proxy.SetResponseModifier(topg)
 
-	if m.HarLogging {
+	if m.HARLogging {
 		// add HAR logger for unmodified logs.
 		uhl := har.NewLogger()
 		uhmuxf := servemux.NewFilter(m.mux)
@@ -203,6 +206,41 @@ func (m *Martian) Start() {
 
 	// start the API server
 	apiAddr := fmt.Sprintf(":%d", m.APIPort)
+	if m.APIOverTLS {
+		if m.Cert == "" || m.Key == "" {
+			log.Fatal("mobile: APIOverTLS cannot be true without valid cert and key")
+		}
+
+		cerfile, err := ioutil.TempFile("", "martian-api.cert")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		keyfile, err := ioutil.TempFile("", "martian-api.key")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if _, err := cerfile.Write([]byte(m.Cert)); err != nil {
+			log.Fatal(err)
+		}
+
+		if _, err := keyfile.Write([]byte(m.Key)); err != nil {
+			log.Fatal(err)
+		}
+
+		go func() {
+			http.ListenAndServeTLS(apiAddr, cerfile.Name(), keyfile.Name(), m.mux)
+			defer os.Remove(cerfile.Name())
+			defer os.Remove(keyfile.Name())
+		}()
+
+		mlog.Infof("mobile: proxy API started on %s over TLS", apiAddr)
+	} else {
+		go http.ListenAndServe(apiAddr, m.mux)
+		mlog.Infof("mobile: proxy API started on %s", apiAddr)
+	}
+
 	go http.ListenAndServe(apiAddr, m.mux)
 	mlog.Infof("mobile: proxy API started on %s", apiAddr)
 	m.started = true
