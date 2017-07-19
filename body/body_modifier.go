@@ -100,7 +100,8 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 		rh = strings.ToLower(rh)
 		rs := strings.Split(strings.TrimLeft(rh, "bytes="), "-")
 		if len(rs) != 2 {
-			return fmt.Errorf("body.Modifier: invalid Range request header: %s", rh)
+			res.StatusCode = http.StatusRequestedRangeNotSatisfiable
+			return nil
 		}
 		start, err := strconv.Atoi(rs[0])
 		if err != nil {
@@ -113,7 +114,8 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 		}
 
 		if start > end {
-			return fmt.Errorf("body.Modifier: invalid range request. %d should be greater than %d", end, start)
+			res.StatusCode = http.StatusRequestedRangeNotSatisfiable
+			return nil
 		}
 
 		br := bufio.NewReader(bytes.NewReader(m.body))
