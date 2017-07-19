@@ -16,10 +16,14 @@
 package body
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/google/martian/parse"
 )
@@ -88,6 +92,52 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 	res.Body.Close()
 
 	res.Header.Set("Content-Type", m.contentType)
+
+	// Check for Range request.
+	rhv := res.Request.Header.Get("Range")
+	if rhv != "" && strings.HasPrefix(rhv, "bytes=") {
+		rh := res.Request.Header.Get("Range")
+		rh = strings.ToLower(rh)
+		rs := strings.Split(strings.TrimLeft(rh, "bytes="), "-")
+		if len(rs) != 2 {
+			return fmt.Errorf("body.Modifier: invalid Range request header: %s", rh)
+		}
+		start, err := strconv.Atoi(rs[0])
+		if err != nil {
+			return err
+		}
+
+		end, err := strconv.Atoi(rs[1])
+		if err != nil {
+			return err
+		}
+
+		if start > end {
+			return fmt.Errorf("body.Modifier: invalid range request. %d should be greater than %d", end, start)
+		}
+
+		br := bufio.NewReader(bytes.NewReader(m.body))
+		if _, err := br.Discard(start); err != nil {
+			return err
+		}
+
+		var segment []byte
+		seglen := end - start + 1
+		for i := 0; i < seglen; i++ {
+			b, err := br.ReadByte()
+			if err != nil {
+				return err
+			}
+			segment = append(segment, b)
+		}
+
+		res.ContentLength = int64(len(segment))
+		res.Body = ioutil.NopCloser(bytes.NewReader(segment))
+		res.StatusCode = http.StatusPartialContent
+		res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
+
+		return nil
+	}
 
 	// Reset the Content-Encoding since we know that the new body isn't encoded.
 	res.Header.Del("Content-Encoding")

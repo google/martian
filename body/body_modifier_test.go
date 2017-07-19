@@ -88,13 +88,13 @@ func TestBodyModifier(t *testing.T) {
 	}
 }
 func TestRangeHeaderRequest(t *testing.T) {
-	mod := NewModifier([]byte("01234567890"), "text/plain")
+	mod := NewModifier([]byte("0123456789"), "text/plain")
 
 	req, err := http.NewRequest("GET", "/", strings.NewReader(""))
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
-	req.Header.Set("Range", "bytes=0-5")
+	req.Header.Set("Range", "bytes=1-4")
 
 	res := proxyutil.NewResponse(200, nil, req)
 
@@ -105,10 +105,10 @@ func TestRangeHeaderRequest(t *testing.T) {
 	if got, want := res.StatusCode, http.StatusPartialContent; got != want {
 		t.Errorf("res.Status: got %v, want %v", got, want)
 	}
-	if got, want := res.ContentLength, int64(len([]byte("012345"))); got != want {
+	if got, want := res.ContentLength, int64(len([]byte("1234"))); got != want {
 		t.Errorf("res.ContentLength: got %d, want %d", got, want)
 	}
-	if got, want := res.Header.Get("Content-Range"), "bytes 0-6/10"; got != want {
+	if got, want := res.Header.Get("Content-Range"), "bytes 1-4/10"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Content-Encoding", got, want)
 	}
 
@@ -118,7 +118,7 @@ func TestRangeHeaderRequest(t *testing.T) {
 	}
 	res.Body.Close()
 
-	if want := []byte("012345"); !bytes.Equal(got, want) {
+	if want := []byte("1234"); !bytes.Equal(got, want) {
 		t.Errorf("res.Body: got %q, want %q", got, want)
 	}
 }
@@ -144,7 +144,12 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("resmod: got nil, want not nil")
 	}
 
-	res := proxyutil.NewResponse(200, nil, nil)
+	req, err := http.NewRequest("GET", "/", strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
 	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
