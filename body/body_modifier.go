@@ -18,10 +18,14 @@ package body
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strconv"
 	"strings"
 
@@ -36,6 +40,7 @@ func init() {
 type Modifier struct {
 	contentType string
 	body        []byte
+	boundary    string
 }
 
 type modifierJSON struct {
@@ -49,6 +54,7 @@ func NewModifier(b []byte, contentType string) *Modifier {
 	return &Modifier{
 		contentType: contentType,
 		body:        b,
+		boundary:    randomBoundary(),
 	}
 }
 
@@ -86,6 +92,11 @@ func (m *Modifier) ModifyRequest(req *http.Request) error {
 	return nil
 }
 
+// SetBoundary set the boundary string used for multipart range responses.
+func (m *Modifier) SetBoundary(boundary string) {
+	m.boundary = boundary
+}
+
 // ModifyResponse sets the Content-Type header and overrides the response body.
 func (m *Modifier) ModifyResponse(res *http.Response) error {
 	// Replace the existing body, close it first.
@@ -93,22 +104,33 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 
 	res.Header.Set("Content-Type", m.contentType)
 
-	// Check for Range request.
-	rhv := res.Request.Header.Get("Range")
-	if rhv != "" && strings.HasPrefix(rhv, "bytes=") {
-		rh := res.Request.Header.Get("Range")
-		rh = strings.ToLower(rh)
-		rs := strings.Split(strings.TrimLeft(rh, "bytes="), "-")
+	// Reset the Content-Encoding since we know that the new body isn't encoded.
+	res.Header.Del("Content-Encoding")
+
+	// If no range request header is present, return the body as the response body.
+	if res.Request.Header.Get("Range") == "" {
+		res.ContentLength = int64(len(m.body))
+		res.Body = ioutil.NopCloser(bytes.NewReader(m.body))
+
+		return nil
+	}
+
+	rh := res.Request.Header.Get("Range")
+	rh = strings.ToLower(rh)
+	sranges := strings.Split(strings.TrimLeft(rh, "bytes="), ",")
+	var ranges [][]int
+	for _, rng := range sranges {
+		rs := strings.Split(strings.TrimLeft(rng, "bytes="), "-")
 		if len(rs) != 2 {
 			res.StatusCode = http.StatusRequestedRangeNotSatisfiable
 			return nil
 		}
-		start, err := strconv.Atoi(rs[0])
+		start, err := strconv.Atoi(strings.TrimSpace(rs[0]))
 		if err != nil {
 			return err
 		}
 
-		end, err := strconv.Atoi(rs[1])
+		end, err := strconv.Atoi(strings.TrimSpace(rs[1]))
 		if err != nil {
 			return err
 		}
@@ -118,34 +140,89 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 			return nil
 		}
 
-		br := bufio.NewReader(bytes.NewReader(m.body))
-		if _, err := br.Discard(start); err != nil {
+		ranges = append(ranges, []int{start, end})
+	}
+
+	// Range request.
+	res.StatusCode = http.StatusPartialContent
+
+	// Single range request.
+	if len(ranges) == 1 {
+		start := ranges[0][0]
+		end := ranges[0][1]
+		seg, err := m.extractSegment(start, end)
+		if err != nil {
 			return err
 		}
-
-		var segment []byte
-		seglen := end - start + 1
-		for i := 0; i < seglen; i++ {
-			b, err := br.ReadByte()
-			if err != nil {
-				return err
-			}
-			segment = append(segment, b)
-		}
-
-		res.ContentLength = int64(len(segment))
-		res.Body = ioutil.NopCloser(bytes.NewReader(segment))
-		res.StatusCode = http.StatusPartialContent
-		res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
+		res.ContentLength = int64(len(seg))
+		res.Body = ioutil.NopCloser(bytes.NewReader(seg))
+		res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(seg)))
 
 		return nil
 	}
 
-	// Reset the Content-Encoding since we know that the new body isn't encoded.
-	res.Header.Del("Content-Encoding")
+	// Multipart range request.
+	var mpbody bytes.Buffer
+	mpw := multipart.NewWriter(&mpbody)
+	defer mpw.Close()
+	mpw.SetBoundary(m.boundary)
 
-	res.ContentLength = int64(len(m.body))
-	res.Body = ioutil.NopCloser(bytes.NewReader(m.body))
+	for _, rng := range ranges {
+		start, end := rng[0], rng[1]
+		mimeh := make(textproto.MIMEHeader)
+		mimeh.Set("Content-Type", m.contentType)
+		mimeh.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
+
+		pw, err := mpw.CreatePart(mimeh)
+		if err != nil {
+			return err
+		}
+
+		seg, err := m.extractSegment(start, end)
+		if err != nil {
+			return err
+		}
+
+		if _, err := pw.Write(seg); err != nil {
+			return err
+		}
+	}
+
+	res.ContentLength = int64(len(mpbody.Bytes()))
+	res.Body = ioutil.NopCloser(bytes.NewReader(mpbody.Bytes()))
+	// res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
 
 	return nil
+
+}
+
+func (m *Modifier) extractSegment(start, end int) ([]byte, error) {
+	br := bufio.NewReader(bytes.NewReader(m.body))
+	if _, err := br.Discard(start); err != nil {
+		return nil, err
+	}
+
+	var segment []byte
+	seglen := end - start + 1
+	for i := 0; i < seglen; i++ {
+		b, err := br.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		segment = append(segment, b)
+	}
+
+	return segment, nil
+}
+
+// randomBoundary generates a 30 character string for boundaries for mulipart range
+// requests. This func panics if io.Readfull fails.
+// Borrowed from: https://golang.org/src/mime/multipart/writer.go?#L73
+func randomBoundary() string {
+	var buf [30]byte
+	_, err := io.ReadFull(rand.Reader, buf[:])
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", buf[:])
 }
