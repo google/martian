@@ -180,7 +180,7 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 		t.Errorf("ioutil.Readall(prt1): got %v, want no error", err)
 	}
 
-	if got, want := string(prt1b), "123"; got != want {
+	if got, want := string(prt1b), "1234"; got != want {
 		t.Errorf("prt1 body: got %s, want %s", got, want)
 	}
 
