@@ -16,7 +16,6 @@
 package body
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
@@ -150,13 +149,10 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 	if len(ranges) == 1 {
 		start := ranges[0][0]
 		end := ranges[0][1]
-		seg, err := m.extractSegment(start, end)
-		if err != nil {
-			return err
-		}
+		seg := m.body[start : end+1]
 		res.ContentLength = int64(len(seg))
 		res.Body = ioutil.NopCloser(bytes.NewReader(seg))
-		res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(seg)))
+		res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
 
 		return nil
 	}
@@ -173,12 +169,9 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 		mimeh.Set("Content-Type", m.contentType)
 		mimeh.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
 
-		pw, err := mpw.CreatePart(mimeh)
-		if err != nil {
-			return err
-		}
+		seg := m.body[start : end+1]
 
-		seg, err := m.extractSegment(start, end)
+		pw, err := mpw.CreatePart(mimeh)
 		if err != nil {
 			return err
 		}
@@ -190,29 +183,9 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 
 	res.ContentLength = int64(len(mpbody.Bytes()))
 	res.Body = ioutil.NopCloser(bytes.NewReader(mpbody.Bytes()))
-	// res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
+	res.Header.Set("Content-Type", fmt.Sprintf("multipart/byteranges; boundary=%s", m.boundary))
 
 	return nil
-
-}
-
-func (m *Modifier) extractSegment(start, end int) ([]byte, error) {
-	br := bufio.NewReader(bytes.NewReader(m.body))
-	if _, err := br.Discard(start); err != nil {
-		return nil, err
-	}
-
-	var segment []byte
-	seglen := end - start + 1
-	for i := 0; i < seglen; i++ {
-		b, err := br.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-		segment = append(segment, b)
-	}
-
-	return segment, nil
 }
 
 // randomBoundary generates a 30 character string for boundaries for mulipart range

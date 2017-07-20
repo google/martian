@@ -135,7 +135,7 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
-	req.Header.Set("Range", "bytes=1-4, 7-10")
+	req.Header.Set("Range", "bytes=1-4, 7-9")
 
 	res := proxyutil.NewResponse(200, nil, req)
 	if err := mod.ModifyResponse(res); err != nil {
@@ -172,7 +172,7 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 	}
 
 	if got, want := prt1.Header.Get("Content-Range"), "bytes 1-4/10"; got != want {
-		t.Errorf("prt1.Header.Get(%q): got %q, want %q", "Content-Type", got, want)
+		t.Errorf("prt1.Header.Get(%q): got %q, want %q", "Content-Range", got, want)
 	}
 
 	prt1b, err := ioutil.ReadAll(prt1)
@@ -180,7 +180,7 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 		t.Errorf("ioutil.Readall(prt1): got %v, want no error", err)
 	}
 
-	if got, want := string(prt1b), "1234"; got != want {
+	if got, want := string(prt1b), "123"; got != want {
 		t.Errorf("prt1 body: got %s, want %s", got, want)
 	}
 
@@ -194,8 +194,8 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 		t.Errorf("prt2.Header.Get(%q): got %q, want %q", "Content-Type", got, want)
 	}
 
-	if got, want := prt2.Header.Get("Content-Range"), "bytes 7-10/10"; got != want {
-		t.Errorf("prt2.Header.Get(%q): got %q, want %q", "Content-Type", got, want)
+	if got, want := prt2.Header.Get("Content-Range"), "bytes 7-9/10"; got != want {
+		t.Errorf("prt2.Header.Get(%q): got %q, want %q", "Content-Range", got, want)
 	}
 
 	prt2b, err := ioutil.ReadAll(prt2)
@@ -203,7 +203,7 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 		t.Errorf("ioutil.Readall(prt2): got %v, want no error", err)
 	}
 
-	if got, want := string(prt2b), "7890"; got != want {
+	if got, want := string(prt2b), "789"; got != want {
 		t.Errorf("prt2 body: got %s, want %s", got, want)
 	}
 
