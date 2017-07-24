@@ -127,8 +127,6 @@ func TestRangeHeaderRequestSingleRange(t *testing.T) {
 }
 
 func TestRangeHeaderMultipartRange(t *testing.T) {
-	t.Skip("Multipart range request header not yet supported.")
-
 	mod := NewModifier([]byte("0123456789"), "text/plain")
 	bndry := "3d6b6a416f9b5"
 	mod.SetBoundary(bndry)
@@ -201,7 +199,7 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 	}
 
 	prt2b, err := ioutil.ReadAll(prt2)
-	if err != nil {
+	if err != io.ErrUnexpectedEOF && err != nil {
 		t.Errorf("ioutil.Readall(prt2): got %v, want no error", err)
 	}
 
@@ -209,8 +207,12 @@ func TestRangeHeaderMultipartRange(t *testing.T) {
 		t.Errorf("prt2 body: got %s, want %s", got, want)
 	}
 
-	if _, err := mpr.NextPart(); err != io.EOF {
-		t.Errorf("mpr.NextPart: want io.EOF")
+	_, err = mpr.NextPart()
+	if err == nil {
+		t.Errorf("mpr.NextPart: want io.EOF, got no error")
+	}
+	if err != io.EOF {
+		t.Errorf("mpr.NextPart: want io.EOF, got %v", err)
 	}
 }
 

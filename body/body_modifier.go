@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strconv"
 	"strings"
 
@@ -155,39 +157,35 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 		return nil
 	}
 
-	// Multipart range request not yet supported.
-	res.StatusCode = http.StatusRequestedRangeNotSatisfiable
-	return nil
-	/*
-		var mpbody bytes.Buffer
-		mpw := multipart.NewWriter(&mpbody)
-		defer mpw.Close()
-		mpw.SetBoundary(m.boundary)
+	// Multipart range request.
+	var mpbody bytes.Buffer
+	mpw := multipart.NewWriter(&mpbody)
+	mpw.SetBoundary(m.boundary)
 
-		for _, rng := range ranges {
-			start, end := rng[0], rng[1]
-			mimeh := make(textproto.MIMEHeader)
-			mimeh.Set("Content-Type", m.contentType)
-			mimeh.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
+	for _, rng := range ranges {
+		start, end := rng[0], rng[1]
+		mimeh := make(textproto.MIMEHeader)
+		mimeh.Set("Content-Type", m.contentType)
+		mimeh.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(m.body)))
 
-			seg := m.body[start : end+1]
+		seg := m.body[start : end+1]
 
-			pw, err := mpw.CreatePart(mimeh)
-			if err != nil {
-				return err
-			}
-
-			if _, err := pw.Write(seg); err != nil {
-				return err
-			}
+		pw, err := mpw.CreatePart(mimeh)
+		if err != nil {
+			return err
 		}
 
-		res.ContentLength = int64(len(mpbody.Bytes()))
-		res.Body = ioutil.NopCloser(bytes.NewReader(mpbody.Bytes()))
-		res.Header.Set("Content-Type", fmt.Sprintf("multipart/byteranges; boundary=%s", m.boundary))
+		if _, err := pw.Write(seg); err != nil {
+			return err
+		}
+	}
+	mpw.Close()
 
-		return nil
-	*/
+	res.ContentLength = int64(len(mpbody.Bytes()))
+	res.Body = ioutil.NopCloser(bytes.NewReader(mpbody.Bytes()))
+	res.Header.Set("Content-Type", fmt.Sprintf("multipart/byteranges; boundary=%s", m.boundary))
+
+	return nil
 }
 
 // randomBoundary generates a 30 character string for boundaries for mulipart range
