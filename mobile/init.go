@@ -18,6 +18,6 @@
 package mobile
 
 // Init runs common initialization code for a martian proxy.
-func Init() {
+func init() {
 	// Add custom code for your environment here.
 }

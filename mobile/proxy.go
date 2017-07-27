@@ -57,10 +57,6 @@ import (
 	_ "github.com/google/martian/status"
 )
 
-func init() {
-	Init()
-}
-
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
 	proxy       *martian.Proxy
