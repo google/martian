@@ -20,32 +20,30 @@ import (
 	"regexp"
 )
 
-// Matcher is a conditional evaluator of request urls to be used in
+// RegexMatcher is a conditional evaluator of request urls to be used in
 // filters that take conditionals.
 type RegexMatcher struct {
 	r *regexp.Regexp
 }
 
-// NewMatcher builds a new url matcher.
+// NewRegexMatcher builds a new url matcher from a compiled Regexp.
 func NewRegexMatcher(r *regexp.Regexp) *RegexMatcher {
 	return &RegexMatcher{
 		r: r,
 	}
 }
 
-// MatchRequest retuns true if all non-empty URL segments in m.url match the
-// request URL.
+// MatchRequest retuns true if the request URL matches r.
 func (m *RegexMatcher) MatchRequest(req *http.Request) bool {
 	return m.matches(req.URL)
 }
 
-// MatchResponse retuns true if all non-empty URL segments in m.url match the
-// request URL.
+// MatchRequest retuns true if the response URL matches r.
 func (m *RegexMatcher) MatchResponse(res *http.Response) bool {
 	return m.matches(res.Request.URL)
 }
 
-// matches forces all non-empty URL segments to match or it returns false.
+// matches checks if a url matches r.
 func (m *RegexMatcher) matches(u *url.URL) bool {
 	return m.r.MatchString(u.String())
 }
