@@ -38,7 +38,7 @@ func (m *RegexMatcher) MatchRequest(req *http.Request) bool {
 	return m.matches(req.URL)
 }
 
-// MatchRequest retuns true if the response URL matches r.
+// MatchResponse retuns true if the response URL matches r.
 func (m *RegexMatcher) MatchResponse(res *http.Response) bool {
 	return m.matches(res.Request.URL)
 }

@@ -26,8 +26,8 @@ func init() {
 	parse.Register("url.RegexFilter", regexFilterFromJSON)
 }
 
-// URLRegexFilter runs modifiers iff the request URL matches the regex. This is not to be confused with
-// url.Filter that does string matching on URL segments.
+// URLRegexFilter runs Modifier if the request URL matches the regex, and runs ElseModifier if not.
+// This is not to be confused with url.Filter that does string matching on URL segments.
 type URLRegexFilter struct {
 	*filter.Filter
 }
