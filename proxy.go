@@ -50,6 +50,7 @@ func isCloseable(err error) bool {
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
 	roundTripper http.RoundTripper
+	dialer       net.Dialer
 	timeout      time.Duration
 	mitm         *mitm.Config
 	proxyURL     *url.URL
@@ -62,19 +63,21 @@ type Proxy struct {
 
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
 	return &Proxy{
 		roundTripper: &http.Transport{
 			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
 			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
-			TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
-			Proxy:        http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
+			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
+			Proxy:                 http.ProxyFromEnvironment,
+			Dial:                  dialer.Dial,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: time.Second,
 		},
+		dialer:  *dialer,
 		timeout: 5 * time.Minute,
 		conns:   &sync.WaitGroup{},
 		closing: make(chan bool),
@@ -111,6 +114,11 @@ func (p *Proxy) SetTimeout(timeout time.Duration) {
 // SetMITM sets the config to use for MITMing of CONNECT requests.
 func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
+}
+
+// SetDialer sets the dialer used to establish a connection.
+func (p *Proxy) SetDialer(dialer net.Dialer) {
+	p.dialer = dialer
 }
 
 // Close sets the proxy to the closing state so it stops receiving new connections,
@@ -489,7 +497,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	if p.proxyURL != nil {
 		log.Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
 
-		conn, err := net.Dial("tcp", p.proxyURL.Host)
+		conn, err := p.dialer.Dial("tcp", p.proxyURL.Host)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -509,7 +517,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
 
-	conn, err := net.Dial("tcp", req.URL.Host)
+	conn, err := p.dialer.Dial("tcp", req.URL.Host)
 	if err != nil {
 		return nil, nil, err
 	}
