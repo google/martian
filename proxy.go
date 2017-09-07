@@ -509,7 +509,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
 
-	conn, err := net.Dial("tcp", req.URL.Host)
+	conn, err := p.roundTripper.(*http.Transport).Dial("tcp", req.URL.Host)
 	if err != nil {
 		return nil, nil, err
 	}
