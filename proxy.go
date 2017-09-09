@@ -387,7 +387,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			log.Infof("martian: connection hijacked by response modifier")
 			return nil
 		}
-
+		res.ContentLength = -1
 		if err := res.Write(brw); err != nil {
 			log.Errorf("martian: got error while writing response back to client: %v", err)
 		}

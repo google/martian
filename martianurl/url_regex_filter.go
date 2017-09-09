@@ -16,11 +16,9 @@ package martianurl
 
 import (
 	"encoding/json"
-	"net/http"
-	"net/url"
 	"regexp"
 
-	"github.com/google/martian"
+	"github.com/google/martian/filter"
 	"github.com/google/martian/parse"
 )
 
@@ -28,58 +26,26 @@ func init() {
 	parse.Register("url.RegexFilter", regexFilterFromJSON)
 }
 
-// URLRegexFilter runs modifiers iff the request URL matches the regex. This is not to be confused with
-// url.Filter that does string matching on URL segments.
+// URLRegexFilter runs Modifier if the request URL matches the regex, and runs ElseModifier if not.
+// This is not to be confused with url.Filter that does string matching on URL segments.
 type URLRegexFilter struct {
-	reqmod  martian.RequestModifier
-	resmod  martian.ResponseModifier
-	matcher *regexp.Regexp
+	*filter.Filter
 }
 
 type regexFilterJSON struct {
-	Regex    string               `json:"regex"`
-	Modifier json.RawMessage      `json:"modifier"`
-	Scope    []parse.ModifierType `json:"scope"`
+	Regex        string               `json:"regex"`
+	Modifier     json.RawMessage      `json:"modifier"`
+	ElseModifier json.RawMessage      `json:"else"`
+	Scope        []parse.ModifierType `json:"scope"`
 }
 
 // NewRegexFilter constructs a filter that matches on regular expressions.
 func NewRegexFilter(r *regexp.Regexp) *URLRegexFilter {
-	return &URLRegexFilter{
-		matcher: r,
-	}
-}
-
-// SetRequestModifier sets the request modifier.
-func (f *URLRegexFilter) SetRequestModifier(reqmod martian.RequestModifier) {
-	f.reqmod = reqmod
-}
-
-// SetResponseModifier sets the response modifier.
-func (f *URLRegexFilter) SetResponseModifier(resmod martian.ResponseModifier) {
-	f.resmod = resmod
-}
-
-// ModifyRequest runs the modifier if the URL matches the provided matcher.
-func (f *URLRegexFilter) ModifyRequest(req *http.Request) error {
-	if f.reqmod != nil && f.matches(req.URL) {
-		return f.reqmod.ModifyRequest(req)
-	}
-
-	return nil
-}
-
-// ModifyResponse runs the modifier if the request URL matches the provided matcher.
-func (f *URLRegexFilter) ModifyResponse(res *http.Response) error {
-	if f.resmod != nil && f.matches(res.Request.URL) {
-		return f.resmod.ModifyResponse(res)
-	}
-
-	return nil
-}
-
-// matches applies the regex to the URL.
-func (f *URLRegexFilter) matches(u *url.URL) bool {
-	return f.matcher.MatchString(u.String())
+	filter := filter.New()
+	matcher := NewRegexMatcher(r)
+	filter.SetRequestCondition(matcher)
+	filter.SetResponseCondition(matcher)
+	return &URLRegexFilter{filter}
 }
 
 // regexFilterFromJSON takes a JSON message as a byte slice and returns a
@@ -104,19 +70,23 @@ func regexFilterFromJSON(b []byte) (*parse.Result, error) {
 
 	filter := NewRegexFilter(matcher)
 
-	r, err := parse.FromJSON(msg.Modifier)
+	m, err := parse.FromJSON(msg.Modifier)
 	if err != nil {
 		return nil, err
 	}
 
-	reqmod := r.RequestModifier()
-	if reqmod != nil {
-		filter.SetRequestModifier(reqmod)
-	}
+	filter.RequestWhenTrue(m.RequestModifier())
+	filter.ResponseWhenTrue(m.ResponseModifier())
 
-	resmod := r.ResponseModifier()
-	if resmod != nil {
-		filter.SetResponseModifier(resmod)
+	if len(msg.ElseModifier) > 0 {
+		em, err := parse.FromJSON(msg.ElseModifier)
+		if err != nil {
+			return nil, err
+		}
+		if em != nil {
+			filter.RequestWhenFalse(em.RequestModifier())
+			filter.ResponseWhenFalse(em.ResponseModifier())
+		}
 	}
 
 	return parse.NewResult(filter, msg.Scope)

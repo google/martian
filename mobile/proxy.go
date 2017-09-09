@@ -57,23 +57,20 @@ import (
 	_ "github.com/google/martian/status"
 )
 
-func init() {
-	Init()
-}
-
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
-	proxy       *martian.Proxy
-	listener    net.Listener
-	mux         *http.ServeMux
-	started     bool
-	HARLogging  bool
-	TrafficPort int
-	APIPort     int
-	APIOverTLS  bool
-	Cert        string
-	Key         string
-	AllowCORS   bool
+	proxy        *martian.Proxy
+	listener     net.Listener
+	mux          *http.ServeMux
+	started      bool
+	HARLogging   bool
+	TrafficPort  int
+	APIPort      int
+	APIOverTLS   bool
+	Cert         string
+	Key          string
+	AllowCORS    bool
+	RoundTripper *http.Transport
 }
 
 // EnableCybervillains configures Martian to use the Cybervillians certificate.
@@ -124,6 +121,9 @@ func (m *Martian) Start() {
 
 		m.proxy.SetMITM(mc)
 
+		if m.RoundTripper != nil {
+			m.proxy.SetRoundTripper(m.RoundTripper)
+		}
 		m.handle("/authority.cer", martianhttp.NewAuthorityHandler(x509c))
 	}
 
