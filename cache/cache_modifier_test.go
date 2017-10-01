@@ -15,34 +15,50 @@
 package cache
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/google/martian/parse"
 )
 
-func TestCookieModifier(t *testing.T) {
-	mod := NewModifier()
+func TestCacheModifier(t *testing.T) {
+	f, err := ioutil.TempFile("", "cache_test")
+	if err != nil {
+		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
+	}
+	defer os.RemoveAll(f.Name())
+	mod, err := NewModifier(f.Name(), "foo", true, true)
+	if err != nil {
+		t.Fatalf("NewModifier: got error %v, want no error", err)
+	}
 	if mod == nil {
-		t.Fatal("mod is nil")
+		t.Fatal("NewModifier: mod is nil")
 	}
 }
 
 func TestModifierFromJSON(t *testing.T) {
-	msg := []byte(`{
+	f, err := ioutil.TempFile("", "cache_test")
+	if err != nil {
+		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
+	}
+	defer os.RemoveAll(f.Name())
+	msg := []byte(fmt.Sprintf(`{
 		"cache.Modifier": {
 			"scope": ["request", "response"],
-			"file": "/dev/null",
-			"bucket": "martian"
+			"file": "%s",
+			"bucket": "foo",
+			"replay": true,
+			"update": true
 		}
-	}`)
+	}`, f.Name()))
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
-		t.Fatalf("parse.FromJSON(): got %v, want no error", err)
+		t.Fatalf("parse.FromJSON(): got error %v, want no error", err)
 	}
-
-	// debug
 	if r == nil {
-		t.Fatal("result is nil")
+		t.Fatal("parse.FromJSON(): result is nil")
 	}
 }
