@@ -16,56 +16,51 @@
 package cache
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/google/martian"
-	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
+
+const ctxKey = "cache.Response"
 
 func init() {
 	parse.Register("cache.Modifier", modifierFromJSON)
 }
 
 type modifier struct {
-	db     *bolt.DB
-	bucket string
-	replay bool
-	update bool
+	db       *bolt.DB
+	bucket   string
+	update   bool
+	replay   bool
+	hermetic bool
 }
 
 type modifierJSON struct {
-	File   string               `json:"file"`
-	Bucket string               `json:"bucket"`
-	Replay bool                 `json:"replay"`
-	Update bool                 `json:"update"`
-	Scope  []parse.ModifierType `json:"scope"`
-}
-
-// ModifyRequest
-func (m *modifier) ModifyRequest(req *http.Request) error {
-	log.Infof("Modifying request with bucket %s: %v", m.bucket, *req.URL)
-	return nil
-}
-
-// ModifyResponse
-func (m *modifier) ModifyResponse(res *http.Response) error {
-	log.Infof("Modifying response with bucket %s: %v", m.bucket, *res.Request.URL)
-	return nil
+	File     string               `json:"file"`
+	Bucket   string               `json:"bucket"`
+	Update   bool                 `json:"update"`
+	Replay   bool                 `json:"replay"`
+	Hermetic bool                 `json:"hermetic"`
+	Scope    []parse.ModifierType `json:"scope"`
 }
 
 // NewModifier returns a modifier that
-func NewModifier(filepath, bucket string, replay, update bool) (martian.RequestResponseModifier, error) {
-	log.Infof("Making new cache.Modifier to %s", filepath)
+func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martian.RequestResponseModifier, error) {
+	log.Printf("Making new cache.Modifier to %s", filepath)
 	opt := &bolt.Options{
 		Timeout:  10 * time.Second,
 		ReadOnly: !update,
 	}
-	log.Infof("cache.Modifier: opening boltdb file %q", filepath)
+	log.Printf("cache.Modifier: opening boltdb file %q", filepath)
 	db, err := bolt.Open(filepath, 0600, opt)
 	if err != nil {
 		return nil, fmt.Errorf("bolt.Open(%q): %v", filepath, err)
@@ -85,20 +80,21 @@ func NewModifier(filepath, bucket string, replay, update bool) (martian.RequestR
 	}
 
 	mod := &modifier{
-		db:     db,
-		bucket: bucket,
-		replay: replay,
-		update: update,
+		db:       db,
+		bucket:   bucket,
+		update:   update,
+		replay:   replay,
+		hermetic: hermetic,
 	}
 	// runtime.SetFinalizer(m, func(m *modifier) {
 	// 	filepath := filepath
-	// 	log.Infof("Closing db with file %s", filepath)
+	// 	log.Printf("Closing db with file %s", filepath)
 	// 	})
 	// runtime.SetFinalizer(m.db, func(db *something) {
-	// 	log.Infof("Releasing mutex")
+	// 	log.Printf("Releasing mutex")
 	// 	// db.mu.Unlock()
-	// 	// log.Infof("Closing db with file %s", *db)
-	// 	// fmt.Infof("Closing db with file %s", *db)
+	// 	// log.Printf("Closing db with file %s", *db)
+	// 	// fmt.Printf("Closing db with file %s", *db)
 	// })
 	return mod, nil
 }
@@ -110,17 +106,105 @@ func NewModifier(filepath, bucket string, replay, update bool) (martian.RequestR
 // {
 // }
 func modifierFromJSON(b []byte) (*parse.Result, error) {
-	log.Infof("Modifier fron JSON!")
+	log.Printf("Modifier fron JSON!")
 	msg := &modifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {
 		return nil, err
 	}
 
-	log.Infof("Making new modifier")
-	mod, err := NewModifier(msg.File, msg.Bucket, msg.Replay, msg.Update)
+	log.Printf("Making new modifier")
+	mod, err := NewModifier(msg.File, msg.Bucket, msg.Update, msg.Replay, msg.Hermetic)
 	if err != nil {
 		return nil, fmt.Errorf("cache.NewModifier: %v", err)
 	}
-	log.Infof("Made new modifier with bucket %s with file %s", msg.Bucket, msg.File)
+	log.Printf("Made new modifier with bucket %s with file %s", msg.Bucket, msg.File)
 	return parse.NewResult(mod, msg.Scope)
+}
+
+// ModifyRequest
+func (m *modifier) ModifyRequest(req *http.Request) error {
+	log.Printf("Modifying request with bucket %s: %v", m.bucket, *req.URL)
+	if !m.replay {
+		return nil
+	}
+	key, err := m.generateCacheKey(req)
+	if err != nil {
+		return fmt.Errorf("cache.Modifier: generateCacheKey: %v", err)
+	}
+	if err := m.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(m.bucket))
+		cached := b.Get(key)
+		if cached != nil {
+			log.Printf("Got cached response!")
+			res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(cached)), req)
+			if err != nil {
+				return fmt.Errorf("http.ReadResponse(): %v", err)
+			}
+			ctx := martian.NewContext(req)
+			ctx.SkipRoundTrip()
+			ctx.Set(ctxKey, res)
+		} else if m.hermetic {
+			return fmt.Errorf("in hermetic mode and no cached response found")
+		}
+		log.Printf("No cached response found, forwarding.")
+		return nil
+	}); err != nil {
+		return fmt.Errorf("cache.Modifier: %v", err)
+	}
+	return nil
+}
+
+// ModifyResponse
+func (m *modifier) ModifyResponse(res *http.Response) error {
+	log.Printf("Modifying response with bucket %s: %v", m.bucket, *res.Request.URL)
+	ctx := martian.NewContext(res.Request)
+	cached, ok := ctx.Get(ctxKey)
+	if ok {
+		log.Printf("Found cached response from context")
+		*res = *cached.(*http.Response)
+	} else if m.update {
+		log.Printf("Updating response cache.")
+		key, err := m.generateCacheKey(res.Request)
+		if err != nil {
+			return fmt.Errorf("cache.Modifier: generateCacheKey: %v", err)
+		}
+		var buf bytes.Buffer
+		// TODO: Wrap res.Body so res.Write doesn't close it.
+		if err := res.Write(&buf); err != nil {
+			return fmt.Errorf("cache.Modifier: res.Write(): %v", err)
+		}
+		if err := m.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(m.bucket))
+			if err := b.Put(key, buf.Bytes()); err != nil {
+				return fmt.Errorf("bucket.Put(): %v", err)
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("cache.Modifier: %v", err)
+		}
+	}
+	return nil
+}
+
+func (m *modifier) generateCacheKey(req *http.Request) ([]byte, error) {
+	hash := sha1.New()
+	// TODO: Implement white/blacklisting of headers and url params.
+	log.Printf("generateCacheKey")
+	log.Printf("req.Method=%s", req.Method)
+	log.Printf("req.URL=%v", req.URL)
+	// var hdrs bytes.Buffer
+	// req.Header.Write(&hdrs)
+	// log.Printf("req.Header=%v", hdrs.String())
+
+	var b bytes.Buffer
+	b.WriteString(req.Method)
+	b.WriteString(" ")
+	b.WriteString(req.URL.String())
+	// b.WriteString("\r\n")
+	// b.WriteString(hdrs.String())
+	log.Printf("buffer=%s", b.String())
+	if _, err := b.WriteTo(hash); err != nil {
+		return nil, err
+	}
+	return hash.Sum(nil), nil
 }
