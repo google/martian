@@ -30,7 +30,12 @@ import (
 	"github.com/google/martian/parse"
 )
 
-const ctxKey = "cache.Response"
+const (
+	// KeyContextName is the context name for the custom cache key to use for a request.
+	KeyContextName = "cache.Key"
+
+	cachedResponseCtxName = "cache.Response"
+)
 
 func init() {
 	parse.Register("cache.Modifier", modifierFromJSON)
@@ -56,6 +61,7 @@ type modifierJSON struct {
 // NewModifier returns a modifier that
 func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martian.RequestResponseModifier, error) {
 	log.Printf("Making new cache.Modifier to %s", filepath)
+
 	opt := &bolt.Options{
 		Timeout:  10 * time.Second,
 		ReadOnly: !update,
@@ -127,10 +133,23 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 	if !m.replay {
 		return nil
 	}
-	key, err := m.generateCacheKey(req)
-	if err != nil {
-		return fmt.Errorf("cache.Modifier: generateCacheKey: %v", err)
+
+	var key []byte
+
+	// Use cache key from context if available.
+	ctx := martian.NewContext(req)
+	if keyRaw, ok := ctx.Get(KeyContextName); ok && keyRaw != nil {
+		log.Printf("Using existing cache key from context.")
+		key = keyRaw.([]byte)
+	} else {
+		var err error
+		if key, err = getCacheKey(req); err != nil {
+			return fmt.Errorf("cache.Modifier: getCacheKey: %v", err)
+		}
 	}
+	// TODO: Maybe support option of using HTTP headers to specify cache key.
+	// Name of header can be specified in via JSON.
+
 	if err := m.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(m.bucket))
 		cached := b.Get(key)
@@ -142,7 +161,7 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 			}
 			ctx := martian.NewContext(req)
 			ctx.SkipRoundTrip()
-			ctx.Set(ctxKey, res)
+			ctx.Set(cachedResponseCtxName, res)
 			return nil
 		} else if m.hermetic {
 			return fmt.Errorf("in hermetic mode and no cached response found")
@@ -158,16 +177,18 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 // ModifyResponse
 func (m *modifier) ModifyResponse(res *http.Response) error {
 	log.Printf("Modifying response with bucket %s: %v", m.bucket, *res.Request.URL)
+	// DEBUG
+	log.Printf("Response Headers pre: %v", res.Header)
 	ctx := martian.NewContext(res.Request)
-	cached, ok := ctx.Get(ctxKey)
+	cached, ok := ctx.Get(cachedResponseCtxName)
 	if ok {
 		log.Printf("Found cached response from context")
 		*res = *cached.(*http.Response)
 	} else if m.update {
 		log.Printf("Updating response cache.")
-		key, err := m.generateCacheKey(res.Request)
+		key, err := getCacheKey(res.Request)
 		if err != nil {
-			return fmt.Errorf("cache.Modifier: generateCacheKey: %v", err)
+			return fmt.Errorf("cache.Modifier: getCacheKey: %v", err)
 		}
 		var buf bytes.Buffer
 		// TODO: Wrap res.Body so res.Write doesn't close it.
@@ -189,10 +210,27 @@ func (m *modifier) ModifyResponse(res *http.Response) error {
 		}
 		*res = *r
 	}
+	log.Printf("Response Headers post: %v", res.Header)
 	return nil
 }
 
-func (m *modifier) generateCacheKey(req *http.Request) ([]byte, error) {
+func getCacheKey(req *http.Request) ([]byte, error) {
+	// Use cache key from context if available.
+	ctx := martian.NewContext(req)
+	if keyRaw, ok := ctx.Get(KeyContextName); ok && keyRaw != nil {
+		log.Printf("Using existing cache key from context.")
+		return keyRaw.([]byte), nil
+	}
+	key, err := generateCacheKey(req)
+	if err != nil {
+		return nil, fmt.Errorf("generateCacheKey: %v", err)
+	}
+	return key, nil
+	// TODO: Maybe support option of using HTTP headers to specify cache key.
+	// Name of header can be specified in via JSON.
+}
+
+func generateCacheKey(req *http.Request) ([]byte, error) {
 	hash := sha1.New()
 	// TODO: Implement white/blacklisting of headers and url params.
 	log.Printf("generateCacheKey")
