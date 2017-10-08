@@ -143,6 +143,7 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 			ctx := martian.NewContext(req)
 			ctx.SkipRoundTrip()
 			ctx.Set(ctxKey, res)
+			return nil
 		} else if m.hermetic {
 			return fmt.Errorf("in hermetic mode and no cached response found")
 		}
@@ -182,6 +183,11 @@ func (m *modifier) ModifyResponse(res *http.Response) error {
 		}); err != nil {
 			return fmt.Errorf("cache.Modifier: %v", err)
 		}
+		r, err := http.ReadResponse(bufio.NewReader(&buf), res.Request)
+		if err != nil {
+			return fmt.Errorf("cache.Modifier: http.ReadResponse(): %v", err)
+		}
+		*res = *r
 	}
 	return nil
 }
