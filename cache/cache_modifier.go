@@ -85,28 +85,16 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 		}
 	}
 
-	mod := &modifier{
+	return &modifier{
 		db:       db,
 		bucket:   bucket,
 		update:   update,
 		replay:   replay,
 		hermetic: hermetic,
-	}
-	// runtime.SetFinalizer(m, func(m *modifier) {
-	// 	filepath := filepath
-	// 	log.Printf("Closing db with file %s", filepath)
-	// 	})
-	// runtime.SetFinalizer(m.db, func(db *something) {
-	// 	log.Printf("Releasing mutex")
-	// 	// db.mu.Unlock()
-	// 	// log.Printf("Closing db with file %s", *db)
-	// 	// fmt.Printf("Closing db with file %s", *db)
-	// })
-	return mod, nil
+	}, nil
 }
 
-// modifierFromJSON takes a JSON message as a byte slice and returns a
-// cache.Modifier and an error.
+// modifierFromJSON parses JSON into cache.Modifier.
 //
 // Example JSON Configuration message:
 // {
@@ -134,21 +122,10 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 		return nil
 	}
 
-	var key []byte
-
-	// Use cache key from context if available.
-	ctx := martian.NewContext(req)
-	if keyRaw, ok := ctx.Get(KeyContextName); ok && keyRaw != nil {
-		log.Printf("Using existing cache key from context.")
-		key = keyRaw.([]byte)
-	} else {
-		var err error
-		if key, err = getCacheKey(req); err != nil {
-			return fmt.Errorf("cache.Modifier: getCacheKey: %v", err)
-		}
+	key, err := getCacheKey(req)
+	if err != nil {
+		return fmt.Errorf("cache.Modifier: getCacheKey: %v", err)
 	}
-	// TODO: Maybe support option of using HTTP headers to specify cache key.
-	// Name of header can be specified in via JSON.
 
 	if err := m.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(m.bucket))
@@ -246,7 +223,7 @@ func generateCacheKey(req *http.Request) ([]byte, error) {
 	b.WriteString(req.URL.String())
 	// b.WriteString("\r\n")
 	// b.WriteString(hdrs.String())
-	log.Printf("buffer=%s", b.String())
+	log.Printf("buffer=%q", b.String())
 	if _, err := b.WriteTo(hash); err != nil {
 		return nil, err
 	}
