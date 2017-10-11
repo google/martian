@@ -220,6 +220,7 @@ import (
 	"github.com/google/martian/verify"
 
 	_ "github.com/google/martian/body"
+	_ "github.com/google/martian/cache"
 	_ "github.com/google/martian/cookie"
 	_ "github.com/google/martian/failure"
 	_ "github.com/google/martian/martianurl"
