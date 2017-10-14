@@ -141,9 +141,9 @@ func TestCacheAndReplay(t *testing.T) {
 	}
 	defer os.RemoveAll(f.Name())
 
-	mod, err := NewModifier(f.Name(), "bar_bucket", true, true, false)
+	mod, err := NewModifier(f.Name(), "water_bucket", true, true, false)
 	if err != nil {
-		t.Fatalf("NewModifier(%q, bar_bucket, true, true, false): got error %v, want no error", f.Name(), err)
+		t.Fatalf("NewModifier(%q, water_bucket, true, true, false): got error %v, want no error", f.Name(), err)
 	}
 
 	// First roundtrip should cache response.
@@ -240,4 +240,67 @@ func TestCacheAndReplay(t *testing.T) {
 	if info.Size() == 0 {
 		t.Error("db file size: got empty, want not empty")
 	}
+}
+
+func TestCustomCacheKey(t *testing.T) {
+	f, err := ioutil.TempFile("", fmt.Sprintf("%s_cache.db", t.Name()))
+	if err != nil {
+		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
+	}
+	defer os.RemoveAll(f.Name())
+
+	mod, err := NewModifier(f.Name(), "rice_bucket", true, true, false)
+	if err != nil {
+		t.Fatalf("NewModifier(%q, rice_bucket, true, true, false): got error %v, want no error", f.Name(), err)
+	}
+
+	// Custom keygen modifier that uses only the URL path as cache key.
+	keyGenMod := func(req *http.Request) {
+		ctx := martian.NewContext(req)
+		ctx.Set(CustomKey, []byte(req.URL.Path))
+	}
+
+	// First roundtrip should cache response using custom key.
+	req := httptest.NewRequest("GET", "/hello?abc=123", nil)
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
+	}
+	defer remove()
+
+	// Apply custom keygen.
+	keyGenMod(req)
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(http.StatusTeapot, bytes.NewReader([]byte("some tea")), req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+	assertResponse(t, res, http.StatusTeapot, "some tea")
+
+	// Second roundtrip should replay from cache using custom key.
+	req = httptest.NewRequest("POST", "/hello?xyz=789", nil)
+	_, remove, err = martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
+	}
+	defer remove()
+
+	// Apply custom keygen.
+	keyGenMod(req)
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
+	}
+
+	// Create initial dummy response.
+	res = proxyutil.NewResponse(http.StatusOK, nil, req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+	// Should get cached response.
+	assertResponse(t, res, http.StatusTeapot, "some tea")
 }

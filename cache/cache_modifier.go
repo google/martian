@@ -31,10 +31,11 @@ import (
 )
 
 const (
-	// KeyContextName is the context name for the custom cache key to use for a request.
-	KeyContextName = "cache.Key"
+	// CustomKey is the context key for setting a custom cache key for a request.
+	CustomKey = "cache.CustomKey"
 
-	cachedResponseCtxName = "cache.Response"
+	// cachedResponseCtxKey is the context key for storing the cached response for a request.
+	cachedResponseCtxKey = "cache.Response"
 )
 
 func init() {
@@ -58,7 +59,7 @@ type modifierJSON struct {
 	Scope    []parse.ModifierType `json:"scope"`
 }
 
-// NewModifier returns a modifier that
+// NewModifier returns a cache and replay modifier.
 func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martian.RequestResponseModifier, error) {
 	log.Printf("Making new cache.Modifier to %s", filepath)
 
@@ -138,7 +139,7 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 			}
 			ctx := martian.NewContext(req)
 			ctx.SkipRoundTrip()
-			ctx.Set(cachedResponseCtxName, res)
+			ctx.Set(cachedResponseCtxKey, res)
 			return nil
 		} else if m.hermetic {
 			return fmt.Errorf("in hermetic mode and no cached response found")
@@ -157,7 +158,7 @@ func (m *modifier) ModifyResponse(res *http.Response) error {
 	// DEBUG
 	log.Printf("Response Headers pre: %v", res.Header)
 	ctx := martian.NewContext(res.Request)
-	cached, ok := ctx.Get(cachedResponseCtxName)
+	cached, ok := ctx.Get(cachedResponseCtxKey)
 	if ok {
 		log.Printf("Found cached response from context")
 		*res = *cached.(*http.Response)
@@ -194,7 +195,7 @@ func (m *modifier) ModifyResponse(res *http.Response) error {
 func getCacheKey(req *http.Request) ([]byte, error) {
 	// Use cache key from context if available.
 	ctx := martian.NewContext(req)
-	if keyRaw, ok := ctx.Get(KeyContextName); ok && keyRaw != nil {
+	if keyRaw, ok := ctx.Get(CustomKey); ok && keyRaw != nil {
 		log.Printf("Using existing cache key from context.")
 		return keyRaw.([]byte), nil
 	}
