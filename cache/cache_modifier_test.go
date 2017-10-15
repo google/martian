@@ -16,6 +16,7 @@ package cache
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -29,6 +30,8 @@ import (
 	"github.com/google/martian/proxyutil"
 )
 
+const testBucket = "test_bucket"
+
 func newTempFile(t *testing.T) *os.File {
 	t.Helper()
 
@@ -37,6 +40,16 @@ func newTempFile(t *testing.T) *os.File {
 		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
 	}
 	return f
+}
+
+func newModifier(t *testing.T, filepath string, update, replay, hermetic bool) *modifier {
+	t.Helper()
+
+	mod, err := NewModifier(filepath, testBucket, update, replay, hermetic)
+	if err != nil {
+		t.Fatalf("NewModifier(%q, %q, %v, %v, %v): got error %v, want no error", filepath, testBucket, update, replay, hermetic, err)
+	}
+	return mod.(*modifier)
 }
 
 func newRequestWithContext(t *testing.T, method, url string) (*http.Request, *martian.Context, func()) {
@@ -86,16 +99,20 @@ func TestModifierFromJSON(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
+	fname, err := json.Marshal(f.Name())
+	if err != nil {
+		t.Fatalf("json.Marshal(%q): got error %v, want no error", f.Name(), err)
+	}
 	msg := []byte(fmt.Sprintf(`{
 		"cache.Modifier": {
 			"scope": ["request", "response"],
-			"file": "%s",
-			"bucket": "foo",
+			"file": %s,
+			"bucket": "foo_bucket",
 			"update": true,
 			"replay": true,
 			"hermetic": true
 		}
-	}`, f.Name()))
+	}`, fname))
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
@@ -121,10 +138,10 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Errorf("resmod.db: got nil, want not nil")
 	}
 
-	if got, want := reqmod.bucket, "foo"; got != want {
+	if got, want := reqmod.bucket, "foo_bucket"; got != want {
 		t.Errorf("reqmod.bucket: got %s, want %s", got, want)
 	}
-	if got, want := resmod.bucket, "foo"; got != want {
+	if got, want := resmod.bucket, "foo_bucket"; got != want {
 		t.Errorf("resmod.bucket: got %s, want %s", got, want)
 	}
 
@@ -150,6 +167,48 @@ func TestModifierFromJSON(t *testing.T) {
 	}
 }
 
+func TestEmptyBucketWithNoUpdateAndNoReplayIsOK(t *testing.T) {
+	f := newTempFile(t)
+	defer os.RemoveAll(f.Name())
+
+	mod, err := NewModifier(f.Name(), "", false, false, false)
+	if err != nil {
+		t.Fatalf("NewModifier(): got error %v, want no error", err)
+	}
+
+	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(http.StatusTeapot, bytes.NewReader([]byte("some tea")), req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+}
+
+func TestEmptyBucketWithUpdateIsNotOK(t *testing.T) {
+	_, err := NewModifier("/dev/null", "", true, false, false)
+	if err == nil {
+		t.Fatal("NewModifier(): got no error, want error")
+	}
+	if msg := "bucket name cannot be empty"; !strings.Contains(err.Error(), msg) {
+		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
+	}
+}
+
+func TestEmptyBucketWithReplayIsNotOK(t *testing.T) {
+	_, err := NewModifier("/dev/null", "", false, true, false)
+	if err == nil {
+		t.Fatal("NewModifier(): got no error, want error")
+	}
+	if msg := "bucket name cannot be empty"; !strings.Contains(err.Error(), msg) {
+		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
+	}
+}
+
 func TestNoUpdateAndNoReplay(t *testing.T) {}
 
 func TestUpdateAndNoReplay(t *testing.T) {}
@@ -157,25 +216,38 @@ func TestUpdateAndNoReplay(t *testing.T) {}
 func TestNoUpdateAndReplay(t *testing.T) {}
 
 func TestNoReplayAndHermeticGetsError(t *testing.T) {
-	_, err := NewModifier("/dev/null", "wheat_bucket", true, false, true)
+	_, err := NewModifier("/dev/null", "rice_bucket", true, false, true)
 	if err == nil {
 		t.Fatal("NewModifier(): got no error, want error")
 	}
-	if !strings.Contains(err.Error(), "hermetic") || !strings.Contains(err.Error(), "not replay") {
-		t.Errorf("NewModifier(): got error %q, want error to contain \"hermetic\" and \"not replay\"", err)
+	if msg := "cannot use hermetic mode if not replaying"; !strings.Contains(err.Error(), msg) {
+		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
 	}
 }
 
-func TestHermeticCacheMiss(t *testing.T) {}
+func TestHermeticCacheMiss(t *testing.T) {
+	f := newTempFile(t)
+	defer os.RemoveAll(f.Name())
+
+	mod := newModifier(t, f.Name(), false, true, true)
+
+	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	err := mod.ModifyRequest(req)
+	if err == nil {
+		t.Fatal("mod.ModifyRequest(): got no error, want error")
+	}
+	if msg := "hermetic"; !strings.Contains(err.Error(), msg) {
+		t.Errorf("mod.ModifyRequest(): got error %q, want error to contain %q", err, msg)
+	}
+}
 
 func TestCacheAndReplay(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod, err := NewModifier(f.Name(), "water_bucket", true, true, false)
-	if err != nil {
-		t.Fatalf("NewModifier(%q, water_bucket, true, true, false): got error %v, want no error", f.Name(), err)
-	}
+	mod := newModifier(t, f.Name(), true, true, false)
 
 	// First roundtrip should cache response.
 	req, ctx, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
@@ -261,10 +333,7 @@ func TestCustomCacheKey(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod, err := NewModifier(f.Name(), "rice_bucket", true, true, false)
-	if err != nil {
-		t.Fatalf("NewModifier(%q, rice_bucket, true, true, false): got error %v, want no error", f.Name(), err)
-	}
+	mod := newModifier(t, f.Name(), true, true, false)
 
 	// Custom keygen modifier that uses only the URL path as cache key.
 	keyGenMod := func(req *http.Request) {
@@ -272,11 +341,8 @@ func TestCustomCacheKey(t *testing.T) {
 		ctx.Set(CustomKey, []byte(req.URL.Path))
 	}
 
-	var req *http.Request
-	var remove func()
-
 	// First roundtrip should cache response using custom key.
-	req, _, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
+	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
 	// Apply custom keygen.

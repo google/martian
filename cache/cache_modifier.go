@@ -61,7 +61,7 @@ type modifierJSON struct {
 
 // NewModifier returns a cache and replay modifier.
 // `filepath` is the filepath to the boltdb file containing cached responses.
-// `bucket` is the bucket name of the boltdb to use.
+// `bucket` is the bucket name of the boltdb to use. It will be created in the db if it doesn't already exist.
 // If `update` is true, the database will be updated with any live responses, e.g. on cache miss or when not replaying.
 // If `replay` is true, the modifier will replay responses from its cache.
 // If `hermetic` is true, the modifier will return error if it cannot replay a cached response, e.g. on cache miss or not replaying.
@@ -70,10 +70,12 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 	if !replay && hermetic {
 		return nil, fmt.Errorf("cache.Modifier: cannot use hermetic mode if not replaying")
 	}
+	if bucket == "" && (update || replay) {
+		return nil, fmt.Errorf("cache.Modifier: bucket name cannot be empty if updating or replaying")
+	}
 
 	opt := &bolt.Options{
-		Timeout:  10 * time.Second,
-		ReadOnly: !update,
+		Timeout: 10 * time.Second,
 	}
 	log.Printf("cache.Modifier: opening boltdb file %q", filepath)
 	db, err := bolt.Open(filepath, 0600, opt)
@@ -82,7 +84,7 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 	}
 	// TODO: Figure out how to close the db after use.
 
-	if bucket != "" && update {
+	if bucket != "" {
 		if err := db.Update(func(tx *bolt.Tx) error {
 			_, err := tx.CreateBucketIfNotExists([]byte(bucket))
 			if err != nil {
