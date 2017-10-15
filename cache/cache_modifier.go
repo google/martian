@@ -60,8 +60,16 @@ type modifierJSON struct {
 }
 
 // NewModifier returns a cache and replay modifier.
+// `filepath` is the filepath to the boltdb file containing cached responses.
+// `bucket` is the bucket name of the boltdb to use.
+// If `update` is true, the database will be updated with any live responses, e.g. on cache miss or when not replaying.
+// If `replay` is true, the modifier will replay responses from its cache.
+// If `hermetic` is true, the modifier will return error if it cannot replay a cached response, e.g. on cache miss or not replaying.
+// Argument combinations that don't make sense will return error, e.g. replay=false and hermetic=true.
 func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martian.RequestResponseModifier, error) {
-	log.Printf("Making new cache.Modifier to %s", filepath)
+	if !replay && hermetic {
+		return nil, fmt.Errorf("cache.Modifier: cannot use hermetic mode if not replaying")
+	}
 
 	opt := &bolt.Options{
 		Timeout:  10 * time.Second,
@@ -70,7 +78,7 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 	log.Printf("cache.Modifier: opening boltdb file %q", filepath)
 	db, err := bolt.Open(filepath, 0600, opt)
 	if err != nil {
-		return nil, fmt.Errorf("bolt.Open(%q): %v", filepath, err)
+		return nil, fmt.Errorf("cache.Modifier: bolt.Open(%q): %v", filepath, err)
 	}
 	// TODO: Figure out how to close the db after use.
 
@@ -82,7 +90,7 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 			}
 			return nil
 		}); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cache.Modifier: db.Update(): %v", err)
 		}
 	}
 
@@ -99,40 +107,40 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 //
 // Example JSON Configuration message:
 // {
+//   "file":     "/some/cache.db",
+//   "bucket":   "some_project",
+//   "update":   true,
+//   "replay":   true,
+//   "hermetic": false
 // }
 func modifierFromJSON(b []byte) (*parse.Result, error) {
-	log.Printf("Modifier fron JSON!")
 	msg := &modifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cache.Modifier: json.Unmarshal(): %v", err)
 	}
 
-	log.Printf("Making new modifier")
 	mod, err := NewModifier(msg.File, msg.Bucket, msg.Update, msg.Replay, msg.Hermetic)
 	if err != nil {
-		return nil, fmt.Errorf("cache.NewModifier: %v", err)
+		return nil, err
 	}
-	log.Printf("Made new modifier with bucket %s with file %s", msg.Bucket, msg.File)
 	return parse.NewResult(mod, msg.Scope)
 }
 
-// ModifyRequest
+// ModifyRequest modifies the http.Request.
 func (m *modifier) ModifyRequest(req *http.Request) error {
-	log.Printf("Modifying request with bucket %s: %v", m.bucket, *req.URL)
 	if !m.replay {
 		return nil
 	}
 
 	key, err := getCacheKey(req)
 	if err != nil {
-		return fmt.Errorf("cache.Modifier: getCacheKey: %v", err)
+		return fmt.Errorf("cache.Modifier: getCacheKey(): %v", err)
 	}
 
 	if err := m.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(m.bucket))
 		cached := b.Get(key)
 		if cached != nil {
-			log.Printf("Got cached response!")
 			res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(cached)), req)
 			if err != nil {
 				return fmt.Errorf("http.ReadResponse(): %v", err)
@@ -144,7 +152,6 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 		} else if m.hermetic {
 			return fmt.Errorf("in hermetic mode and no cached response found")
 		}
-		log.Printf("No cached response found, forwarding.")
 		return nil
 	}); err != nil {
 		return fmt.Errorf("cache.Modifier: %v", err)
@@ -152,21 +159,16 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 	return nil
 }
 
-// ModifyResponse
+// ModifyResponse modifies the http.Response.
 func (m *modifier) ModifyResponse(res *http.Response) error {
-	log.Printf("Modifying response with bucket %s: %v", m.bucket, *res.Request.URL)
-	// DEBUG
-	log.Printf("Response Headers pre: %v", res.Header)
 	ctx := martian.NewContext(res.Request)
 	cached, ok := ctx.Get(cachedResponseCtxKey)
 	if ok {
-		log.Printf("Found cached response from context")
 		*res = *cached.(*http.Response)
 	} else if m.update {
-		log.Printf("Updating response cache.")
 		key, err := getCacheKey(res.Request)
 		if err != nil {
-			return fmt.Errorf("cache.Modifier: getCacheKey: %v", err)
+			return fmt.Errorf("cache.Modifier: getCacheKey(): %v", err)
 		}
 		var buf bytes.Buffer
 		// TODO: Wrap res.Body so res.Write doesn't close it.
@@ -188,43 +190,31 @@ func (m *modifier) ModifyResponse(res *http.Response) error {
 		}
 		*res = *r
 	}
-	log.Printf("Response Headers post: %v", res.Header)
 	return nil
 }
 
+// getCacheKey gets a cache key from the request context or generates a new one.
 func getCacheKey(req *http.Request) ([]byte, error) {
-	// Use cache key from context if available.
+	// Use custom cache key from context if available.
 	ctx := martian.NewContext(req)
 	if keyRaw, ok := ctx.Get(CustomKey); ok && keyRaw != nil {
-		log.Printf("Using existing cache key from context.")
 		return keyRaw.([]byte), nil
 	}
 	key, err := generateCacheKey(req)
 	if err != nil {
-		return nil, fmt.Errorf("generateCacheKey: %v", err)
+		return nil, fmt.Errorf("generateCacheKey(): %v", err)
 	}
 	return key, nil
-	// TODO: Maybe support option of using HTTP headers to specify cache key.
-	// Name of header can be specified in via JSON.
 }
 
+// generateCacheKey is a super basic keygen that just hashes the request method and URL.
 func generateCacheKey(req *http.Request) ([]byte, error) {
-	hash := sha1.New()
-	// TODO: Implement white/blacklisting of headers and url params.
-	log.Printf("generateCacheKey")
-	log.Printf("req.Method=%s", req.Method)
-	log.Printf("req.URL=%v", req.URL)
-	// var hdrs bytes.Buffer
-	// req.Header.Write(&hdrs)
-	// log.Printf("req.Header=%v", hdrs.String())
-
 	var b bytes.Buffer
 	b.WriteString(req.Method)
 	b.WriteString(" ")
 	b.WriteString(req.URL.String())
-	// b.WriteString("\r\n")
-	// b.WriteString(hdrs.String())
-	log.Printf("buffer=%q", b.String())
+
+	hash := sha1.New()
 	if _, err := b.WriteTo(hash); err != nil {
 		return nil, err
 	}
