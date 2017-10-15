@@ -21,12 +21,34 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
+
+func newTempFile(t *testing.T) *os.File {
+	t.Helper()
+
+	f, err := ioutil.TempFile("", fmt.Sprintf("%s_cache.db", t.Name()))
+	if err != nil {
+		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
+	}
+	return f
+}
+
+func newRequestWithContext(t *testing.T, method, url string) (*http.Request, *martian.Context, func()) {
+	t.Helper()
+
+	req := httptest.NewRequest(method, url, nil)
+	ctx, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
+	}
+	return req, ctx, remove
+}
 
 func assertResponse(t *testing.T, res *http.Response, code int, body string) {
 	t.Helper()
@@ -48,10 +70,7 @@ func assertResponse(t *testing.T, res *http.Response, code int, body string) {
 }
 
 func TestCreateCacheModifier(t *testing.T) {
-	f, err := ioutil.TempFile("", "cache_test")
-	if err != nil {
-		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
-	}
+	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
 	mod, err := NewModifier(f.Name(), "foo", true, true, false)
@@ -64,10 +83,7 @@ func TestCreateCacheModifier(t *testing.T) {
 }
 
 func TestModifierFromJSON(t *testing.T) {
-	f, err := ioutil.TempFile("", fmt.Sprintf("%s_cache.db", t.Name()))
-	if err != nil {
-		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
-	}
+	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
 	msg := []byte(fmt.Sprintf(`{
@@ -134,11 +150,26 @@ func TestModifierFromJSON(t *testing.T) {
 	}
 }
 
-func TestCacheAndReplay(t *testing.T) {
-	f, err := ioutil.TempFile("", fmt.Sprintf("%s_cache.db", t.Name()))
-	if err != nil {
-		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
+func TestNoUpdateAndNoReplay(t *testing.T) {}
+
+func TestUpdateAndNoReplay(t *testing.T) {}
+
+func TestNoUpdateAndReplay(t *testing.T) {}
+
+func TestNoReplayAndHermeticGetsError(t *testing.T) {
+	_, err := NewModifier("/dev/null", "wheat_bucket", true, false, true)
+	if err == nil {
+		t.Fatal("NewModifier(): got no error, want error")
 	}
+	if !strings.Contains(err.Error(), "hermetic") || !strings.Contains(err.Error(), "not replay") {
+		t.Errorf("NewModifier(): got error %q, want error to contain \"hermetic\" and \"not replay\"", err)
+	}
+}
+
+func TestHermeticCacheMiss(t *testing.T) {}
+
+func TestCacheAndReplay(t *testing.T) {
+	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
 	mod, err := NewModifier(f.Name(), "water_bucket", true, true, false)
@@ -147,11 +178,7 @@ func TestCacheAndReplay(t *testing.T) {
 	}
 
 	// First roundtrip should cache response.
-	req := httptest.NewRequest("GET", "/hello?abc=123", nil)
-	ctx, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
-	}
+	req, ctx, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
 	if err := mod.ModifyRequest(req); err != nil {
@@ -168,11 +195,7 @@ func TestCacheAndReplay(t *testing.T) {
 	assertResponse(t, res, http.StatusTeapot, "some tea")
 
 	// Second roundtrip should replay from cache.
-	req = httptest.NewRequest("GET", "/hello?abc=123", nil)
-	ctx, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
-	}
+	req, ctx, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
 	if err := mod.ModifyRequest(req); err != nil {
@@ -190,11 +213,7 @@ func TestCacheAndReplay(t *testing.T) {
 	assertResponse(t, res, http.StatusTeapot, "some tea")
 
 	// Third roundtrip should also replay from cache.
-	req = httptest.NewRequest("GET", "/hello?abc=123", nil)
-	ctx, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
-	}
+	req, ctx, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
 	if err := mod.ModifyRequest(req); err != nil {
@@ -212,11 +231,7 @@ func TestCacheAndReplay(t *testing.T) {
 	assertResponse(t, res, http.StatusTeapot, "some tea")
 
 	// Fourth roundtrip should not replay from cache.
-	req = httptest.NewRequest("GET", "/hello?xyz=789", nil)
-	ctx, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
-	}
+	req, ctx, remove = newRequestWithContext(t, "GET", "/hello?xyz=789")
 	defer remove()
 
 	if err := mod.ModifyRequest(req); err != nil {
@@ -243,10 +258,7 @@ func TestCacheAndReplay(t *testing.T) {
 }
 
 func TestCustomCacheKey(t *testing.T) {
-	f, err := ioutil.TempFile("", fmt.Sprintf("%s_cache.db", t.Name()))
-	if err != nil {
-		t.Fatalf("ioutil.TempFile(): got error %v, want no error", err)
-	}
+	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
 	mod, err := NewModifier(f.Name(), "rice_bucket", true, true, false)
@@ -260,12 +272,11 @@ func TestCustomCacheKey(t *testing.T) {
 		ctx.Set(CustomKey, []byte(req.URL.Path))
 	}
 
+	var req *http.Request
+	var remove func()
+
 	// First roundtrip should cache response using custom key.
-	req := httptest.NewRequest("GET", "/hello?abc=123", nil)
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
-	}
+	req, _, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
 	// Apply custom keygen.
@@ -282,11 +293,7 @@ func TestCustomCacheKey(t *testing.T) {
 	assertResponse(t, res, http.StatusTeapot, "some tea")
 
 	// Second roundtrip should replay from cache using custom key.
-	req = httptest.NewRequest("POST", "/hello?xyz=789", nil)
-	_, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got error %v, want no error", err)
-	}
+	req, _, remove = newRequestWithContext(t, "POST", "/hello?xyz=789")
 	defer remove()
 
 	// Apply custom keygen.
