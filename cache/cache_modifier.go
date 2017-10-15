@@ -21,12 +21,12 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
 
@@ -77,7 +77,7 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 	opt := &bolt.Options{
 		Timeout: 10 * time.Second,
 	}
-	log.Printf("cache.Modifier: opening boltdb file %q", filepath)
+	log.Debugf("cache.Modifier: opening boltdb file %q", filepath)
 	db, err := bolt.Open(filepath, 0600, opt)
 	if err != nil {
 		return nil, fmt.Errorf("cache.Modifier: bolt.Open(%q): %v", filepath, err)
@@ -126,6 +126,14 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 	return parse.NewResult(mod, msg.Scope)
+}
+
+// Close closes the underlying database.
+func (m *modifier) Close() error {
+	if m.db != nil {
+		return m.db.Close()
+	}
+	return nil
 }
 
 // ModifyRequest modifies the http.Request.

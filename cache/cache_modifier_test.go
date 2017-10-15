@@ -16,6 +16,7 @@ package cache
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -79,7 +80,22 @@ func assertResponse(t *testing.T, res *http.Response, code int, body string) {
 	if err := res.Body.Close(); err != nil {
 		t.Errorf("res.Body.Close(): got error %v, want no error", err)
 	}
+}
 
+func getFileHash(t *testing.T, filepath string) []byte {
+	t.Helper()
+
+	if info, err := os.Stat(filepath); err != nil {
+		t.Fatalf("os.Stat(%q): got error %v, want no error", filepath, err)
+	} else if info.Size() == 0 {
+		t.Fatal("db file size: got empty, want not empty")
+	}
+
+	b, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		t.Fatalf("ioutil.ReadFile(%q): got error %v, want no error", filepath, err)
+	}
+	return sha1.New().Sum(b)
 }
 
 func TestCreateCacheModifier(t *testing.T) {
@@ -209,45 +225,57 @@ func TestEmptyBucketWithReplayIsNotOK(t *testing.T) {
 	}
 }
 
-func TestNoUpdateAndNoReplay(t *testing.T) {}
-
-func TestUpdateAndNoReplay(t *testing.T) {}
-
-func TestNoUpdateAndReplay(t *testing.T) {}
-
-func TestNoReplayAndHermeticGetsError(t *testing.T) {
-	_, err := NewModifier("/dev/null", "rice_bucket", true, false, true)
-	if err == nil {
-		t.Fatal("NewModifier(): got no error, want error")
-	}
-	if msg := "cannot use hermetic mode if not replaying"; !strings.Contains(err.Error(), msg) {
-		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
-	}
-}
-
-func TestHermeticCacheMiss(t *testing.T) {
+func TestNoUpdateWithNoReplay(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod := newModifier(t, f.Name(), false, true, true)
+	mod := newModifier(t, f.Name(), false, false, false)
 
+	oldHash := getFileHash(t, f.Name())
+
+	// First roundtrip should pass through.
 	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
-	err := mod.ModifyRequest(req)
-	if err == nil {
-		t.Fatal("mod.ModifyRequest(): got no error, want error")
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
 	}
-	if msg := "hermetic"; !strings.Contains(err.Error(), msg) {
-		t.Errorf("mod.ModifyRequest(): got error %q, want error to contain %q", err, msg)
+
+	res := proxyutil.NewResponse(http.StatusTeapot, bytes.NewReader([]byte("some tea")), req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+	assertResponse(t, res, http.StatusTeapot, "some tea")
+
+	// Second roundtrip should also pass through.
+	req, _, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
+	}
+
+	res = proxyutil.NewResponse(http.StatusNotFound, bytes.NewReader([]byte("hide and seek")), req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+	assertResponse(t, res, http.StatusNotFound, "hide and seek")
+
+	newHash := getFileHash(t, f.Name())
+
+	// Check db file was not updated.
+	if !bytes.Equal(oldHash, newHash) {
+		t.Error("bytes.Equal(oldHash, newHash): got not equal, want db file hashes to be equal")
 	}
 }
 
-func TestCacheAndReplay(t *testing.T) {
+func TestUpdateWithReplay(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
 	mod := newModifier(t, f.Name(), true, true, false)
+
+	oldHash := getFileHash(t, f.Name())
 
 	// First roundtrip should cache response.
 	req, ctx, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
@@ -277,7 +305,7 @@ func TestCacheAndReplay(t *testing.T) {
 		t.Error("mod.ModifyRequest(): got not skipping round trip, want to skip round trip")
 	}
 
-	// Create initial dummy response.
+	// Initial dummy response.
 	res = proxyutil.NewResponse(http.StatusOK, nil, req)
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
@@ -295,7 +323,7 @@ func TestCacheAndReplay(t *testing.T) {
 		t.Error("mod.ModifyRequest(): got not skipping round trip, want to skip round trip")
 	}
 
-	// Create initial dummy response.
+	// Initial dummy response.
 	res = proxyutil.NewResponse(http.StatusOK, nil, req)
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
@@ -319,13 +347,102 @@ func TestCacheAndReplay(t *testing.T) {
 	}
 	assertResponse(t, res, http.StatusAccepted, "some coffee")
 
-	// Check db file was written.
-	info, err := os.Stat(f.Name())
-	if err != nil {
-		t.Fatalf("os.Stat(%q): got error %v, want no error", f.Name(), err)
+	newHash := getFileHash(t, f.Name())
+
+	// Check db file was updated.
+	if bytes.Equal(oldHash, newHash) {
+		t.Error("bytes.Equal(oldHash, newHash): got equal, want db file hashes to be not equal")
 	}
-	if info.Size() == 0 {
-		t.Error("db file size: got empty, want not empty")
+}
+
+func TestUpdateThenReplay(t *testing.T) {
+	f := newTempFile(t)
+	defer os.RemoveAll(f.Name())
+
+	mod := newModifier(t, f.Name(), true, false, false)
+
+	oldHash := getFileHash(t, f.Name())
+
+	// First roundtrip should pass through.
+	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(http.StatusTeapot, bytes.NewReader([]byte("some tea")), req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+	assertResponse(t, res, http.StatusTeapot, "some tea")
+
+	// Second roundtrip should also pass through.
+	req, _, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
+	}
+
+	res = proxyutil.NewResponse(http.StatusNotFound, bytes.NewReader([]byte("hide and seek")), req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+	assertResponse(t, res, http.StatusNotFound, "hide and seek")
+
+	newHash := getFileHash(t, f.Name())
+
+	// Check db file was updated.
+	if bytes.Equal(oldHash, newHash) {
+		t.Error("bytes.Equal(oldHash, newHash): got equal, want db file hashes to be not equal")
+	}
+
+	// Reuse the db with new hermetic replaying modifier to check the new entry is used.
+	mod.Close()
+	mod = newModifier(t, f.Name(), false, true, true)
+
+	// Third roundtrip should replay using second response.
+	req, _, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	if err := mod.ModifyRequest(req); err != nil {
+		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
+	}
+
+	// Initial dummy response.
+	res = proxyutil.NewResponse(http.StatusOK, nil, req)
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
+	}
+	assertResponse(t, res, http.StatusNotFound, "hide and seek")
+}
+
+func TestHermeticWithNoReplayIsNotOK(t *testing.T) {
+	_, err := NewModifier("/dev/null", "rice_bucket", true, false, true)
+	if err == nil {
+		t.Fatal("NewModifier(): got no error, want error")
+	}
+	if msg := "cannot use hermetic mode if not replaying"; !strings.Contains(err.Error(), msg) {
+		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
+	}
+}
+
+func TestHermeticCacheMiss(t *testing.T) {
+	f := newTempFile(t)
+	defer os.RemoveAll(f.Name())
+
+	mod := newModifier(t, f.Name(), false, true, true)
+
+	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	err := mod.ModifyRequest(req)
+	if err == nil {
+		t.Fatal("mod.ModifyRequest(): got no error, want error")
+	}
+	if msg := "hermetic"; !strings.Contains(err.Error(), msg) {
+		t.Errorf("mod.ModifyRequest(): got error %q, want error to contain %q", err, msg)
 	}
 }
 
@@ -369,7 +486,7 @@ func TestCustomCacheKey(t *testing.T) {
 		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
 	}
 
-	// Create initial dummy response.
+	// Initial dummy response.
 	res = proxyutil.NewResponse(http.StatusOK, nil, req)
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
