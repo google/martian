@@ -18,12 +18,20 @@
 package static
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/google/martian"
 	"github.com/google/martian/parse"
@@ -100,15 +108,113 @@ func (s *Modifier) ModifyResponse(res *http.Response) error {
 	}
 
 	res.Body.Close()
-	res.Body = f
 
 	info, err := f.Stat()
 	if err != nil {
 		res.StatusCode = http.StatusInternalServerError
 		return err
 	}
-	res.ContentLength = info.Size()
-	res.Header.Set("Content-Type", mime.TypeByExtension(filepath.Ext(fpth)))
+
+	contentType := mime.TypeByExtension(filepath.Ext(fpth))
+	res.Header.Set("Content-Type", contentType)
+
+	// If no range request header is present, return the body as the response body.
+	if res.Request.Header.Get("Range") == "" {
+		res.ContentLength = info.Size()
+		res.Body = f
+
+		return nil
+	}
+
+	rh := res.Request.Header.Get("Range")
+	rh = strings.ToLower(rh)
+	sranges := strings.Split(strings.TrimLeft(rh, "bytes="), ",")
+	var ranges [][]int
+	for _, rng := range sranges {
+		if strings.HasSuffix(rng, "-") {
+			rng = fmt.Sprintf("%s%d", rng, info.Size())
+		}
+
+		rs := strings.Split(rng, "-")
+		if len(rs) != 2 {
+			res.StatusCode = http.StatusRequestedRangeNotSatisfiable
+			return nil
+		}
+		start, err := strconv.Atoi(strings.TrimSpace(rs[0]))
+		if err != nil {
+			return err
+		}
+
+		end, err := strconv.Atoi(strings.TrimSpace(rs[1]))
+		if err != nil {
+			return err
+		}
+
+		if start > end {
+			res.StatusCode = http.StatusRequestedRangeNotSatisfiable
+			return nil
+		}
+
+		ranges = append(ranges, []int{start, end})
+	}
+
+	// Range request.
+	res.StatusCode = http.StatusPartialContent
+
+	// Single range request.
+	if len(ranges) == 1 {
+		start := ranges[0][0]
+		end := ranges[0][1]
+		length := end - start + 1
+		seg := make([]byte, length)
+
+		switch n, err := f.ReadAt(seg, int64(start)); err {
+		case nil, io.EOF:
+			res.ContentLength = int64(n)
+		default:
+			return err
+		}
+
+		res.Body = ioutil.NopCloser(bytes.NewReader(seg))
+		res.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, info.Size()))
+
+		return nil
+	}
+
+	// Multipart range request.
+	var mpbody bytes.Buffer
+	mpw := multipart.NewWriter(&mpbody)
+
+	for _, rng := range ranges {
+		start, end := rng[0], rng[1]
+		mimeh := make(textproto.MIMEHeader)
+		mimeh.Set("Content-Type", contentType)
+		mimeh.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, info.Size()))
+
+		length := end - start + 1
+		seg := make([]byte, length)
+
+		switch n, err := f.ReadAt(seg, int64(start)); err {
+		case nil, io.EOF:
+			res.ContentLength = int64(n)
+		default:
+			return err
+		}
+
+		pw, err := mpw.CreatePart(mimeh)
+		if err != nil {
+			return err
+		}
+
+		if _, err := pw.Write(seg); err != nil {
+			return err
+		}
+	}
+	mpw.Close()
+
+	res.ContentLength = int64(len(mpbody.Bytes()))
+	res.Body = ioutil.NopCloser(bytes.NewReader(mpbody.Bytes()))
+	res.Header.Set("Content-Type", fmt.Sprintf("multipart/byteranges; boundary=%s", mpw.Boundary()))
 
 	return nil
 }

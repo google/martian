@@ -126,6 +126,32 @@ func TestRangeHeaderRequestSingleRange(t *testing.T) {
 	}
 }
 
+func TestRangeNoEndingIndexSpecified(t *testing.T) {
+	mod := NewModifier([]byte("0123456789"), "text/plai")
+
+	req, err := http.NewRequest("GET", "/", strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Range", "bytes=8-")
+
+	res := proxyutil.NewResponse(200, nil, req)
+
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.StatusCode, http.StatusPartialContent; got != want {
+		t.Errorf("res.Status: got %v, want %v", got, want)
+	}
+	if got, want := res.ContentLength, int64(len([]byte("789"))); got != want {
+		t.Errorf("res.ContentLength: got %d, want %d", got, want)
+	}
+	if got, want := res.Header.Get("Content-Range"), "bytes 8-10/10"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Content-Encoding", got, want)
+	}
+}
+
 func TestRangeHeaderMultipartRange(t *testing.T) {
 	mod := NewModifier([]byte("0123456789"), "text/plain")
 	bndry := "3d6b6a416f9b5"
