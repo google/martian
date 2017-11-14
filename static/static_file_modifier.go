@@ -118,7 +118,7 @@ func (s *Modifier) ModifyResponse(res *http.Response) error {
 	contentType := mime.TypeByExtension(filepath.Ext(fpth))
 	res.Header.Set("Content-Type", contentType)
 
-	// If no range request header is present, return the body as the response body.
+	// If no range request header is present, return the file as the response body.
 	if res.Request.Header.Get("Range") == "" {
 		res.ContentLength = info.Size()
 		res.Body = f

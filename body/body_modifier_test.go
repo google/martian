@@ -127,7 +127,7 @@ func TestRangeHeaderRequestSingleRange(t *testing.T) {
 }
 
 func TestRangeNoEndingIndexSpecified(t *testing.T) {
-	mod := NewModifier([]byte("0123456789"), "text/plai")
+	mod := NewModifier([]byte("0123456789"), "text/plain")
 
 	req, err := http.NewRequest("GET", "/", strings.NewReader(""))
 	if err != nil {
