@@ -70,7 +70,7 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -119,7 +119,7 @@ func TestIntegrationHTTP(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -188,7 +188,7 @@ func TestIntegrationHTTP100Continue(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -198,7 +198,7 @@ func TestIntegrationHTTP100Continue(t *testing.T) {
 
 	p.SetTimeout(2 * time.Second)
 
-	sl, err := net.Listen("tcp", "[::1]:0")
+	sl, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -302,7 +302,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	t.Parallel()
 
 	// Start first proxy to use as downstream.
-	dl, err := net.Listen("tcp", "[::1]:0")
+	dl, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -318,7 +318,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	go downstream.Serve(dl)
 
 	// Start second proxy as upstream proxy, will write to downstream proxy.
-	ul, err := net.Listen("tcp", "[::1]:0")
+	ul, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -367,7 +367,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -377,7 +377,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 
 	// Set proxy's downstream proxy to invalid host:port to force failure.
 	p.SetDownstreamProxy(&url.URL{
-		Host: "[::1]:0",
+		Host: "[::]:0",
 	})
 	p.SetTimeout(600 * time.Millisecond)
 
@@ -425,7 +425,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -447,7 +447,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	mc.SetHandshakeErrorCallback(func(_ *http.Request, err error) { herr = fmt.Errorf("handshake error") })
 	p.SetMITM(mc)
 
-	tl, err := net.Listen("tcp", "[::1]:0")
+	tl, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("tls.Listen(): got %v, want no error", err)
 	}
@@ -522,7 +522,7 @@ func TestIntegrationConnect(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -540,7 +540,7 @@ func TestIntegrationConnect(t *testing.T) {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
 
-	tl, err := net.Listen("tcp", "[::1]:0")
+	tl, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("tls.Listen(): got %v, want no error", err)
 	}
@@ -648,7 +648,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	t.Parallel()
 
 	// Start first proxy to use as downstream.
-	dl, err := net.Listen("tcp", "[::1]:0")
+	dl, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -674,7 +674,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	go downstream.Serve(dl)
 
 	// Start second proxy as upstream proxy, will CONNECT to downstream proxy.
-	ul, err := net.Listen("tcp", "[::1]:0")
+	ul, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -756,7 +756,7 @@ func TestIntegrationMITM(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -869,7 +869,7 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -940,7 +940,7 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 	//
 	// BUG: tls.Listen will not accept a tls.Config where Certificates is empty,
 	// even though it is supported by tls.Server when GetCertificate is not nil.
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -1017,7 +1017,7 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -1070,7 +1070,7 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -1126,7 +1126,7 @@ func TestHTTPThroughConnectWithMITM(t *testing.T) {
 	t.Skip("Test is failing on Travis.")
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -1267,7 +1267,7 @@ func TestServerClosesConnection(t *testing.T) {
 		conn.Close()
 	}()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}

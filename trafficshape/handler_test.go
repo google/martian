@@ -24,7 +24,7 @@ import (
 )
 
 func TestHandler(t *testing.T) {
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
