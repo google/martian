@@ -69,7 +69,7 @@ func (l *timeoutListener) Accept() (net.Conn, error) {
 func TestIntegrationTemporaryTimeout(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -515,7 +515,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 func TestIntegrationConnect(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -1252,7 +1252,7 @@ func TestServerClosesConnection(t *testing.T) {
 		conn.Close()
 	}()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
