@@ -50,7 +50,7 @@ func isCloseable(err error) bool {
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
 	roundTripper http.RoundTripper
-	dialer       net.Dialer
+	dial         func(string, string) (net.Conn, error)
 	timeout      time.Duration
 	mitm         *mitm.Config
 	proxyURL     *url.URL
@@ -63,22 +63,23 @@ type Proxy struct {
 
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
-	dialer := &net.Dialer{
+	dialfunc := (&net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
-	}
+	}).Dial
+
 	return &Proxy{
 		roundTripper: &http.Transport{
 			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
 			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
 			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
 			Proxy:                 http.ProxyFromEnvironment,
-			Dial:                  dialer.Dial,
+			Dial:                  dialfunc,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: time.Second,
 		},
-		dialer:  *dialer,
 		timeout: 5 * time.Minute,
+		dial:    dialfunc,
 		conns:   &sync.WaitGroup{},
 		closing: make(chan bool),
 		reqmod:  noop,
@@ -93,6 +94,7 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 		tr.Proxy = http.ProxyURL(p.proxyURL)
+		tr.Dial = p.dial
 	}
 }
 
@@ -116,9 +118,13 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
 }
 
-// SetDialer sets the dialer used to establish a connection.
-func (p *Proxy) SetDialer(dialer net.Dialer) {
-	p.dialer = dialer
+// SetDial sets the dial func used to establish a connection.
+func (p *Proxy) SetDial(dial func(string, string) (net.Conn, error)) {
+	p.dial = dial
+
+	if tr, ok := p.roundTripper.(*http.Transport); ok {
+		tr.Dial = p.dial
+	}
 }
 
 // Close sets the proxy to the closing state so it stops receiving new connections,
@@ -202,6 +208,10 @@ func (p *Proxy) Serve(l net.Listener) error {
 
 		go p.handleLoop(conn)
 	}
+}
+
+func (p *Proxy) dial(network string, addr string) (net.Conn, error) {
+
 }
 
 func (p *Proxy) handleLoop(conn net.Conn) {
@@ -497,7 +507,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	if p.proxyURL != nil {
 		log.Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
 
-		conn, err := p.dialer.Dial("tcp", p.proxyURL.Host)
+		conn, err := p.dial("tcp", p.proxyURL.Host)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -517,7 +527,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
 
-	conn, err := p.dialer.Dial("tcp", req.URL.Host)
+	conn, err := p.dial("tcp", req.URL.Host)
 	if err != nil {
 		return nil, nil, err
 	}
