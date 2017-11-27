@@ -26,7 +26,7 @@ import (
 
 func TestListenerRead(t *testing.T) {
 	// reproing bind error
-	t.Parallel()
+	// t.Parallel()
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
@@ -122,7 +122,7 @@ func TestListenerRead(t *testing.T) {
 }
 
 func TestListenerWrite(t *testing.T) {
-	t.Parallel()
+	//	t.Parallel()
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
@@ -210,7 +210,7 @@ func TestListenerWrite(t *testing.T) {
 }
 
 func TestListenerWriteTo(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
@@ -298,7 +298,7 @@ func TestListenerWriteTo(t *testing.T) {
 }
 
 func TestListenerReadFrom(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	l, err := net.Listen("tcp", "[::1]:0")
 	if err != nil {
