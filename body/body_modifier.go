@@ -119,7 +119,11 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 	sranges := strings.Split(strings.TrimLeft(rh, "bytes="), ",")
 	var ranges [][]int
 	for _, rng := range sranges {
-		rs := strings.Split(strings.TrimLeft(rng, "bytes="), "-")
+		if strings.HasSuffix(rng, "-") {
+			rng = fmt.Sprintf("%s%d", rng, len(m.body))
+		}
+
+		rs := strings.Split(rng, "-")
 		if len(rs) != 2 {
 			res.StatusCode = http.StatusRequestedRangeNotSatisfiable
 			return nil
