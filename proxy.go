@@ -210,10 +210,6 @@ func (p *Proxy) Serve(l net.Listener) error {
 	}
 }
 
-func (p *Proxy) dial(network string, addr string) (net.Conn, error) {
-
-}
-
 func (p *Proxy) handleLoop(conn net.Conn) {
 	p.conns.Add(1)
 	defer p.conns.Done()
