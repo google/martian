@@ -132,7 +132,7 @@ func (s *Modifier) ModifyResponse(res *http.Response) error {
 	var ranges [][]int
 	for _, rng := range sranges {
 		if strings.HasSuffix(rng, "-") {
-			rng = fmt.Sprintf("%s%d", rng, info.Size())
+			rng = fmt.Sprintf("%s%d", rng, info.Size()-1)
 		}
 
 		rs := strings.Split(rng, "-")
