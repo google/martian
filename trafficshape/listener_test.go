@@ -27,7 +27,7 @@ import (
 func TestListenerRead(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -123,7 +123,7 @@ func TestListenerRead(t *testing.T) {
 func TestListenerWrite(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -211,7 +211,7 @@ func TestListenerWrite(t *testing.T) {
 func TestListenerWriteTo(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
@@ -299,7 +299,7 @@ func TestListenerWriteTo(t *testing.T) {
 func TestListenerReadFrom(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::1]:0")
+	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
