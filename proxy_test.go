@@ -1220,7 +1220,7 @@ func TestHTTPThroughConnectWithMITM(t *testing.T) {
 func TestServerClosesConnection(t *testing.T) {
 	t.Parallel()
 
-	dstl, err := net.Listen("tcp4", ":0")
+	dstl, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("Failed to create http listener: %v", err)
 	}

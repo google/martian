@@ -126,6 +126,42 @@ func TestRangeHeaderRequestSingleRange(t *testing.T) {
 	}
 }
 
+func TestRangeHeaderRequestSingleRangeHasAllTheBytes(t *testing.T) {
+	mod := NewModifier([]byte("0123456789"), "text/plain")
+
+	req, err := http.NewRequest("GET", "/", strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set("Range", "bytes=0-")
+
+	res := proxyutil.NewResponse(200, nil, req)
+
+	if err := mod.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.StatusCode, http.StatusPartialContent; got != want {
+		t.Errorf("res.Status: got %v, want %v", got, want)
+	}
+	if got, want := res.ContentLength, int64(len([]byte("0123456789"))); got != want {
+		t.Errorf("res.ContentLength: got %d, want %d", got, want)
+	}
+	if got, want := res.Header.Get("Content-Range"), "bytes 0-9/10"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Content-Encoding", got, want)
+	}
+
+	got, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(): got %v, want no error", err)
+	}
+	res.Body.Close()
+
+	if want := []byte("0123456789"); !bytes.Equal(got, want) {
+		t.Errorf("res.Body: got %q, want %q", got, want)
+	}
+}
+
 func TestRangeNoEndingIndexSpecified(t *testing.T) {
 	mod := NewModifier([]byte("0123456789"), "text/plain")
 
@@ -144,10 +180,10 @@ func TestRangeNoEndingIndexSpecified(t *testing.T) {
 	if got, want := res.StatusCode, http.StatusPartialContent; got != want {
 		t.Errorf("res.Status: got %v, want %v", got, want)
 	}
-	if got, want := res.ContentLength, int64(len([]byte("789"))); got != want {
+	if got, want := res.ContentLength, int64(len([]byte("89"))); got != want {
 		t.Errorf("res.ContentLength: got %d, want %d", got, want)
 	}
-	if got, want := res.Header.Get("Content-Range"), "bytes 8-10/10"; got != want {
+	if got, want := res.Header.Get("Content-Range"), "bytes 8-9/10"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "Content-Encoding", got, want)
 	}
 }
