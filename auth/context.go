@@ -44,7 +44,7 @@ func FromContext(ctx *martian.Context) *Context {
 // ID returns the ID.
 func (ctx *Context) ID() string {
 	ctx.mu.RLock()
-	ctx.mu.RUnlock()
+	defer ctx.mu.RUnlock()
 
 	return ctx.id
 }
@@ -52,7 +52,7 @@ func (ctx *Context) ID() string {
 // SetID sets the ID.
 func (ctx *Context) SetID(id string) {
 	ctx.mu.Lock()
-	ctx.mu.Unlock()
+	defer ctx.mu.Unlock()
 
 	ctx.err = nil
 
