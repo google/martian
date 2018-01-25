@@ -137,19 +137,17 @@ func (s *Stream) sendHeader(id string, mt MessageType, key, value string) {
 	s.framec <- f
 }
 
-func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b []byte) {
-	bl := uint32(len(b))
-
+func (s *Stream) sendData(id string, mt MessageType, i uint32, terminal bool, b []byte, bl int) {
 	var ti uint8
 	if terminal {
 		ti = 1
 	}
 
-	f := newFrame(id, DataFrame, mt, 40+bl)
+	f := newFrame(id, DataFrame, mt, 72+uint32(bl))
 	f = append(f, byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 	f = append(f, byte(ti))
 	f = append(f, byte(bl>>24), byte(bl>>16), byte(bl>>8), byte(bl))
-	f = append(f, b...)
+	f = append(f, b[:bl]...)
 
 	s.framec <- f
 }
@@ -238,7 +236,7 @@ func (bl *bodyLogger) Read(b []byte) (int, error) {
 		terminal = true
 	}
 
-	bl.s.sendData(bl.id, bl.mt, atomic.AddUint32(&bl.index, 1)-1, terminal, b)
+	bl.s.sendData(bl.id, bl.mt, atomic.AddUint32(&bl.index, 1)-1, terminal, b, n)
 
 	return n, err
 }
