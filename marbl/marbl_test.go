@@ -323,7 +323,7 @@ func TestBodyLogging_ManyReads(t *testing.T) {
 
 // readAllDataFrames reads all DataFrames with reader, filters the one that match provided
 // id and assembles data from all frames into single slice. It expects that
-// there is only one set of DataFrames with provided id.
+// there is only one slice of DataFrames with provided id.
 func readAllDataFrames(reader *Reader, id string, t *testing.T) []byte {
 	res := make([]byte, 0)
 	term := false
