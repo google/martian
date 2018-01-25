@@ -225,7 +225,7 @@ func TestBodyLogging_OneRead(t *testing.T) {
 	// Read request body into big slice.
 	bodybytes := make([]byte, 100)
 
-	// First read. Due to implementation details of stirngs.Read
+	// First read. Due to implementation details of strings.Read
 	// it reads all bytes but doesn't return EOF.
 	n, err := req.Body.Read(bodybytes)
 	if n != len(body) {
@@ -264,7 +264,7 @@ func TestBodyLogging_ManyReads(t *testing.T) {
 	// 1. Prepare HTTP request with body containing a string.
 	// 2. Initialize marbl logging on this request.
 	// 3. Read body of the request in many reads, 1 byte per read and
-	// .  verity that it matches original string.
+	// .  verify that it matches original string.
 	// 4. Parse marbl data, extract DataFrames and verify that they match
 	// .  original string.
 	body := "hello, world"
