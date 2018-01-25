@@ -198,7 +198,7 @@ func TestSendTimestampWithLogResponse(t *testing.T) {
 	}
 }
 
-func TestBodyLogging_OneRead(t *testing.T) {
+func TestBodyLoggingWithOneRead(t *testing.T) {
 	// Test scenario:
 	// 1. Prepare HTTP request with body containing a string.
 	// 2. Initialize marbl logging on this request.
@@ -229,33 +229,33 @@ func TestBodyLogging_OneRead(t *testing.T) {
 	// it reads all bytes but doesn't return EOF.
 	n, err := req.Body.Read(bodybytes)
 	if n != len(body) {
-		t.Fatalf("expected to read %v bytes but read %v", len(body), n)
+		t.Fatalf("req.Body.Read(): expected to read %v bytes but read %v", len(body), n)
 	}
 	if body != string(bodybytes[:n]) {
-		t.Fatalf("expected to read %v but read %v", body, string(bodybytes[:n]))
+		t.Fatalf("req.Body.Read(): expected to read %v but read %v", body, string(bodybytes[:n]))
 	}
 	if err != nil {
-		t.Fatalf("first read expected to be successful but got error %v", err)
+		t.Fatalf("req.Body.Read(): first read expected to be successful but got error %v", err)
 	}
 
 	// second read. We already consumed the whole string on the first read
 	// so now it should be 0 bytes and EOF.
 	n, err = req.Body.Read(bodybytes)
 	if n != 0 {
-		t.Fatalf("expected to read 0 bytes but read %v", n)
+		t.Fatalf("req.Body.Read(): expected to read 0 bytes but read %v", n)
 	}
 	if err != io.EOF {
-		t.Fatalf("expected EOF but got %v", err)
+		t.Fatalf("req.Body.Read(): expected EOF but got %v", err)
 	}
 
 	s.Close()
 	reader := NewReader(&b)
 	bodybytes = readAllDataFrames(reader, "Fake_Id0", t)
 	if len(bodybytes) != len(body) {
-		t.Fatalf("expected .marbl data to have %v bytes, but got %v", len(body), len(bodybytes))
+		t.Fatalf("readAllDataFrames(): expected .marbl data to have %v bytes, but got %v", len(body), len(bodybytes))
 	}
 	if body != string(bodybytes) {
-		t.Fatalf("expected .marbl data to have string %v but got %v", body, string(bodybytes))
+		t.Fatalf("readAllDataFrames(): expected .marbl data to have string %v but got %v", body, string(bodybytes))
 	}
 }
 
@@ -290,13 +290,13 @@ func TestBodyLogging_ManyReads(t *testing.T) {
 		// first read
 		n, err := req.Body.Read(bodybytes)
 		if n != 1 {
-			t.Fatalf("expected to read 1 byte but read %v", n)
+			t.Fatalf("req.Body.Read(): expected to read 1 byte but read %v", n)
 		}
 		if body[i] != bodybytes[0] {
-			t.Fatalf("expected to read %v but read %v", body[i], bodybytes[0])
+			t.Fatalf("req.Body.Read(): expected to read %v but read %v", body[i], bodybytes[0])
 		}
 		if err != nil {
-			t.Fatalf("read expected to be successfully but got error %v", err)
+			t.Fatalf("req.Body.Read(): read expected to be successfully but got error %v", err)
 		}
 	}
 
@@ -304,26 +304,26 @@ func TestBodyLogging_ManyReads(t *testing.T) {
 	// so now it should be 0 bytes and EOF.
 	n, err := req.Body.Read(bodybytes)
 	if n != 0 {
-		t.Fatalf("expected to read 0 bytes but read %v", n)
+		t.Fatalf("req.Body.Read(): expected to read 0 bytes but read %v", n)
 	}
 	if err != io.EOF {
-		t.Fatalf("expected EOF but got %v", err)
+		t.Fatalf("req.Body.Read(): expected EOF but got %v", err)
 	}
 
 	s.Close()
 	reader := NewReader(&b)
 	bodybytes = readAllDataFrames(reader, "Fake_Id0", t)
 	if len(bodybytes) != len(body) {
-		t.Fatalf("expected .marbl data to have %v bytes, but got %v", len(body), len(bodybytes))
+		t.Fatalf("readAllDataFrames(): expected .marbl data to have %v bytes, but got %v", len(body), len(bodybytes))
 	}
 	if body != string(bodybytes) {
-		t.Fatalf("expected .marbl data to have string %v but got %v", body, string(bodybytes))
+		t.Fatalf("readAllDataFrames(): expected .marbl data to have string %v but got %v", body, string(bodybytes))
 	}
 }
 
-// Given Reader reads all DataFrames, filters the one that match provided
-// id and assembles data from all frames into single slice. It expects
-// there is only one chaing of DataFrames with provided id.
+// readAllDataFrames reads all DataFrames with reader, filters the one that match provided
+// id and assembles data from all frames into single slice. It expects that
+// there is only one set of DataFrames with provided id.
 func readAllDataFrames(reader *Reader, id string, t *testing.T) []byte {
 	res := make([]byte, 0)
 	term := false
@@ -349,8 +349,10 @@ func readAllDataFrames(reader *Reader, id string, t *testing.T) []byte {
 			i++
 		}
 	}
+	
 	if !term {
 		t.Fatal("didn't see terminal DataFrame")
 	}
+	
 	return res
 }
