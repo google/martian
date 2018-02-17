@@ -17,6 +17,8 @@ package martianurl
 import (
 	"net/http"
 	"net/url"
+
+	"github.com/google/martian/log"
 )
 
 // Matcher is a conditional evaluator of request urls to be used in
@@ -35,13 +37,21 @@ func NewMatcher(url *url.URL) *Matcher {
 // MatchRequest retuns true if all non-empty URL segments in m.url match the
 // request URL.
 func (m *Matcher) MatchRequest(req *http.Request) bool {
-	return m.matches(req.URL)
+	matched := m.matches(req.URL)
+	if matched {
+		log.Debugf("martianurl.Matcher.MatchRequest: matched: %s", req.URL)
+	}
+	return matched
 }
 
 // MatchResponse retuns true if all non-empty URL segments in m.url match the
 // request URL.
 func (m *Matcher) MatchResponse(res *http.Response) bool {
-	return m.matches(res.Request.URL)
+	matched := m.matches(res.Request.URL)
+	if matched {
+		log.Debugf("martianurl.Matcher.MatchResponse: matched: %s", res.Request.URL)
+	}
+	return matched
 }
 
 // matches forces all non-empty URL segments to match or it returns false.

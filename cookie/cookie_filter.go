@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/filter"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
 
@@ -39,6 +40,7 @@ func init() {
 
 // NewFilter builds a new cookie filter.
 func NewFilter(cookie *http.Cookie) *filter.Filter {
+	log.Debugf("cookie.NewFilter: cookie: %s", cookie.String())
 	f := filter.New()
 	m := NewMatcher(cookie)
 

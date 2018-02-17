@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/filter"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
 
@@ -47,6 +48,7 @@ type filterJSON struct {
 // NewFilter constructs a filter that applies the modifer when the
 // request URL matches all of the provided URL segments.
 func NewFilter(u *url.URL) *Filter {
+	log.Debugf("martianurl.NewFilter: %s", u)
 	m := NewMatcher(u)
 	f := filter.New()
 	f.SetRequestCondition(m)

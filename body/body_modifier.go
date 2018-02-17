@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
 
@@ -50,6 +51,7 @@ type modifierJSON struct {
 
 // NewModifier constructs and returns a body.Modifier.
 func NewModifier(b []byte, contentType string) *Modifier {
+	log.Debugf("body.NewModifier: len(b): %d, contentType %s", len(b), contentType)
 	return &Modifier{
 		contentType: contentType,
 		body:        b,
@@ -78,6 +80,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 
 // ModifyRequest sets the Content-Type header and overrides the request body.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
+	log.Debugf("body.ModifyRequest: request: %s", req.URL)
 	req.Body.Close()
 
 	req.Header.Set("Content-Type", m.contentType)
@@ -98,6 +101,7 @@ func (m *Modifier) SetBoundary(boundary string) {
 
 // ModifyResponse sets the Content-Type header and overrides the response body.
 func (m *Modifier) ModifyResponse(res *http.Response) error {
+	log.Debugf("body.ModifyResponse: request: %s", res.Request.URL)
 	// Replace the existing body, close it first.
 	res.Body.Close()
 
