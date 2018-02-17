@@ -135,7 +135,11 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 func (f *Filter) ModifyResponse(res *http.Response) error {
 	match := f.rescond.MatchResponse(res)
 	if match {
-		log.Debugf("filter.ModifyResponse: %s", res.Request.URL)
+		requ := ""
+		if res.Request != nil {
+			requ = res.Request.URL.String()
+		}
+		log.Debugf("filter.ModifyResponse: %s", requ)
 		return f.tresmod.ModifyResponse(res)
 	}
 
