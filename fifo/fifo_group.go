@@ -118,7 +118,11 @@ func (g *Group) ModifyRequest(req *http.Request) error {
 // aggregateErrors is set to true, the errors returned by each modifier in the group are
 // aggregated.
 func (g *Group) ModifyResponse(res *http.Response) error {
-	log.Debugf("fifo.ModifyResponse: %s", res.Request.URL)
+	requ := ""
+	if res.Request != nil {
+		requ = res.Request.URL.String()
+		log.Debugf("fifo.ModifyResponse: %s", requ)
+	}
 	g.resmu.RLock()
 	defer g.resmu.RUnlock()
 
