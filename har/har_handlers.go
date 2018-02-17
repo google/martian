@@ -48,9 +48,10 @@ func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != "GET" {
 		rw.Header().Add("Allow", "GET")
 		rw.WriteHeader(http.StatusMethodNotAllowed)
-		log.Errorf("har: method not allowed: %s", req.Method)
+		log.Errorf("har.ServeHTTP: method not allowed: %s", req.Method)
 		return
 	}
+	log.Debugf("exportHandler.ServeHTTP: writing HAR logs to ResponseWriter")
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	hl := h.logger.Export()
@@ -68,7 +69,7 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	h.logger.Reset()
 
-	log.Infof("har: logs cleared")
+	log.Infof("resetHandler.ServeHTTP: HAR logs cleared")
 
 	rw.WriteHeader(http.StatusNoContent)
 }

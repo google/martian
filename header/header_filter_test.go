@@ -88,7 +88,7 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatal("resmod: got nil, want not nil")
 	}
 
-	res := proxyutil.NewResponse(200, nil, nil)
+	res := proxyutil.NewResponse(200, nil, req)
 	res.Header.Set("Martian-Passthrough", "true")
 	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
@@ -103,7 +103,7 @@ func TestFilterFromJSON(t *testing.T) {
 		t.Fatal("resmod: got nil, want not nil")
 	}
 
-	res = proxyutil.NewResponse(200, nil, nil)
+	res = proxyutil.NewResponse(200, nil, req)
 	res.Header.Set("Martian-Passthrough", "false")
 	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("ModifyResponse(): got %v, want no error", err)
@@ -248,7 +248,12 @@ func TestResponseWhenTrue(t *testing.T) {
 		f.SetResponseCondition(hm)
 		f.ResponseWhenTrue(tm)
 
-		res := proxyutil.NewResponse(200, nil, nil)
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+		}
+
+		res := proxyutil.NewResponse(200, nil, req)
 
 		res.Header[tc.name] = tc.values
 
@@ -289,7 +294,11 @@ func TestResponseWhenFalse(t *testing.T) {
 		f.SetResponseCondition(hm)
 		f.ResponseWhenFalse(tm)
 
-		res := proxyutil.NewResponse(200, nil, nil)
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+		}
+		res := proxyutil.NewResponse(200, nil, req)
 
 		res.Header[tc.name] = tc.values
 
