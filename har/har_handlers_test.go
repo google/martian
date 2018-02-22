@@ -105,4 +105,35 @@ func TestExportHandlerServeHTTP(t *testing.T) {
 	if got, want := len(hl.Log.Entries), 0; got != want {
 		t.Errorf("len(Log.Entries): got %v, want %v", got, want)
 	}
+
+	req, err = http.NewRequest("DELETE", "/?return=1", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	rw = httptest.NewRecorder()
+	rh.ServeHTTP(rw, req)
+	if got, want := rw.Code, http.StatusOK; got != want {
+		t.Errorf("rw.Code: got %d, want %d", got, want)
+	}
+
+	hl = &HAR{}
+	if err := json.Unmarshal(rw.Body.Bytes(), hl); err != nil {
+		t.Fatalf("json.Unmarshal(): got %v, want no error", err)
+	}
+
+	if got, want := len(hl.Log.Entries), 0; got != want {
+		t.Errorf("len(Log.Entries): got %v, want %v", got, want)
+	}
+
+	req, err = http.NewRequest("DELETE", "/?return=0", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	rw = httptest.NewRecorder()
+	rh.ServeHTTP(rw, req)
+	if got, want := rw.Code, http.StatusNoContent; got != want {
+		t.Errorf("rw.Code: got %d, want %d", got, want)
+	}
 }

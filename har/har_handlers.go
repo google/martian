@@ -17,6 +17,7 @@ package har
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/google/martian/log"
 )
@@ -67,9 +68,15 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("har: method not allowed: %s", req.Method)
 		return
 	}
-	h.logger.Reset()
+
+	if isBool, _ := strconv.ParseBool(req.URL.Query().Get("return")); isBool {
+		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+		hl := h.logger.ExportAndReset()
+		json.NewEncoder(rw).Encode(hl)
+	} else {
+		h.logger.Reset()
+		rw.WriteHeader(http.StatusNoContent)
+	}
 
 	log.Infof("resetHandler.ServeHTTP: HAR logs cleared")
-
-	rw.WriteHeader(http.StatusNoContent)
 }
