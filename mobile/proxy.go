@@ -61,6 +61,7 @@ import (
 type Martian struct {
 	proxy        *martian.Proxy
 	listener     net.Listener
+	APIListener  net.Listener
 	mux          *http.ServeMux
 	started      bool
 	HARLogging   bool
@@ -206,6 +207,10 @@ func (m *Martian) Start() {
 
 	// start the API server
 	apiAddr := fmt.Sprintf(":%d", m.APIPort)
+	m.APIListener, err = net.Listen("tcp", apiAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if m.APIOverTLS {
 		if m.Cert == "" || m.Key == "" {
 			log.Fatal("mobile: APIOverTLS cannot be true without valid cert and key")
@@ -230,19 +235,17 @@ func (m *Martian) Start() {
 		}
 
 		go func() {
-			http.ListenAndServeTLS(apiAddr, cerfile.Name(), keyfile.Name(), m.mux)
+			http.ServeTLS(m.APIListener, m.mux, cerfile.Name(), keyfile.Name())
 			defer os.Remove(cerfile.Name())
 			defer os.Remove(keyfile.Name())
 		}()
 
 		mlog.Infof("mobile: proxy API started on %s over TLS", apiAddr)
 	} else {
-		go http.ListenAndServe(apiAddr, m.mux)
+		go http.Serve(m.APIListener, m.mux)
 		mlog.Infof("mobile: proxy API started on %s", apiAddr)
 	}
 
-	go http.ListenAndServe(apiAddr, m.mux)
-	mlog.Infof("mobile: proxy API started on %s", apiAddr)
 	m.started = true
 }
 
@@ -257,6 +260,7 @@ func (m *Martian) IsStarted() bool {
 func (m *Martian) Shutdown() {
 	mlog.Infof("mobile: shutting down proxy")
 	m.listener.Close()
+	m.APIListener.Close()
 	m.proxy.Close()
 	m.started = false
 	mlog.Infof("mobile: proxy shut down")
