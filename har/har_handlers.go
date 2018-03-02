@@ -17,6 +17,7 @@ package har
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/google/martian/log"
@@ -69,7 +70,14 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if v, _ := strconv.ParseBool(req.URL.Query().Get("return")); v {
+
+	v, err := parseBoolQueryParam(req.URL.Query(), "return")
+	if err != nil {
+		log.Errorf("har: invalid value for return param: %s", err)
+		rw.WriteHeader(http.StatusBadRequest)
+	}
+
+	if v {
 		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 		hl := h.logger.ExportAndReset()
 		json.NewEncoder(rw).Encode(hl)
@@ -79,4 +87,15 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	log.Infof("resetHandler.ServeHTTP: HAR logs cleared")
+}
+
+func parseBoolQueryParam(params url.Values, name string) (bool, error) {
+	if params[name] == nil {
+		return false, nil
+	}
+	v, err := strconv.ParseBool(params.Get("return"))
+	if err != nil {
+		return true, err
+	}
+	return v, nil
 }

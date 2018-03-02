@@ -136,4 +136,15 @@ func TestExportHandlerServeHTTP(t *testing.T) {
 	if got, want := rw.Code, http.StatusNoContent; got != want {
 		t.Errorf("rw.Code: got %d, want %d", got, want)
 	}
+
+	req, err = http.NewRequest("DELETE", "/?return=notboolean", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	rw = httptest.NewRecorder()
+	rh.ServeHTTP(rw, req)
+	if got, want := rw.Code, http.StatusBadRequest; got != want {
+		t.Errorf("rw.Code: got %d, want %d", got, want)
+	}
 }
