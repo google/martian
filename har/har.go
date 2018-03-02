@@ -391,11 +391,10 @@ func (l *Logger) RecordRequest(id string, req *http.Request) error {
 	if l.tail == nil {
 		l.tail = entry
 		l.tail.next = entry
-	} else {
-		entry.next = l.tail.next
-		l.tail.next = entry
-		l.tail = entry
 	}
+	entry.next = l.tail.next
+	l.tail.next = entry
+	l.tail = entry
 
 	return nil
 }

@@ -69,7 +69,7 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if isBool, _ := strconv.ParseBool(req.URL.Query().Get("return")); isBool {
+	if v, _ := strconv.ParseBool(req.URL.Query().Get("return")); v {
 		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 		hl := h.logger.ExportAndReset()
 		json.NewEncoder(rw).Encode(hl)
