@@ -75,6 +75,7 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Errorf("har: invalid value for return param: %s", err)
 		rw.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	if v {
@@ -95,7 +96,7 @@ func parseBoolQueryParam(params url.Values, name string) (bool, error) {
 	}
 	v, err := strconv.ParseBool(params.Get("return"))
 	if err != nil {
-		return true, err
+		return false, err
 	}
 	return v, nil
 }
