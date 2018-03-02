@@ -59,19 +59,20 @@ import (
 
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
-	proxy        *martian.Proxy
-	listener     net.Listener
+	proxy         *martian.Proxy
+	listener      net.Listener
 	apiListener  net.Listener
-	mux          *http.ServeMux
-	started      bool
-	HARLogging   bool
-	TrafficPort  int
-	APIPort      int
-	APIOverTLS   bool
-	Cert         string
-	Key          string
-	AllowCORS    bool
-	RoundTripper *http.Transport
+	mux           *http.ServeMux
+	started       bool
+	HARLogging    bool
+	TrafficPort   int
+	APIPort       int
+	APIOverTLS    bool
+	BindLocalhost bool
+	Cert          string
+	Key           string
+	AllowCORS     bool
+	RoundTripper  *http.Transport
 }
 
 // EnableCybervillains configures Martian to use the Cybervillians certificate.
@@ -88,7 +89,7 @@ func NewProxy() *Martian {
 // Start starts the proxy given the configured values of the Martian struct.
 func (m *Martian) Start() {
 	var err error
-	m.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", m.TrafficPort))
+	m.listener, err = net.Listen("tcp", m.bindAddress(m.TrafficPort))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -206,7 +207,7 @@ func (m *Martian) Start() {
 	go m.proxy.Serve(m.listener)
 
 	// start the API server
-	apiAddr := fmt.Sprintf(":%d", m.APIPort)
+	apiAddr := m.bindAddress(m.APIPort)
 	m.apiListener, err = net.Listen("tcp", apiAddr)
 	if err != nil {
 		log.Fatal(err)
@@ -282,4 +283,11 @@ func (m *Martian) handle(pattern string, handler http.Handler) {
 	lhp := path.Join(fmt.Sprintf("localhost:%d", m.APIPort), pattern)
 	m.mux.Handle(lhp, handler)
 	mlog.Infof("mobile: handler registered for %s", lhp)
+}
+
+func (m *Martian) bindAddress(port int) string {
+	if m.BindLocalhost {
+		return fmt.Sprintf("[::1]:%d", port)
+	}
+	return fmt.Sprintf(":%d", port)
 }
