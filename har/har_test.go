@@ -417,6 +417,29 @@ func TestModifyRequestBodyMultipart(t *testing.T) {
 	}
 }
 
+func TestModifyRequestErrorsOnDuplicateRequest(t *testing.T) {
+	logger := NewLogger()
+
+	req, err := http.NewRequest("POST", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if logger.ModifyRequest(req) == nil {
+		t.Fatalf("ModifyRequest(): was supposed to error")
+	}
+}
+
 func TestHARExportsTime(t *testing.T) {
 	logger := NewLogger()
 
@@ -548,6 +571,156 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 
 	log := logger.Export().Log
 	if got, want := len(log.Entries), 0; got != want {
+		t.Errorf("len(log.Entries): got %d, want %d", got, want)
+	}
+}
+
+func TestExportAndResetResetsCompleteRequests(t *testing.T) {
+	logger := NewLogger()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	logger.ExportAndReset()
+
+	log := logger.Export().Log
+	if got, want := len(log.Entries), 0; got != want {
+		t.Errorf("len(log.Entries): got %d, want %d", got, want)
+	}
+}
+
+func TestExportAndResetLeavesPendingRequests(t *testing.T) {
+	logger := NewLogger()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	logger.ExportAndReset()
+
+	log := logger.Export().Log
+	if got, want := len(log.Entries), 1; got != want {
+		t.Errorf("len(log.Entries): got %d, want %d", got, want)
+	}
+}
+
+func TestExportAndResetExportsCompleteRequests(t *testing.T) {
+	logger := NewLogger()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log := logger.ExportAndReset().Log
+	if got, want := len(log.Entries), 1; got != want {
+		t.Errorf("len(log.Entries): got %d, want %d", got, want)
+	}
+}
+
+func TestExportAndResetExportsCompleteRequestsWithPendingLeft(t *testing.T) {
+	logger := NewLogger()
+
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err = martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err = martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("martian.TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	if err := logger.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := logger.ModifyResponse(res); err != nil {
+		t.Fatalf("ModifyResponse(): got %v, want no error", err)
+	}
+
+	log := logger.ExportAndReset().Log
+	if got, want := len(log.Entries), 1; got != want {
+		t.Errorf("len(log.Entries): got %d, want %d", got, want)
+	}
+
+	log = logger.Export().Log
+	if got, want := len(log.Entries), 2; got != want {
 		t.Errorf("len(log.Entries): got %d, want %d", got, want)
 	}
 }

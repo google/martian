@@ -19,13 +19,13 @@
 package har
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +45,7 @@ type Logger struct {
 
 	mu      sync.Mutex
 	entries map[string]*Entry
+	tail    *Entry
 }
 
 // HAR is the top level object of a HAR log.
@@ -87,6 +88,7 @@ type Entry struct {
 	// Timings describes various phases within request-response round trip. All
 	// times are specified in milliseconds.
 	Timings *Timings `json:"timings"`
+	next    *Entry
 }
 
 // Request holds data about an individual HTTP request.
@@ -371,16 +373,27 @@ func (l *Logger) RecordRequest(id string, req *http.Request) error {
 		return err
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.entries[id] = &Entry{
+	entry := &Entry{
 		ID:              id,
 		StartedDateTime: time.Now().UTC(),
 		Request:         hreq,
 		Cache:           &Cache{},
 		Timings:         &Timings{},
 	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if _, exists := l.entries[id]; exists {
+		return fmt.Errorf("Duplicate request ID: %s", id)
+	}
+	l.entries[id] = entry
+	if l.tail == nil {
+		l.tail = entry
+	}
+	entry.next = l.tail.next
+	l.tail.next = entry
+	l.tail = entry
 
 	return nil
 }
@@ -501,12 +514,54 @@ func (l *Logger) Export() *HAR {
 	defer l.mu.Unlock()
 
 	es := make([]*Entry, 0, len(l.entries))
-	for _, e := range l.entries {
-		es = append(es, e)
+	curr := l.tail
+	for curr != nil {
+		curr = curr.next
+		es = append(es, curr)
+		if curr == l.tail {
+			break
+		}
 	}
 
-	sort.Sort(byRequestDate(es))
+	return l.makeHAR(es)
+}
 
+// ExportAndReset returns the in-memory log for completed requests, clearing them.
+func (l *Logger) ExportAndReset() *HAR {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	es := make([]*Entry, 0, len(l.entries))
+	curr := l.tail
+	prev := l.tail
+	var first *Entry
+	for curr != nil {
+		curr = curr.next
+		if curr.Response != nil {
+			es = append(es, curr)
+			delete(l.entries, curr.ID)
+		} else {
+			if first == nil {
+				first = curr
+			}
+			prev.next = curr
+			prev = curr
+		}
+		if curr == l.tail {
+			break
+		}
+	}
+	if len(l.entries) == 0 {
+		l.tail = nil
+	} else {
+		l.tail = prev
+		l.tail.next = first
+	}
+
+	return l.makeHAR(es)
+}
+
+func (l *Logger) makeHAR(es []*Entry) *HAR {
 	return &HAR{
 		Log: &Log{
 			Version: "1.2",
@@ -522,6 +577,7 @@ func (l *Logger) Reset() {
 	defer l.mu.Unlock()
 
 	l.entries = make(map[string]*Entry)
+	l.tail = nil
 }
 
 func cookies(cs []*http.Cookie) []Cookie {
@@ -649,17 +705,4 @@ func postData(req *http.Request, logBody bool) (*PostData, error) {
 	}
 
 	return pd, nil
-}
-
-type byRequestDate []*Entry
-
-// Len returns the length of the slice of entries.
-func (e byRequestDate) Len() int { return len(e) }
-
-// Swap swaps entries by position.
-func (e byRequestDate) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
-
-// Less returns whether the entry at i has a StartedDateTime before the entry at j.
-func (e byRequestDate) Less(i, j int) bool {
-	return e[i].StartedDateTime.Before(e[j].StartedDateTime)
 }
