@@ -23,7 +23,9 @@ import (
 
 func TestModifyRequest(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("example.com/test", nil)
+	mux.HandleFunc("example.com/test", func(rw http.ResponseWriter, req *http.Request) {
+		return
+	})
 
 	f := NewFilter(mux)
 	tm := martiantest.NewModifier()
@@ -71,7 +73,9 @@ func TestModifyRequest(t *testing.T) {
 
 func TestModifyResponse(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("example.com/restest", nil)
+	mux.HandleFunc("example.com/restest", func(rw http.ResponseWriter, req *http.Request) {
+		return
+	})
 
 	f := NewFilter(mux)
 	tm := martiantest.NewModifier()
