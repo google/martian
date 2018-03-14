@@ -69,11 +69,6 @@ func (s *Modifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 	ctx.SkipRoundTrip()
 
-	if req.URL.Scheme == "https" {
-		req.URL.Scheme = "http"
-		ctx.Session().MarkInsecure()
-	}
-
 	return nil
 }
 
