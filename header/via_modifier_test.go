@@ -16,6 +16,7 @@ package header
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/martian"
@@ -39,8 +40,8 @@ func TestViaModifier(t *testing.T) {
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := req.Header.Get("Via"), "1.1 martian"; got != want {
-		t.Errorf("req.Header.Get(%q): got %q, want %q", "Via", got, want)
+	if got, want := req.Header.Get("Via"), "1.1 martian"; !strings.HasPrefix(got, want) {
+		t.Errorf("req.Header.Get(%q): got %q, want prefixed with %q", "Via", got, want)
 	}
 
 	if err := m.ModifyResponse(res); err != nil {
@@ -51,11 +52,12 @@ func TestViaModifier(t *testing.T) {
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := req.Header.Get("Via"), "1.0\talpha\t(martian), 1.1 martian"; got != want {
-		t.Errorf("req.Header.Get(%q): got %q, want %q", "Via", got, want)
+	if got, want := req.Header.Get("Via"), "1.0\talpha\t(martian), 1.1 martian"; !strings.HasPrefix(got, want) {
+		t.Errorf("req.Header.Get(%q): got %q, want prefixed with %q", "Via", got, want)
 	}
 
-	req.Header.Set("Via", "1.0\talpha\t(martian), 1.1 martian, 1.1 beta")
+	m.SetBoundary("boundary")
+	req.Header.Set("Via", "1.0\talpha\t(martian), 1.1 martian-boundary, 1.1 beta")
 	if err := m.ModifyRequest(req); err == nil {
 		t.Fatal("ModifyRequest(): got nil, want request loop error")
 	}
