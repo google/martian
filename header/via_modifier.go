@@ -15,7 +15,9 @@
 package header
 
 import (
+	"crypto/rand"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -27,14 +29,17 @@ const viaLoopKey = "via.LoopDetection"
 
 var whitespace = regexp.MustCompile("[\t ]+")
 
-type viaModifier struct {
+// ViaModifier is a header modifier that checks for proxy redirect loops.
+type ViaModifier struct {
 	requestedBy string
+	boundary    string
 }
 
 // NewViaModifier returns a new Via modifier.
-func NewViaModifier(requestedBy string) martian.RequestResponseModifier {
-	return &viaModifier{
+func NewViaModifier(requestedBy string) *ViaModifier {
+	return &ViaModifier{
 		requestedBy: requestedBy,
+		boundary:    randomBoundary(),
 	}
 }
 
@@ -44,8 +49,8 @@ func NewViaModifier(requestedBy string) martian.RequestResponseModifier {
 // skipped.
 //
 // http://tools.ietf.org/html/draft-ietf-httpbis-p1-messaging-14#section-9.9
-func (m *viaModifier) ModifyRequest(req *http.Request) error {
-	via := fmt.Sprintf("%d.%d %s", req.ProtoMajor, req.ProtoMinor, m.requestedBy)
+func (m *ViaModifier) ModifyRequest(req *http.Request) error {
+	via := fmt.Sprintf("%d.%d %s-%s", req.ProtoMajor, req.ProtoMinor, m.requestedBy, m.boundary)
 
 	if v := req.Header.Get("Via"); v != "" {
 		if m.hasLoop(v) {
@@ -68,7 +73,7 @@ func (m *viaModifier) ModifyRequest(req *http.Request) error {
 
 // ModifyResponse sets the status code to 400 Bad Request if a loop was
 // detected in the request.
-func (m *viaModifier) ModifyResponse(res *http.Response) error {
+func (m *ViaModifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
 
 	if err, _ := ctx.Get(viaLoopKey); err != nil {
@@ -83,7 +88,7 @@ func (m *viaModifier) ModifyResponse(res *http.Response) error {
 
 // hasLoop parses via and attempts to match requestedBy against the contained
 // pseudonyms/host:port pairs.
-func (m *viaModifier) hasLoop(via string) bool {
+func (m *ViaModifier) hasLoop(via string) bool {
 	for _, v := range strings.Split(via, ",") {
 		parts := whitespace.Split(strings.TrimSpace(v), 3)
 
@@ -92,10 +97,29 @@ func (m *viaModifier) hasLoop(via string) bool {
 			continue
 		}
 
-		if m.requestedBy == parts[1] {
+		if fmt.Sprintf("%s-%s", m.requestedBy, m.boundary) == parts[1] {
 			return true
 		}
 	}
 
 	return false
+}
+
+// SetBoundary sets the boundary string (random 10 character by default) used to
+// disabiguate Martians that are chained together with identical requestedBy values.
+// This should only be used for testing.
+func (m *ViaModifier) SetBoundary(boundary string) {
+	m.boundary = boundary
+}
+
+// randomBoundary generates a 10 character string to ensure that Martians that
+// are chained together with the same requestedBy value do not collide.  This func
+// panics if io.Readfull fails.
+func randomBoundary() string {
+	var buf [10]byte
+	_, err := io.ReadFull(rand.Reader, buf[:])
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", buf[:])
 }

@@ -16,6 +16,7 @@ package httpspec
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/martian"
@@ -57,7 +58,7 @@ func TestNewStack(t *testing.T) {
 	if got, want := req.Header.Get("X-Forwarded-For"), "10.0.0.1"; got != want {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", "X-Forwarded-For", got, want)
 	}
-	if got, want := req.Header.Get("Via"), "1.1 martian"; got != want {
+	if got, want := req.Header.Get("Via"), "1.1 martian"; !strings.HasPrefix(got, want) {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", "Via", got, want)
 	}
 
