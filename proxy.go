@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/martian/log"
 	"github.com/google/martian/mitm"
+	"github.com/google/martian/nosigpipe"
 	"github.com/google/martian/proxyutil"
 )
 
@@ -63,28 +64,26 @@ type Proxy struct {
 
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
-	dialfunc := (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).Dial
-
-	return &Proxy{
+	proxy := &Proxy{
 		roundTripper: &http.Transport{
 			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
 			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
 			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
 			Proxy:                 http.ProxyFromEnvironment,
-			Dial:                  dialfunc,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: time.Second,
 		},
 		timeout: 5 * time.Minute,
-		dial:    dialfunc,
 		conns:   &sync.WaitGroup{},
 		closing: make(chan bool),
 		reqmod:  noop,
 		resmod:  noop,
 	}
+	proxy.SetDial((&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).Dial)
+	return proxy
 }
 
 // SetRoundTripper sets the http.RoundTripper of the proxy.
@@ -120,7 +119,11 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 
 // SetDial sets the dial func used to establish a connection.
 func (p *Proxy) SetDial(dial func(string, string) (net.Conn, error)) {
-	p.dial = dial
+	p.dial = func(a, b string) (net.Conn, error) {
+		c, e := dial(a, b)
+		nosigpipe.IgnoreSIGPIPE(c)
+		return c, e
+	}
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.Dial = p.dial
@@ -179,6 +182,7 @@ func (p *Proxy) Serve(l net.Listener) error {
 		}
 
 		conn, err := l.Accept()
+		nosigpipe.IgnoreSIGPIPE(conn)
 		if err != nil {
 			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 				if delay == 0 {
