@@ -18,11 +18,11 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	net "net"
-	http "net/http"
-	httptest "net/http/httptest"
-	testing "testing"
-	time "time"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
 )
 
 func compareActions(testSlice []Action, refSlice []Action) (bool, string) {

@@ -18,15 +18,15 @@ Package proxyutil provides functionality for building proxies.
 package proxyutil
 
 import (
-	bytes "bytes"
-	fmt "fmt"
-	io "io"
-	ioutil "io/ioutil"
-	http "net/http"
-	regexp "regexp"
-	strconv "strconv"
-	strings "strings"
-	time "time"
+	"bytes"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // NewResponse builds new HTTP responses.

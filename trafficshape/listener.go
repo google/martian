@@ -15,13 +15,13 @@
 package trafficshape
 
 import (
-	io "io"
-	net "net"
-	sort "sort"
-	sync "sync"
-	time "time"
+	"io"
+	"net"
+	"sort"
+	"sync"
+	"time"
 
-	log "github.com/google/martian/log/log"
+	"github.com/google/martian/log"
 )
 
 // ErrForceClose is an error that communicates the need to close the connection.

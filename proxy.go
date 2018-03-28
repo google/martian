@@ -15,23 +15,23 @@
 package martian
 
 import (
-	bufio "bufio"
-	bytes "bytes"
-	tls "crypto/tls"
-	errors "errors"
-	io "io"
-	net "net"
-	http "net/http"
-	httputil "net/http/httputil"
-	url "net/url"
-	regexp "regexp"
-	sync "sync"
-	time "time"
+	"bufio"
+	"bytes"
+	"crypto/tls"
+	"errors"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"regexp"
+	"sync"
+	"time"
 
-	log "github.com/google/martian/log/log"
-	mitm "github.com/google/martian/mitm/mitm"
-	proxyutil "github.com/google/martian/proxyutil/proxyutil"
-	trafficshape "github.com/google/martian/trafficshape/trafficshape"
+	"github.com/google/martian/log"
+	"github.com/google/martian/mitm"
+	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/trafficshape"
 )
 
 var errClose = errors.New("closing connection")

@@ -16,13 +16,13 @@ package trafficshape
 
 import (
 	"bytes"
-	json "encoding/json"
-	io "io"
+	"encoding/json"
+	"io"
 	"io/ioutil"
-	http "net/http"
-	time "time"
+	"net/http"
+	"time"
 
-	log "github.com/google/martian/log/log"
+	"github.com/google/martian/log"
 )
 
 // Handler configures a trafficshape.Listener.

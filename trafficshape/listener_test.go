@@ -15,15 +15,15 @@
 package trafficshape
 
 import (
-	bytes "bytes"
-	io "io"
-	ioutil "io/ioutil"
-	net "net"
-	http "net/http"
-	httptest "net/http/httptest"
-	sync "sync"
-	testing "testing"
-	time "time"
+	"bytes"
+	"io"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"testing"
+	"time"
 )
 
 func TestListenerRead(t *testing.T) {

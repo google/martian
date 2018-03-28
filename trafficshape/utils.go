@@ -1,13 +1,13 @@
 package trafficshape
 
 import (
-	errors "errors"
-	fmt "fmt"
-	regexp "regexp"
-	sort "sort"
-	strconv "strconv"
-	strings "strings"
-	time "time"
+	"errors"
+	"fmt"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Converts a sorted slice of Throttles to their ChangeBandwidth actions. In adddition, checks for

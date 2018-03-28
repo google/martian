@@ -15,12 +15,12 @@
 package trafficshape
 
 import (
-	errors "errors"
-	sync "sync"
-	atomic "sync/atomic"
-	time "time"
+	"errors"
+	"sync"
+	"sync/atomic"
+	"time"
 
-	log "github.com/google/martian/log/log"
+	"github.com/google/martian/log"
 )
 
 // Bucket is a generic leaky bucket that drains at a configurable interval and

@@ -1,20 +1,20 @@
 package martian
 
 import (
-	bufio "bufio"
-	bytes "bytes"
-	ioutil "io/ioutil"
-	net "net"
-	http "net/http"
-	httptest "net/http/httptest"
-	httputil "net/http/httputil"
-	strings "strings"
-	testing "testing"
-	time "time"
+	"bufio"
+	"bytes"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"strings"
+	"testing"
+	"time"
 
-	log "github.com/google/martian/log/log"
-	martiantest "github.com/google/martian/martiantest/martiantest"
-	trafficshape "github.com/google/martian/trafficshape/trafficshape"
+	"github.com/google/martian/log"
+	"github.com/google/martian/martiantest"
+	"github.com/google/martian/trafficshape"
 )
 
 // Tests that sending data of length 600 bytes with max bandwidth of 100 bytes/s takes
