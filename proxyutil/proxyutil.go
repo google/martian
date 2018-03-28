@@ -18,12 +18,15 @@ Package proxyutil provides functionality for building proxies.
 package proxyutil
 
 import (
-	"bytes"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"time"
+	bytes "bytes"
+	fmt "fmt"
+	io "io"
+	ioutil "io/ioutil"
+	http "net/http"
+	regexp "regexp"
+	strconv "strconv"
+	strings "strings"
+	time "time"
 )
 
 // NewResponse builds new HTTP responses.
@@ -71,3 +74,31 @@ func Warning(header http.Header, err error) {
 	w := fmt.Sprintf(`199 "martian" %q %q`, err.Error(), date)
 	header.Add("Warning", w)
 }
+
+// GetRangeStart returns the byte index of the start of the range, if it has one.
+// Returns 0 if the range header is absent, and -1 if the range header is invalid or
+// has multi-part ranges.
+func GetRangeStart(res *http.Response) int64 {
+	if res.StatusCode != http.StatusPartialContent {
+		return 0
+	}
+
+	if strings.Contains(res.Header.Get("Content-Type"), "multipart/byteranges") {
+		return -1
+	}
+
+	re := regexp.MustCompile(`bytes (\d+)-\d+/\d+`)
+	matchSlice := re.FindStringSubmatch(res.Header.Get("Content-Range"))
+
+	if len(matchSlice) < 2 {
+		return -1
+	}
+
+	num, err := strconv.ParseInt(matchSlice[1], 10, 64)
+
+	if err != nil {
+		return -1
+	}
+	return num
+}
+

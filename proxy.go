@@ -15,21 +15,23 @@
 package martian
 
 import (
-	"bufio"
-	"bytes"
-	"crypto/tls"
-	"errors"
-	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"sync"
-	"time"
+	bufio "bufio"
+	bytes "bytes"
+	tls "crypto/tls"
+	errors "errors"
+	io "io"
+	net "net"
+	http "net/http"
+	httputil "net/http/httputil"
+	url "net/url"
+	regexp "regexp"
+	sync "sync"
+	time "time"
 
-	"github.com/google/martian/log"
-	"github.com/google/martian/mitm"
-	"github.com/google/martian/nosigpipe"
-	"github.com/google/martian/proxyutil"
+	log "google3/third_party/golang/martian/log/log"
+	mitm "google3/third_party/golang/martian/mitm/mitm"
+	proxyutil "google3/third_party/golang/martian/proxyutil/proxyutil"
+	trafficshape "google3/third_party/golang/martian/trafficshape/trafficshape"
 )
 
 var errClose = errors.New("closing connection")
@@ -64,26 +66,28 @@ type Proxy struct {
 
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
-	proxy := &Proxy{
+	dialfunc := (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).Dial
+
+	return &Proxy{
 		roundTripper: &http.Transport{
 			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
 			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
 			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
 			Proxy:                 http.ProxyFromEnvironment,
+			Dial:                  dialfunc,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: time.Second,
 		},
 		timeout: 5 * time.Minute,
+		dial:    dialfunc,
 		conns:   &sync.WaitGroup{},
 		closing: make(chan bool),
 		reqmod:  noop,
 		resmod:  noop,
 	}
-	proxy.SetDial((&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}).Dial)
-	return proxy
 }
 
 // SetRoundTripper sets the http.RoundTripper of the proxy.
@@ -119,11 +123,7 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 
 // SetDial sets the dial func used to establish a connection.
 func (p *Proxy) SetDial(dial func(string, string) (net.Conn, error)) {
-	p.dial = func(a, b string) (net.Conn, error) {
-		c, e := dial(a, b)
-		nosigpipe.IgnoreSIGPIPE(c)
-		return c, e
-	}
+	p.dial = dial
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.Dial = p.dial
@@ -182,7 +182,6 @@ func (p *Proxy) Serve(l net.Listener) error {
 		}
 
 		conn, err := l.Accept()
-		nosigpipe.IgnoreSIGPIPE(conn)
 		if err != nil {
 			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 				if delay == 0 {
@@ -302,8 +301,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	if req.URL.Host == "" {
 		req.URL.Host = req.Host
 	}
-
-	log.Infof("martian: received request: %s", req.URL)
 
 	if req.Method == "CONNECT" {
 		if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -471,14 +468,61 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		closing = errClose
 	}
 
-	log.Debugf("martian: sent response: %v", req.URL)
-	if err := res.Write(brw); err != nil {
-		log.Errorf("martian: got error while writing response back to client: %v", err)
-	}
-	if err := brw.Flush(); err != nil {
-		log.Errorf("martian: got error while flushing response back to client: %v", err)
+	// Check if conn is a traffic shaped connection.
+	if ptsconn, ok := conn.(*trafficshape.Conn); ok {
+		ptsconn.Context = &trafficshape.Context{}
+		// Check if the request URL matches any URLRegex in Shapes. If so, set the connections's Context
+		// with the required information, so that the Write() method of the Conn has access to it.
+		for urlregex, buckets := range ptsconn.LocalBuckets {
+			if match, _ := regexp.MatchString(urlregex, req.URL.String()); match {
+				if rangeStart := proxyutil.GetRangeStart(res); rangeStart > -1 {
+					dump, err := httputil.DumpResponse(res, false)
+					if err != nil {
+						return err
+					}
+					ptsconn.Context = &trafficshape.Context{
+						Shaping:            true,
+						Buckets:            buckets,
+						GlobalBucket:       ptsconn.GlobalBuckets[urlregex],
+						URLRegex:           urlregex,
+						RangeStart:         rangeStart,
+						ByteOffset:         rangeStart,
+						HeaderLen:          int64(len(dump)),
+						HeaderBytesWritten: 0,
+					}
+					// Get the next action to perform, if there.
+					ptsconn.Context.NextActionInfo = ptsconn.GetNextActionFromByte(rangeStart)
+					// Check if response lies in a throttled byte range.
+					ptsconn.Context.ThrottleContext = ptsconn.GetCurrentThrottle(rangeStart)
+					if ptsconn.Context.ThrottleContext.ThrottleNow {
+						ptsconn.Context.Buckets.WriteBucket.SetCapacity(ptsconn.Context.ThrottleContext.Bandwidth)
+					}
+					log.Infof("Request %s with Range Start: %d matches a Shaping request %s. Will enforce Traffic shaping.",
+						req.URL, rangeStart, urlregex)
+				}
+				break
+			}
+		}
 	}
 
+	log.Infof("Start of Write for res %s", req.URL)
+	err = res.Write(brw)
+	if err != nil {
+		log.Errorf("martian: got error while writing response back to client: %v", err)
+		if _, ok := err.(*trafficshape.ErrForceClose); ok {
+			closing = errClose
+		}
+	}
+	log.Infof("End of Write for req %s", req.URL)
+	log.Infof("Start of Flush for res %s", req.URL)
+	err = brw.Flush()
+	if err != nil {
+		log.Errorf("martian: got error while flushing response back to client: %v", err)
+		if _, ok := err.(*trafficshape.ErrForceClose); ok {
+			closing = errClose
+		}
+	}
+	log.Infof("End of Flush for req %v", req.URL)
 	return closing
 }
 
@@ -489,7 +533,7 @@ type peekedConn struct {
 	r io.Reader
 }
 
-// Read allows control over the embeded net.Conn's read data. By using an
+// Read allows control over the embedded net.Conn's read data. By using an
 // io.MultiReader one can read from a conn, and then replace what they read, to
 // be read again.
 func (c *peekedConn) Read(buf []byte) (int, error) { return c.r.Read(buf) }
@@ -534,3 +578,4 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 	return proxyutil.NewResponse(200, nil, req), conn, nil
 }
+

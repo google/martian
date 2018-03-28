@@ -15,13 +15,15 @@
 package trafficshape
 
 import (
-	"bytes"
-	"io"
-	"io/ioutil"
-	"net"
-	"sync"
-	"testing"
-	"time"
+	bytes "bytes"
+	io "io"
+	ioutil "io/ioutil"
+	net "net"
+	http "net/http"
+	httptest "net/http/httptest"
+	sync "sync"
+	testing "testing"
+	time "time"
 )
 
 func TestListenerRead(t *testing.T) {
@@ -35,11 +37,11 @@ func TestListenerRead(t *testing.T) {
 	tsl := NewListener(l)
 	defer tsl.Close()
 
-	if got := tsl.ReadBitrate(); got != defaultBitrate {
-		t.Errorf("tsl.ReadBitrate(): got %d, want defaultBitrate", got)
+	if got := tsl.ReadBitrate(); got != DefaultBitrate {
+		t.Errorf("tsl.ReadBitrate(): got %d, want DefaultBitrate", got)
 	}
-	if got := tsl.WriteBitrate(); got != defaultBitrate {
-		t.Errorf("tsl.WriteBitrate(): got %d, want defaultBitrate", got)
+	if got := tsl.WriteBitrate(); got != DefaultBitrate {
+		t.Errorf("tsl.WriteBitrate(): got %d, want DefaultBitrate", got)
 	}
 
 	tsl.SetReadBitrate(40) // 4 bytes per second
@@ -393,3 +395,182 @@ func TestListenerReadFrom(t *testing.T) {
 func between(d, min, max time.Duration) bool {
 	return d >= min && d <= max
 }
+
+type throttleAssertion struct {
+	Offset          int64
+	ThrottleContext *ThrottleContext
+}
+
+type actionByteAssertion struct {
+	Offset         int64
+	NextActionInfo *NextActionInfo
+}
+
+func TestActionsAndThrottles(t *testing.T) {
+	l, err := net.Listen("tcp", "[::]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+
+	tt := []struct {
+		jsonString           string
+		throttleAssertions   []throttleAssertion
+		actionByteAssertions []actionByteAssertion
+	}{
+		{
+			jsonString: `{"trafficshape":{"shapes":[{"url_regex":"http://example/example", "max_global_bandwidth":1000, "throttles":[{"bytes":"500-1000","bandwidth":100},{"bytes":"1000-2000","bandwidth":300},{"bytes":"2001-","bandwidth":400}],
+	"halts":[{"byte":530,"duration": 5, "count": 1}],"close_connections":[{"byte":1078,"count":1}]}]}}`,
+			throttleAssertions: []throttleAssertion{
+				{
+					Offset:          10,
+					ThrottleContext: &ThrottleContext{ThrottleNow: false},
+				},
+				{
+					Offset:          700,
+					ThrottleContext: &ThrottleContext{ThrottleNow: true, Bandwidth: 100},
+				},
+				{
+					Offset:          1000,
+					ThrottleContext: &ThrottleContext{ThrottleNow: true, Bandwidth: 300},
+				},
+				{
+					Offset:          5000,
+					ThrottleContext: &ThrottleContext{ThrottleNow: true, Bandwidth: 400},
+				},
+			},
+			actionByteAssertions: []actionByteAssertion{
+				{
+					Offset:         501,
+					NextActionInfo: &NextActionInfo{ActionNext: true, ByteOffset: 530, Index: 1},
+				},
+				{
+					Offset:         900,
+					NextActionInfo: &NextActionInfo{ActionNext: true, ByteOffset: 1000, Index: 2},
+				},
+				{
+					Offset:         1015,
+					NextActionInfo: &NextActionInfo{ActionNext: true, ByteOffset: 1078, Index: 3},
+				},
+				{
+					Offset:         2001,
+					NextActionInfo: &NextActionInfo{ActionNext: true, ByteOffset: 2001, Index: 5},
+				},
+			},
+		},
+	}
+
+	for i, tc := range tt {
+		tsl := NewListener(l)
+		defer tsl.Close()
+
+		h := NewHandler(tsl)
+		req, err := http.NewRequest("POST", "test", bytes.NewBufferString(tc.jsonString))
+		if err != nil {
+			t.Fatalf("%d. http.NewRequest(): got %v, want no error", i, err)
+		}
+
+		rw := httptest.NewRecorder()
+
+		h.ServeHTTP(rw, req)
+
+		body, _ := ioutil.ReadAll(rw.Result().Body)
+		t.Logf("%d\n %s", i+1, string(body))
+
+		if got, want := rw.Code, 200; got != want {
+			t.Errorf("%d. rw.Code: got %d, want %d", i+1, got, want)
+		}
+
+		t.Logf("%d starting %v", i, time.Now())
+		conn, err := net.Dial("tcp", l.Addr().String())
+		defer conn.Close()
+		if err != nil {
+			t.Fatalf("net.Dial(): got %v, want no error", err)
+		}
+
+		tsconn := tsl.GetTrafficShapedConn(conn)
+		tsconn.Context = &Context{
+			Shaping:  true,
+			URLRegex: "http://example/example",
+		}
+
+		for _, ta := range tc.throttleAssertions {
+			if got, want := *tsconn.GetCurrentThrottle(ta.Offset), *ta.ThrottleContext; got != want {
+				t.Errorf("tc.%d CurtThrottleInfo at %d got %+v, want %+v", i+1, ta.Offset, got, want)
+			}
+		}
+		for _, aba := range tc.actionByteAssertions {
+			if got, want := *tsconn.GetNextActionFromByte(aba.Offset), *aba.NextActionInfo; got != want {
+				t.Errorf("tc.%d NextActionInfo at %d got %+v, want %+v", i+1, aba.Offset, got, want)
+			}
+		}
+	}
+}
+
+func TestActionsAfterUpdatingCounts(t *testing.T) {
+	l, err := net.Listen("tcp", "[::]:0")
+	if err != nil {
+		t.Fatalf("net.Listen(): got %v, want no error", err)
+	}
+	jsonString := `{"trafficshape":{"shapes":[{"url_regex":"http://example/example", "max_global_bandwidth":1000, "throttles":[{"bytes":"500-1000","bandwidth":100}],
+"halts":[{"byte":530,"duration": 5, "count": 1},{"byte":550,"duration": 5, "count": 1}],"close_connections":[{"byte":1078,"count":1}]}]}}`
+	tsl := NewListener(l)
+	defer tsl.Close()
+
+	h := NewHandler(tsl)
+	req, err := http.NewRequest("POST", "test", bytes.NewBufferString(jsonString))
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	rw := httptest.NewRecorder()
+
+	h.ServeHTTP(rw, req)
+
+	body, _ := ioutil.ReadAll(rw.Result().Body)
+	t.Logf("%s", string(body))
+
+	if got, want := rw.Code, 200; got != want {
+		t.Errorf("rw.Code: got %d, want %d", got, want)
+	}
+
+	conn, err := net.Dial("tcp", l.Addr().String())
+	defer conn.Close()
+	if err != nil {
+		t.Fatalf("net.Dial(): got %v, want no error", err)
+	}
+
+	tsconn := tsl.GetTrafficShapedConn(conn)
+	tsconn.Context = &Context{
+		Shaping:  true,
+		URLRegex: "http://example/example",
+	}
+
+	actions := tsconn.Shapes.M[tsconn.Context.URLRegex].Shape.Actions
+	nai := []*NextActionInfo{
+		&NextActionInfo{ActionNext: true, ByteOffset: 530, Index: 1},
+		&NextActionInfo{ActionNext: true, ByteOffset: 550, Index: 2},
+		&NextActionInfo{ActionNext: true, ByteOffset: 1000, Index: 3},
+		&NextActionInfo{ActionNext: true, ByteOffset: 1078, Index: 4},
+		&NextActionInfo{ActionNext: false},
+	}
+	if got, want := *tsconn.GetNextActionFromByte(515), *nai[0]; got != want {
+		t.Errorf("NextActionInfo at %d got %+v, want %+v", 515, got, want)
+	}
+	actions[1].decrementCount()
+	if got, want := *tsconn.GetNextActionFromByte(515), *nai[1]; got != want {
+		t.Errorf("NextActionInfo at %d got %+v, want %+v", 515, got, want)
+	}
+	actions[2].decrementCount()
+	if got, want := *tsconn.GetNextActionFromByte(515), *nai[2]; got != want {
+		t.Errorf("NextActionInfo at %d got %+v, want %+v", 515, got, want)
+	}
+
+	if got, want := *tsconn.GetNextActionFromByte(1015), *nai[3]; got != want {
+		t.Errorf("NextActionInfo at %d got %+v, want %+v", 1015, got, want)
+	}
+	actions[4].decrementCount()
+	if got, want := *tsconn.GetNextActionFromByte(1015), *nai[4]; got != want {
+		t.Errorf("NextActionInfo at %d got %+v, want %+v", 1015, got, want)
+	}
+}
+
