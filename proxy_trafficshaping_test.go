@@ -12,9 +12,9 @@ import (
 	testing "testing"
 	time "time"
 
-	log "google3/third_party/golang/martian/log/log"
-	martiantest "google3/third_party/golang/martian/martiantest/martiantest"
-	trafficshape "google3/third_party/golang/martian/trafficshape/trafficshape"
+	log "github.com/google/martian/log/log"
+	martiantest "github.com/google/martian/martiantest/martiantest"
+	trafficshape "github.com/google/martian/trafficshape/trafficshape"
 )
 
 // Tests that sending data of length 600 bytes with max bandwidth of 100 bytes/s takes

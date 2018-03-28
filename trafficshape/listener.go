@@ -21,7 +21,7 @@ import (
 	sync "sync"
 	time "time"
 
-	log "google3/third_party/golang/martian/log/log"
+	log "github.com/google/martian/log/log"
 )
 
 // ErrForceClose is an error that communicates the need to close the connection.

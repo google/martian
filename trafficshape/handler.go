@@ -22,7 +22,7 @@ import (
 	http "net/http"
 	time "time"
 
-	log "google3/third_party/golang/martian/log/log"
+	log "github.com/google/martian/log/log"
 )
 
 // Handler configures a trafficshape.Listener.

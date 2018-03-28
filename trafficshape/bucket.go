@@ -20,7 +20,7 @@ import (
 	atomic "sync/atomic"
 	time "time"
 
-	log "google3/third_party/golang/martian/log/log"
+	log "github.com/google/martian/log/log"
 )
 
 // Bucket is a generic leaky bucket that drains at a configurable interval and

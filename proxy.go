@@ -28,10 +28,10 @@ import (
 	sync "sync"
 	time "time"
 
-	log "google3/third_party/golang/martian/log/log"
-	mitm "google3/third_party/golang/martian/mitm/mitm"
-	proxyutil "google3/third_party/golang/martian/proxyutil/proxyutil"
-	trafficshape "google3/third_party/golang/martian/trafficshape/trafficshape"
+	log "github.com/google/martian/log/log"
+	mitm "github.com/google/martian/mitm/mitm"
+	proxyutil "github.com/google/martian/proxyutil/proxyutil"
+	trafficshape "github.com/google/martian/trafficshape/trafficshape"
 )
 
 var errClose = errors.New("closing connection")
