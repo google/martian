@@ -321,6 +321,53 @@ func TestBodyLogging_ManyReads(t *testing.T) {
 	}
 }
 
+func TestReturnOriginalRequestPathAndQuery(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://example.com/foo%20bar?baz%20qux", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	var b bytes.Buffer
+	s := NewStream(&b)
+
+	s.LogRequest("Fake_Id0", req)
+	s.Close()
+
+	headers := make(map[string]string)
+	reader := NewReader(&b)
+
+	for {
+		frame, err := reader.ReadFrame()
+		if frame == nil {
+			break
+		}
+		if err != nil && err != io.EOF {
+			t.Fatalf("reader.ReadFrame(): got %v, want no error or io.EOF", err)
+		}
+
+		headerFrame, ok := frame.(Header)
+		if !ok {
+			t.Fatalf("frame.(Header): couldn't convert frame '%v' to a headerFrame", frame)
+		}
+		headers[headerFrame.Name] = headerFrame.Value
+	}
+
+	path := headers[":path"]
+	if path != "/foo%20bar" {
+		t.Fatalf("headers[:path]: expected /foo%%20bar but got %s", path)
+	}
+	query := headers[":query"]
+	if query != "baz%20qux" {
+		t.Fatalf("headers[:query]: expected baz%%20qux but got %s", query)
+	}
+}
+
 // readAllDataFrames reads all DataFrames with reader, filters the one that match provided
 // id and assembles data from all frames into single slice. It expects that
 // there is only one slice of DataFrames with provided id.

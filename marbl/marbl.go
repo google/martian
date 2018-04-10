@@ -157,7 +157,7 @@ func (s *Stream) LogRequest(id string, req *http.Request) error {
 	s.sendHeader(id, Request, ":method", req.Method)
 	s.sendHeader(id, Request, ":scheme", req.URL.Scheme)
 	s.sendHeader(id, Request, ":authority", req.URL.Host)
-	s.sendHeader(id, Request, ":path", req.URL.Path)
+	s.sendHeader(id, Request, ":path", req.URL.EscapedPath())
 	s.sendHeader(id, Request, ":query", req.URL.RawQuery)
 	s.sendHeader(id, Request, ":proto", req.Proto)
 	s.sendHeader(id, Request, ":remote", req.RemoteAddr)
