@@ -16,6 +16,7 @@ package trafficshape
 
 import (
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 type Bucket struct {
 	capacity int64 // atomic
 	fill     int64 // atomic
+	mu       sync.Mutex
 
 	t      *time.Ticker
 	closec chan struct{}
@@ -60,7 +62,7 @@ func (b *Bucket) Capacity() int64 {
 
 // SetCapacity sets the capacity for the bucket and resets the fill to zero.
 func (b *Bucket) SetCapacity(capacity int64) {
-	log.Debugf("trafficshape: set capacity: %d", capacity)
+	log.Infof("trafficshape: set capacity: %d", capacity)
 
 	atomic.StoreInt64(&b.capacity, capacity)
 	atomic.StoreInt64(&b.fill, 0)
@@ -108,6 +110,32 @@ func (b *Bucket) FillThrottle(fn func(int64) (int64, error)) (int64, error) {
 
 			return n, err
 		}
+
+		log.Debugf("trafficshape: bucket full (%d/%d)", fill, capacity)
+	}
+}
+
+// FillThrottleLocked is like FillThrottle, except that it uses a lock to protect
+// the critical section between accessing the fill value and updating it.
+func (b *Bucket) FillThrottleLocked(fn func(int64) (int64, error)) (int64, error) {
+	for {
+		if b.closed() {
+			log.Errorf("trafficshape: fill on closed bucket")
+			return 0, errFillClosedBucket
+		}
+
+		b.mu.Lock()
+		fill := atomic.LoadInt64(&b.fill)
+		capacity := atomic.LoadInt64(&b.capacity)
+
+		if fill < capacity {
+
+			n, err := fn(capacity - fill)
+			fill = atomic.AddInt64(&b.fill, n)
+			b.mu.Unlock()
+			return n, err
+		}
+		b.mu.Unlock()
 
 		log.Debugf("trafficshape: bucket full (%d/%d)", fill, capacity)
 	}
@@ -180,3 +208,4 @@ func (b *Bucket) closed() bool {
 		return false
 	}
 }
+

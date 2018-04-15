@@ -59,18 +59,20 @@ import (
 
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
-	proxy        *martian.Proxy
-	listener     net.Listener
-	mux          *http.ServeMux
-	started      bool
-	HARLogging   bool
-	TrafficPort  int
-	APIPort      int
-	APIOverTLS   bool
-	Cert         string
-	Key          string
-	AllowCORS    bool
-	RoundTripper *http.Transport
+	proxy         *martian.Proxy
+	listener      net.Listener
+	apiListener  net.Listener
+	mux           *http.ServeMux
+	started       bool
+	HARLogging    bool
+	TrafficPort   int
+	APIPort       int
+	APIOverTLS    bool
+	BindLocalhost bool
+	Cert          string
+	Key           string
+	AllowCORS     bool
+	RoundTripper  *http.Transport
 }
 
 // EnableCybervillains configures Martian to use the Cybervillians certificate.
@@ -87,7 +89,7 @@ func NewProxy() *Martian {
 // Start starts the proxy given the configured values of the Martian struct.
 func (m *Martian) Start() {
 	var err error
-	m.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", m.TrafficPort))
+	m.listener, err = net.Listen("tcp", m.bindAddress(m.TrafficPort))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -205,7 +207,11 @@ func (m *Martian) Start() {
 	go m.proxy.Serve(m.listener)
 
 	// start the API server
-	apiAddr := fmt.Sprintf(":%d", m.APIPort)
+	apiAddr := m.bindAddress(m.APIPort)
+	m.apiListener, err = net.Listen("tcp", apiAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if m.APIOverTLS {
 		if m.Cert == "" || m.Key == "" {
 			log.Fatal("mobile: APIOverTLS cannot be true without valid cert and key")
@@ -230,19 +236,17 @@ func (m *Martian) Start() {
 		}
 
 		go func() {
-			http.ListenAndServeTLS(apiAddr, cerfile.Name(), keyfile.Name(), m.mux)
+			http.ServeTLS(m.apiListener, m.mux, cerfile.Name(), keyfile.Name())
 			defer os.Remove(cerfile.Name())
 			defer os.Remove(keyfile.Name())
 		}()
 
 		mlog.Infof("mobile: proxy API started on %s over TLS", apiAddr)
 	} else {
-		go http.ListenAndServe(apiAddr, m.mux)
+		go http.Serve(m.apiListener, m.mux)
 		mlog.Infof("mobile: proxy API started on %s", apiAddr)
 	}
 
-	go http.ListenAndServe(apiAddr, m.mux)
-	mlog.Infof("mobile: proxy API started on %s", apiAddr)
 	m.started = true
 }
 
@@ -257,6 +261,7 @@ func (m *Martian) IsStarted() bool {
 func (m *Martian) Shutdown() {
 	mlog.Infof("mobile: shutting down proxy")
 	m.listener.Close()
+	m.apiListener.Close()
 	m.proxy.Close()
 	m.started = false
 	mlog.Infof("mobile: proxy shut down")
@@ -278,4 +283,11 @@ func (m *Martian) handle(pattern string, handler http.Handler) {
 	lhp := path.Join(fmt.Sprintf("localhost:%d", m.APIPort), pattern)
 	m.mux.Handle(lhp, handler)
 	mlog.Infof("mobile: handler registered for %s", lhp)
+}
+
+func (m *Martian) bindAddress(port int) string {
+	if m.BindLocalhost {
+		return fmt.Sprintf("[::1]:%d", port)
+	}
+	return fmt.Sprintf(":%d", port)
 }

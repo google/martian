@@ -34,27 +34,36 @@ func (hf Header) String() string {
 	return fmt.Sprintf("ID=%s; Type=%d; Name=%s; Value=%s", hf.ID, hf.MessageType, hf.Name, hf.Value)
 }
 
+// FrameType returns HeaderFrame
+func (hf Header) FrameType() FrameType {
+	return HeaderFrame
+}
+
 // Data is the payload (body) of the request or response.
 type Data struct {
 	ID          string
 	MessageType MessageType
+	Index       uint32
+	Terminal    bool
 	Data        []byte
 }
 
 // String returns the contents of a Data frame in a format appropriate for debugging and runtime logging. The
-// first 20 characters of the payload are emitted.
+// contents of the data content slice (df.Data) is not printed, instead the length of Data is printed.
 func (df Data) String() string {
-	dl := len(df.Data)
-	if dl > 20 {
-		dl = 20
-	}
+	return fmt.Sprintf("ID=%s; Type=%d; Index=%d; Terminal=%t; Data length=%d",
+		df.ID, df.MessageType, df.Index, df.Terminal, len(df.Data))
+}
 
-	return fmt.Sprintf("ID=%s; Type=%d; Data=%q", df.ID, df.MessageType, df.Data[:dl])
+// FrameType returns DataFrame
+func (df Data) FrameType() FrameType {
+	return DataFrame
 }
 
 // Frame describes the interface for a frame (either Data or Header).
 type Frame interface {
 	String() string
+	FrameType() FrameType
 }
 
 // Reader wraps a buffered Reader that reads from the io.Reader and emits Frames.
@@ -107,12 +116,20 @@ func (r *Reader) ReadFrame() (Frame, error) {
 			MessageType: MessageType(fh[1]),
 		}
 
-		dlen := make([]byte, 4)
-		if _, err := io.ReadFull(r.r, dlen); err != nil {
+		// Reading 9 bytes:
+		// 4 bytes index
+		// 1 byte terminal
+		// 4 bytes data length
+		desc := make([]byte, 9)
+		if _, err := io.ReadFull(r.r, desc); err != nil {
 			return nil, err
 		}
 
-		dl := binary.BigEndian.Uint32(dlen[:4])
+		df.Index = binary.BigEndian.Uint32(desc[:4])
+		df.Terminal = desc[4] == 1
+
+		dl := binary.BigEndian.Uint32(desc[5:])
+
 
 		data := make([]byte, int(dl))
 		if _, err := io.ReadFull(r.r, data); err != nil {

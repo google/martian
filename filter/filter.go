@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 	"github.com/google/martian/verify"
 )
 
@@ -122,6 +123,7 @@ func (f *Filter) ResponseWhenFalse(mod martian.ResponseModifier) {
 func (f *Filter) ModifyRequest(req *http.Request) error {
 	match := f.reqcond.MatchRequest(req)
 	if match {
+		log.Debugf("filter.ModifyRequest: matched %s", req.URL)
 		return f.treqmod.ModifyRequest(req)
 	}
 
@@ -133,6 +135,11 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 func (f *Filter) ModifyResponse(res *http.Response) error {
 	match := f.rescond.MatchResponse(res)
 	if match {
+		requ := ""
+		if res.Request != nil {
+			requ = res.Request.URL.String()
+		}
+		log.Debugf("filter.ModifyResponse: %s", requ)
 		return f.tresmod.ModifyResponse(res)
 	}
 

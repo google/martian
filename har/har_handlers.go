@@ -17,6 +17,8 @@ package har
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/google/martian/log"
 )
@@ -48,9 +50,10 @@ func (h *exportHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != "GET" {
 		rw.Header().Add("Allow", "GET")
 		rw.WriteHeader(http.StatusMethodNotAllowed)
-		log.Errorf("har: method not allowed: %s", req.Method)
+		log.Errorf("har.ServeHTTP: method not allowed: %s", req.Method)
 		return
 	}
+	log.Debugf("exportHandler.ServeHTTP: writing HAR logs to ResponseWriter")
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	hl := h.logger.Export()
@@ -66,9 +69,34 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("har: method not allowed: %s", req.Method)
 		return
 	}
-	h.logger.Reset()
 
-	log.Infof("har: logs cleared")
 
-	rw.WriteHeader(http.StatusNoContent)
+	v, err := parseBoolQueryParam(req.URL.Query(), "return")
+	if err != nil {
+		log.Errorf("har: invalid value for return param: %s", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if v {
+		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+		hl := h.logger.ExportAndReset()
+		json.NewEncoder(rw).Encode(hl)
+	} else {
+		h.logger.Reset()
+		rw.WriteHeader(http.StatusNoContent)
+	}
+
+	log.Infof("resetHandler.ServeHTTP: HAR logs cleared")
+}
+
+func parseBoolQueryParam(params url.Values, name string) (bool, error) {
+	if params[name] == nil {
+		return false, nil
+	}
+	v, err := strconv.ParseBool(params.Get("return"))
+	if err != nil {
+		return false, err
+	}
+	return v, nil
 }

@@ -69,11 +69,6 @@ func (s *Modifier) ModifyRequest(req *http.Request) error {
 	ctx := martian.NewContext(req)
 	ctx.SkipRoundTrip()
 
-	if req.URL.Scheme == "https" {
-		req.URL.Scheme = "http"
-		ctx.Session().MarkInsecure()
-	}
-
 	return nil
 }
 
@@ -132,7 +127,7 @@ func (s *Modifier) ModifyResponse(res *http.Response) error {
 	var ranges [][]int
 	for _, rng := range sranges {
 		if strings.HasSuffix(rng, "-") {
-			rng = fmt.Sprintf("%s%d", rng, info.Size())
+			rng = fmt.Sprintf("%s%d", rng, info.Size()-1)
 		}
 
 		rs := strings.Split(rng, "-")

@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/google/martian"
+	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/verify"
 )
@@ -88,6 +89,7 @@ func (g *Group) AddResponseModifier(resmod martian.ResponseModifier) {
 // aggregateErrors is set to true, the errors returned by each modifier in the group are
 // aggregated.
 func (g *Group) ModifyRequest(req *http.Request) error {
+	log.Debugf("fifo.ModifyRequest: %s", req.URL)
 	g.reqmu.RLock()
 	defer g.reqmu.RUnlock()
 
@@ -116,6 +118,11 @@ func (g *Group) ModifyRequest(req *http.Request) error {
 // aggregateErrors is set to true, the errors returned by each modifier in the group are
 // aggregated.
 func (g *Group) ModifyResponse(res *http.Response) error {
+	requ := ""
+	if res.Request != nil {
+		requ = res.Request.URL.String()
+		log.Debugf("fifo.ModifyResponse: %s", requ)
+	}
 	g.resmu.RLock()
 	defer g.resmu.RUnlock()
 
@@ -142,6 +149,7 @@ func (g *Group) ModifyResponse(res *http.Response) error {
 // VerifyRequests returns a MultiError containing all the
 // verification errors returned by request verifiers.
 func (g *Group) VerifyRequests() error {
+	log.Debugf("fifo.VerifyRequests()")
 	g.reqmu.Lock()
 	defer g.reqmu.Unlock()
 
@@ -167,6 +175,7 @@ func (g *Group) VerifyRequests() error {
 // VerifyResponses returns a MultiError containing all the
 // verification errors returned by response verifiers.
 func (g *Group) VerifyResponses() error {
+	log.Debugf("fifo.VerifyResponses()")
 	g.resmu.Lock()
 	defer g.resmu.Unlock()
 
@@ -191,6 +200,7 @@ func (g *Group) VerifyResponses() error {
 
 // ResetRequestVerifications resets the state of the contained request verifiers.
 func (g *Group) ResetRequestVerifications() {
+	log.Debugf("fifo.ResetRequestVerifications()")
 	g.reqmu.Lock()
 	defer g.reqmu.Unlock()
 
@@ -203,6 +213,7 @@ func (g *Group) ResetRequestVerifications() {
 
 // ResetResponseVerifications resets the state of the contained request verifiers.
 func (g *Group) ResetResponseVerifications() {
+	log.Debugf("fifo.ResetResponseVerifications()")
 	g.resmu.Lock()
 	defer g.resmu.Unlock()
 

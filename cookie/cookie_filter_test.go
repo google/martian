@@ -263,7 +263,12 @@ func TestResponseWhenTrue(t *testing.T) {
 		f.SetResponseCondition(cm)
 		f.ResponseWhenTrue(tm)
 
-		res := proxyutil.NewResponse(200, nil, nil)
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+		}
+
+		res := proxyutil.NewResponse(200, nil, req)
 
 		c := &http.Cookie{Name: tc.name, Value: tc.value}
 		res.Header.Add("Set-Cookie", c.String())
@@ -305,7 +310,12 @@ func TestResponseWhenFalse(t *testing.T) {
 		f.SetResponseCondition(cm)
 		f.ResponseWhenFalse(tm)
 
-		res := proxyutil.NewResponse(200, nil, nil)
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+		}
+
+		res := proxyutil.NewResponse(200, nil, req)
 
 		c := &http.Cookie{Name: tc.name, Value: tc.value}
 		res.Header.Add("Set-Cookie", c.String())
