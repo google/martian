@@ -254,7 +254,6 @@ func TestUpdateWithReplay(t *testing.T) {
 	req, ctx, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
-fmt.Println("About to call first ModifyRequest()")
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
 	}
@@ -263,7 +262,6 @@ fmt.Println("About to call first ModifyRequest()")
 	}
 
 	res := proxyutil.NewResponse(http.StatusTeapot, bytes.NewReader([]byte("some tea")), req)
-fmt.Println("About to call first ModifyResponse()")
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
 	}
@@ -273,7 +271,6 @@ fmt.Println("About to call first ModifyResponse()")
 	req, ctx, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
-fmt.Println("About to call second ModifyRequest()")
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
 	}
@@ -283,7 +280,6 @@ fmt.Println("About to call second ModifyRequest()")
 
 	// Initial dummy response.
 	res = proxyutil.NewResponse(http.StatusOK, nil, req)
-fmt.Println("About to call second ModifyResponse()")
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
 	}
@@ -376,7 +372,7 @@ func TestUpdateThenReplay(t *testing.T) {
 	}
 
 	// Reuse the db with new hermetic replaying modifier to check the new entry is used.
-	mod.db.Close()
+	mod.Close()
 	mod = newTestModifier(t, f.Name(), false, true, true)
 
 	// Third roundtrip should replay using second response.

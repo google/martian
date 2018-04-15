@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"runtime"
 	"time"
@@ -52,13 +54,13 @@ func init() {
 }
 
 type Modifier struct {
-	db       *bolt.DB
+	db *bolt.DB
 	// Bucket is the name of the database bucket.
-	Bucket   string
-	// Update determines whether the cache will be updated with new responses.
-	Update   bool
+	Bucket string
+	// Update determines whether the cache will be updated with live responses.
+	Update bool
 	// Replay determines whether the modifier will replay cached responses.
-	Replay   bool
+	Replay bool
 	// Hermetic determines whether to prevent request forwarding on cache miss.
 	Hermetic bool
 }
@@ -83,13 +85,12 @@ func NewModifier(filepath string) (*Modifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cache.Modifier: bolt.Open(%q): %v", filepath, err)
 	}
-	runtime.SetFinalizer(db, func(db *bolt.DB){
+	runtime.SetFinalizer(db, func(db *bolt.DB) {
 		log.Infof("cache.Modifier: closing boltdb file %q", db.Path())
 		if err := db.Close(); err != nil {
 			log.Errorf("cache.Modifier: db.Close(): %v", err)
 		}
-		})
-	// TODO: Figure out how to close the db after use.
+	})
 
 	return &Modifier{
 		db:       db,
@@ -100,11 +101,14 @@ func NewModifier(filepath string) (*Modifier, error) {
 	}, nil
 }
 
-// `bucket` is the bucket name of the boltdb to use. It will be created in the db if it doesn't already exist.
-// If `update` is true, the database will be updated with any live responses, e.g. on cache miss or when not replaying.
-// If `replay` is true, the modifier will replay responses from its cache.
-// If `hermetic` is true, the modifier will return error if it cannot replay a cached response, e.g. on cache miss or not replaying.
-// Argument combinations that don't make sense will return error, e.g. replay=false and hermetic=true.
+// Close closes the underlying database file.
+func (m *Modifier) Close() error {
+	if m.db != nil {
+		runtime.SetFinalizer(m.db, nil)
+		return m.db.Close()
+	}
+	return nil
+}
 
 // modifierFromJSON parses JSON into cache.Modifier.
 //
@@ -116,6 +120,12 @@ func NewModifier(filepath string) (*Modifier, error) {
 //   "replay":   true,
 //   "hermetic": false
 // }
+//
+// `file` is the filepath to the cache database file.
+// `bucket` is the name of the boltdb bucket to use. It will be created in the db on cache update if it doesn't already exist.
+// If `update` is true, the database will be updated with live responses, e.g. on cache miss or when not replaying.
+// If `replay` is true, the modifier will attempt to replay responses from its cache.
+// If `hermetic` is true, the modifier will return error if it cannot replay a cached response, e.g. on cache miss or not replaying.
 func modifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &modifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {
@@ -133,18 +143,6 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 	mod.Replay = msg.Replay
 	mod.Hermetic = msg.Hermetic
 
-	if mod.Update {
-		if err := mod.db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte(mod.Bucket))
-			if err != nil {
-				return fmt.Errorf("CreateBucketIfNotExists(%q): %v", mod.Bucket, err)
-			}
-			return nil
-		}); err != nil {
-			return nil, fmt.Errorf("cache.Modifier: db.Update(): %v", err)
-		}
-	}
-
 	log.Infof("cache.Modifier: created modifier from JSON: %v", mod)
 	return parse.NewResult(mod, msg.Scope)
 }
@@ -155,85 +153,77 @@ func (m *Modifier) String() string {
 		m.db.Path(), m.Bucket, m.Update, m.Replay, m.Hermetic)
 }
 
-// ModifyRequest modifies the http.Request.
+// ModifyRequest performs a cache lookup or passthrough for the request.
 func (m *Modifier) ModifyRequest(req *http.Request) error {
 	if !m.Replay {
 		if m.Hermetic {
-			return errors.New("cache.Modifier: in hermetic mode and not replaying from cache")
+			return errors.New("cache.Modifier.ModifyRequest(): in hermetic mode and not replaying from cache")
 		}
 		return nil
 	}
-fmt.Println("getCacheKey()")
+
 	key, err := getCacheKey(req)
 	if err != nil {
-		return fmt.Errorf("cache.Modifier: getCacheKey(): %v", err)
+		return fmt.Errorf("cache.Modifier.ModifyRequest(): getCacheKey(): %v", err)
 	}
-	fmt.Printf("key=%v\n", key)
-fmt.Println("m.db.View()")
-	if err := m.db.View(func(tx *bolt.Tx) error {
-		fmt.Printf("tx.Bucket(%v)\n", m.Bucket)
-		b := tx.Bucket([]byte(m.Bucket))
-fmt.Printf("b=%v\n", b)
-		fmt.Println("b.Get(key)")
-		cached := b.Get(key)
-		if cached != nil {
-			fmt.Println("ReadResponse()")
-			res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(cached)), req)
-			if err != nil {
-				return fmt.Errorf("http.ReadResponse(): %v", err)
+
+	return m.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket([]byte(m.Bucket)); b != nil {
+			if cached := b.Get(key); cached != nil {
+				res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(cached)), req)
+				if err != nil {
+					return fmt.Errorf("cache.Modifier.ModifyRequest(): http.ReadResponse(): %v", err)
+				}
+				ctx := martian.NewContext(req)
+				ctx.SkipRoundTrip()
+				ctx.Set(cachedResponseCtxKey, res)
+				return nil
 			}
-			fmt.Println("NewContext()")
-			ctx := martian.NewContext(req)
-			ctx.SkipRoundTrip()
-			ctx.Set(cachedResponseCtxKey, res)
-			return nil
 		}
 		if m.Hermetic {
-			return errors.New("in hermetic mode and no cached response found")
+			return errors.New("cache.Modifier.ModifyRequest(): in hermetic mode and no cached response found")
 		}
 		return nil
-	}); err != nil {
-		return fmt.Errorf("cache.Modifier: %v", err)
-	}
-	return nil
+	})
 }
 
-// ModifyResponse modifies the http.Response.
+// ModifyResponse applies the cached response, updates the cache with real response, or just passes through the response.
 func (m *Modifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
 	if cached, ok := ctx.Get(cachedResponseCtxKey); ok {
 		*res = *cached.(*http.Response)
 		return nil
 	}
-	if m.Update {
-		key, err := getCacheKey(res.Request)
-		if err != nil {
-			return fmt.Errorf("cache.Modifier: getCacheKey(): %v", err)
-		}
-		var buf bytes.Buffer
-		// TODO: Wrap res.Body so res.Write doesn't close it.
-		if err := res.Write(&buf); err != nil {
-			return fmt.Errorf("cache.Modifier: res.Write(): %v", err)
-		}
-		if err := m.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(m.Bucket))
-			if err := b.Put(key, buf.Bytes()); err != nil {
-				return fmt.Errorf("bucket.Put(): %v", err)
-			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("cache.Modifier: %v", err)
-		}
-		r, err := http.ReadResponse(bufio.NewReader(&buf), res.Request)
-		if err != nil {
-			return fmt.Errorf("cache.Modifier: http.ReadResponse(): %v", err)
-		}
-		*res = *r
+
+	if !m.Update {
+		return nil
 	}
-	return nil
+
+	key, err := getCacheKey(res.Request)
+	if err != nil {
+		return fmt.Errorf("cache.Modifier.ModifyResponse(): getCacheKey(): %v", err)
+	}
+
+	var buf, body bytes.Buffer
+	res.Body = ioutil.NopCloser(io.TeeReader(res.Body, &body))
+	defer func() { res.Body = ioutil.NopCloser(&body) }()
+	if err := res.Write(&buf); err != nil {
+		return fmt.Errorf("cache.Modifier.ModifyResponse(): res.Write(): %v", err)
+	}
+
+	return m.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(m.Bucket))
+		if err != nil {
+			return fmt.Errorf("cache.Modifier.ModifyResponse(): CreateBucketIfNotExists(%q): %v", m.Bucket, err)
+		}
+		if err := b.Put(key, buf.Bytes()); err != nil {
+			return fmt.Errorf("cache.Modifier.ModifyResponse(): bucket.Put(): %v", err)
+		}
+		return nil
+	})
 }
 
-// getCacheKey gets a cache key from the request context or generates a new one.
+// getCacheKey gets a cache key from the request context or generates a new one from the request.
 func getCacheKey(req *http.Request) ([]byte, error) {
 	// Use custom cache key from context if available.
 	ctx := martian.NewContext(req)
