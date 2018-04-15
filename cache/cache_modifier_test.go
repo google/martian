@@ -31,8 +31,6 @@ import (
 	"github.com/google/martian/proxyutil"
 )
 
-const testBucket = "test_bucket"
-
 func newTempFile(t *testing.T) *os.File {
 	t.Helper()
 
@@ -43,14 +41,17 @@ func newTempFile(t *testing.T) *os.File {
 	return f
 }
 
-func newModifier(t *testing.T, filepath string, update, replay, hermetic bool) *modifier {
+func newTestModifier(t *testing.T, filepath string, update, replay, hermetic bool) *Modifier {
 	t.Helper()
 
-	mod, err := NewModifier(filepath, testBucket, update, replay, hermetic)
+	mod, err := NewModifier(filepath)
 	if err != nil {
-		t.Fatalf("NewModifier(%q, %q, %v, %v, %v): got error %v, want no error", filepath, testBucket, update, replay, hermetic, err)
+		t.Fatalf("NewModifier(%q): got error %v, want no error", filepath, err)
 	}
-	return mod.(*modifier)
+	mod.Update = update
+	mod.Replay = replay
+	mod.Hermetic = hermetic
+	return mod
 }
 
 func newRequestWithContext(t *testing.T, method, url string) (*http.Request, *martian.Context, func()) {
@@ -102,12 +103,15 @@ func TestCreateCacheModifier(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod, err := NewModifier(f.Name(), "foo", true, true, false)
+	mod, err := NewModifier(f.Name())
 	if err != nil {
 		t.Fatalf("NewModifier(): got error %v, want no error", err)
 	}
 	if mod == nil {
 		t.Fatal("NewModifier(): mod is nil")
+	}
+	if mod.Bucket == "" {
+		t.Error("NewModifier(): Bucket is empty")
 	}
 }
 
@@ -143,85 +147,54 @@ func TestModifierFromJSON(t *testing.T) {
 	if r.ResponseModifier() == nil {
 		t.Fatal("parse.FromJSON(): result.ResponseModifier() is nil")
 	}
-
-	reqmod := r.RequestModifier().(*modifier)
-	resmod := r.ResponseModifier().(*modifier)
-
-	if reqmod.db == nil {
-		t.Errorf("reqmod.db: got nil, want not nil")
-	}
-	if resmod.db == nil {
-		t.Errorf("resmod.db: got nil, want not nil")
+	if r.RequestModifier().(*Modifier) != r.ResponseModifier().(*Modifier) {
+		t.Fatal("parse.FromJSON(): got different request and response modifiers, want same modifier")
 	}
 
-	if got, want := reqmod.bucket, "foo_bucket"; got != want {
-		t.Errorf("reqmod.bucket: got %s, want %s", got, want)
-	}
-	if got, want := resmod.bucket, "foo_bucket"; got != want {
-		t.Errorf("resmod.bucket: got %s, want %s", got, want)
-	}
+	mod := r.RequestModifier().(*Modifier)
 
-	if !reqmod.update {
-		t.Error("reqmod.update: got false, want true")
+	if mod.db == nil {
+		t.Errorf("mod.db: got nil, want not nil")
 	}
-	if !resmod.update {
-		t.Error("resmod.update: got false, want true")
+	if got, want := mod.Bucket, "foo_bucket"; got != want {
+		t.Errorf("mod.Bucket: got %s, want %s", got, want)
 	}
-
-	if !reqmod.replay {
-		t.Error("reqmod.replay: got false, want true")
+	if !mod.Update {
+		t.Error("mod.Update: got false, want true")
 	}
-	if !resmod.replay {
-		t.Error("resmod.replay: got false, want true")
+	if !mod.Replay {
+		t.Error("mod.Replay: got false, want true")
 	}
-
-	if !reqmod.hermetic {
-		t.Error("reqmod.hermetic: got false, want true")
-	}
-	if !resmod.hermetic {
-		t.Error("resmod.hermetic: got false, want true")
+	if !mod.Hermetic {
+		t.Error("mod.Hermetic: got false, want true")
 	}
 }
 
-func TestEmptyBucketWithNoUpdateAndNoReplayIsOK(t *testing.T) {
+func TestModifierFromJSONEmptyBucketUseDefault(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod, err := NewModifier(f.Name(), "", false, false, false)
+	fname, err := json.Marshal(f.Name())
 	if err != nil {
-		t.Fatalf("NewModifier(): got error %v, want no error", err)
+		t.Fatalf("json.Marshal(%q): got error %v, want no error", f.Name(), err)
+	}
+	msg := []byte(fmt.Sprintf(`{
+		"cache.Modifier": {
+			"scope": ["request", "response"],
+			"file": %s,
+			"bucket": ""
+		}
+	}`, fname))
+
+	r, err := parse.FromJSON(msg)
+	if err != nil {
+		t.Fatalf("parse.FromJSON(): got error %v, want no error", err)
 	}
 
-	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
-	defer remove()
+	mod := r.RequestModifier().(*Modifier)
 
-	if err := mod.ModifyRequest(req); err != nil {
-		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
-	}
-
-	res := proxyutil.NewResponse(http.StatusTeapot, bytes.NewReader([]byte("some tea")), req)
-	if err := mod.ModifyResponse(res); err != nil {
-		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
-	}
-}
-
-func TestEmptyBucketWithUpdateIsNotOK(t *testing.T) {
-	_, err := NewModifier("/dev/null", "", true, false, false)
-	if err == nil {
-		t.Fatal("NewModifier(): got no error, want error")
-	}
-	if msg := "bucket name cannot be empty"; !strings.Contains(err.Error(), msg) {
-		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
-	}
-}
-
-func TestEmptyBucketWithReplayIsNotOK(t *testing.T) {
-	_, err := NewModifier("/dev/null", "", false, true, false)
-	if err == nil {
-		t.Fatal("NewModifier(): got no error, want error")
-	}
-	if msg := "bucket name cannot be empty"; !strings.Contains(err.Error(), msg) {
-		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
+	if mod.Bucket == "" {
+		t.Error("mod.Bucket: got empty, want not empty")
 	}
 }
 
@@ -229,7 +202,7 @@ func TestNoUpdateWithNoReplay(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod := newModifier(t, f.Name(), false, false, false)
+	mod := newTestModifier(t, f.Name(), false, false, false)
 
 	oldHash := getFileHash(t, f.Name())
 
@@ -273,7 +246,7 @@ func TestUpdateWithReplay(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod := newModifier(t, f.Name(), true, true, false)
+	mod := newTestModifier(t, f.Name(), true, true, false)
 
 	oldHash := getFileHash(t, f.Name())
 
@@ -281,6 +254,7 @@ func TestUpdateWithReplay(t *testing.T) {
 	req, ctx, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
+fmt.Println("About to call first ModifyRequest()")
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
 	}
@@ -289,6 +263,7 @@ func TestUpdateWithReplay(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(http.StatusTeapot, bytes.NewReader([]byte("some tea")), req)
+fmt.Println("About to call first ModifyResponse()")
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
 	}
@@ -298,6 +273,7 @@ func TestUpdateWithReplay(t *testing.T) {
 	req, ctx, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
 
+fmt.Println("About to call second ModifyRequest()")
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("mod.ModifyRequest(): got error %v, want no error", err)
 	}
@@ -307,6 +283,7 @@ func TestUpdateWithReplay(t *testing.T) {
 
 	// Initial dummy response.
 	res = proxyutil.NewResponse(http.StatusOK, nil, req)
+fmt.Println("About to call second ModifyResponse()")
 	if err := mod.ModifyResponse(res); err != nil {
 		t.Fatalf("mod.ModifyResponse(): got error %v, want no error", err)
 	}
@@ -359,7 +336,7 @@ func TestUpdateThenReplay(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod := newModifier(t, f.Name(), true, false, false)
+	mod := newTestModifier(t, f.Name(), true, false, false)
 
 	oldHash := getFileHash(t, f.Name())
 
@@ -399,8 +376,8 @@ func TestUpdateThenReplay(t *testing.T) {
 	}
 
 	// Reuse the db with new hermetic replaying modifier to check the new entry is used.
-	mod.Close()
-	mod = newModifier(t, f.Name(), false, true, true)
+	mod.db.Close()
+	mod = newTestModifier(t, f.Name(), false, true, true)
 
 	// Third roundtrip should replay using second response.
 	req, _, remove = newRequestWithContext(t, "GET", "/hello?abc=123")
@@ -418,13 +395,21 @@ func TestUpdateThenReplay(t *testing.T) {
 	assertResponse(t, res, http.StatusNotFound, "hide and seek")
 }
 
-func TestHermeticWithNoReplayIsNotOK(t *testing.T) {
-	_, err := NewModifier("/dev/null", "rice_bucket", true, false, true)
+func TestHermeticNoReplay(t *testing.T) {
+	f := newTempFile(t)
+	defer os.RemoveAll(f.Name())
+
+	mod := newTestModifier(t, f.Name(), true, false, true)
+
+	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
+	defer remove()
+
+	err := mod.ModifyRequest(req)
 	if err == nil {
-		t.Fatal("NewModifier(): got no error, want error")
+		t.Fatal("mod.ModifyRequest(): got no error, want error")
 	}
-	if msg := "cannot use hermetic mode if not replaying"; !strings.Contains(err.Error(), msg) {
-		t.Errorf("NewModifier(): got error %q, want error to contain %q", err, msg)
+	if msg := "hermetic"; !strings.Contains(err.Error(), msg) {
+		t.Errorf("mod.ModifyRequest(): got error %q, want error to contain %q", err, msg)
 	}
 }
 
@@ -432,7 +417,7 @@ func TestHermeticCacheMiss(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod := newModifier(t, f.Name(), false, true, true)
+	mod := newTestModifier(t, f.Name(), false, true, true)
 
 	req, _, remove := newRequestWithContext(t, "GET", "/hello?abc=123")
 	defer remove()
@@ -450,7 +435,7 @@ func TestCustomCacheKey(t *testing.T) {
 	f := newTempFile(t)
 	defer os.RemoveAll(f.Name())
 
-	mod := newModifier(t, f.Name(), true, true, false)
+	mod := newTestModifier(t, f.Name(), true, true, false)
 
 	// Custom keygen modifier that uses only the URL path as cache key.
 	keyGenMod := func(req *http.Request) {
