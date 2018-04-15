@@ -32,22 +32,33 @@ import (
 
 const (
 	// CustomKey is the context key for setting a custom cache key for a request.
+	// This can be used by any upstream modifiers to set a custom cache key via the context.
 	CustomKey = "cache.CustomKey"
 
 	// cachedResponseCtxKey is the context key for storing the cached response for a request.
 	cachedResponseCtxKey = "cache.Response"
+
+	// defaultBucket is the default bucket name for boltdb.
+	defaultBucket = "martian.cache"
+
+	// defaultFileOpTimeout is the default timeout when doing file operations, e.g. open.
+	defaultFileOpTimeout = 10 * time.Second
 )
 
 func init() {
 	parse.Register("cache.Modifier", modifierFromJSON)
 }
 
-type modifier struct {
+type Modifier struct {
 	db       *bolt.DB
-	bucket   string
-	update   bool
-	replay   bool
-	hermetic bool
+	// Bucket is the name of the database bucket.
+	Bucket   string
+	// Update determines whether the cache will be updated with new responses.
+	Update   bool
+	// Replay determines whether the modifier will replay cached responses.
+	Replay   bool
+	// Hermetic determines whether to prevent request forwarding on cache miss.
+	Hermetic bool
 }
 
 type modifierJSON struct {
@@ -60,29 +71,34 @@ type modifierJSON struct {
 }
 
 // NewModifier returns a cache and replay modifier.
+// The returned modifier will be in non-hermetic replay mode using a default bucket name.
 // `filepath` is the filepath to the boltdb file containing cached responses.
-// `bucket` is the bucket name of the boltdb to use. It will be created in the db if it doesn't already exist.
-// If `update` is true, the database will be updated with any live responses, e.g. on cache miss or when not replaying.
-// If `replay` is true, the modifier will replay responses from its cache.
-// If `hermetic` is true, the modifier will return error if it cannot replay a cached response, e.g. on cache miss or not replaying.
-// Argument combinations that don't make sense will return error, e.g. replay=false and hermetic=true.
-func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martian.RequestResponseModifier, error) {
+func NewModifier(filepath string) (Modifier, error) {
+	log.Infof("cache.Modifier: opening boltdb file %q", filepath)
+	db, err := bolt.Open(filepath, 0600, &bolt.Options{
+		Timeout: defaultFileOpTimeout,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cache.Modifier: bolt.Open(%q): %v", filepath, err)
+	}
+	// TODO: Figure out how to close the db after use.
+
+	return &modifier{
+		db:       db,
+		Bucket:   defaultBucket,
+		Update:   false,
+		Replay:   true,
+		Hermetic: false,
+	}, nil
+}
+
+, bucket string, update, replay, hermetic bool
 	if !replay && hermetic {
 		return nil, fmt.Errorf("cache.Modifier: cannot use hermetic mode if not replaying")
 	}
 	if bucket == "" && (update || replay) {
 		return nil, fmt.Errorf("cache.Modifier: bucket name cannot be empty if updating or replaying")
 	}
-
-	opt := &bolt.Options{
-		Timeout: 10 * time.Second,
-	}
-	log.Debugf("cache.Modifier: opening boltdb file %q", filepath)
-	db, err := bolt.Open(filepath, 0600, opt)
-	if err != nil {
-		return nil, fmt.Errorf("cache.Modifier: bolt.Open(%q): %v", filepath, err)
-	}
-	// TODO: Figure out how to close the db after use.
 
 	if bucket != "" {
 		if err := db.Update(func(tx *bolt.Tx) error {
@@ -96,14 +112,11 @@ func NewModifier(filepath, bucket string, update, replay, hermetic bool) (martia
 		}
 	}
 
-	return &modifier{
-		db:       db,
-		bucket:   bucket,
-		update:   update,
-		replay:   replay,
-		hermetic: hermetic,
-	}, nil
-}
+// `bucket` is the bucket name of the boltdb to use. It will be created in the db if it doesn't already exist.
+// If `update` is true, the database will be updated with any live responses, e.g. on cache miss or when not replaying.
+// If `replay` is true, the modifier will replay responses from its cache.
+// If `hermetic` is true, the modifier will return error if it cannot replay a cached response, e.g. on cache miss or not replaying.
+// Argument combinations that don't make sense will return error, e.g. replay=false and hermetic=true.
 
 // modifierFromJSON parses JSON into cache.Modifier.
 //
@@ -129,7 +142,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 }
 
 // Close closes the underlying database.
-func (m *modifier) Close() error {
+func (m *Modifier) Close() error {
 	if m.db != nil {
 		return m.db.Close()
 	}
@@ -137,8 +150,8 @@ func (m *modifier) Close() error {
 }
 
 // ModifyRequest modifies the http.Request.
-func (m *modifier) ModifyRequest(req *http.Request) error {
-	if !m.replay {
+func (m *Modifier) ModifyRequest(req *http.Request) error {
+	if !m.Replay {
 		return nil
 	}
 
@@ -148,7 +161,7 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 	}
 
 	if err := m.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(m.bucket))
+		b := tx.Bucket([]byte(m.Bucket))
 		cached := b.Get(key)
 		if cached != nil {
 			res, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(cached)), req)
@@ -159,7 +172,7 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 			ctx.SkipRoundTrip()
 			ctx.Set(cachedResponseCtxKey, res)
 			return nil
-		} else if m.hermetic {
+		} else if m.Hermetic {
 			return fmt.Errorf("in hermetic mode and no cached response found")
 		}
 		return nil
@@ -170,12 +183,13 @@ func (m *modifier) ModifyRequest(req *http.Request) error {
 }
 
 // ModifyResponse modifies the http.Response.
-func (m *modifier) ModifyResponse(res *http.Response) error {
+func (m *Modifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
-	cached, ok := ctx.Get(cachedResponseCtxKey)
-	if ok {
+	if cached, ok := ctx.Get(cachedResponseCtxKey); ok {
 		*res = *cached.(*http.Response)
-	} else if m.update {
+		return nil
+	}
+	if m.Update {
 		key, err := getCacheKey(res.Request)
 		if err != nil {
 			return fmt.Errorf("cache.Modifier: getCacheKey(): %v", err)
@@ -186,7 +200,7 @@ func (m *modifier) ModifyResponse(res *http.Response) error {
 			return fmt.Errorf("cache.Modifier: res.Write(): %v", err)
 		}
 		if err := m.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(m.bucket))
+			b := tx.Bucket([]byte(m.Bucket))
 			if err := b.Put(key, buf.Bytes()); err != nil {
 				return fmt.Errorf("bucket.Put(): %v", err)
 			}
