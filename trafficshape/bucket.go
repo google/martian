@@ -213,3 +213,4 @@ func (b *Bucket) closed() bool {
 		return false
 	}
 }
+
