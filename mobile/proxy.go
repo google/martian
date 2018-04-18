@@ -38,6 +38,7 @@ import (
 	"github.com/google/martian/martianhttp"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/servemux"
+	"github.com/google/martian/trafficshape"
 	"github.com/google/martian/verify"
 
 	// side-effect importing to register with JSON API
@@ -59,20 +60,21 @@ import (
 
 // Martian is a wrapper for the initialized Martian proxy
 type Martian struct {
-	proxy         *martian.Proxy
-	listener      net.Listener
-	apiListener  net.Listener
-	mux           *http.ServeMux
-	started       bool
-	HARLogging    bool
-	TrafficPort   int
-	APIPort       int
-	APIOverTLS    bool
-	BindLocalhost bool
-	Cert          string
-	Key           string
-	AllowCORS     bool
-	RoundTripper  *http.Transport
+	proxy          *martian.Proxy
+	listener       net.Listener
+	apiListener    net.Listener
+	mux            *http.ServeMux
+	started        bool
+	HARLogging     bool
+	TrafficPort    int
+	TrafficShaping bool
+	APIPort        int
+	APIOverTLS     bool
+	BindLocalhost  bool
+	Cert           string
+	Key            string
+	AllowCORS      bool
+	RoundTripper   *http.Transport
 }
 
 // EnableCybervillains configures Martian to use the Cybervillians certificate.
@@ -127,6 +129,14 @@ func (m *Martian) Start() {
 			m.proxy.SetRoundTripper(m.RoundTripper)
 		}
 		m.handle("/authority.cer", martianhttp.NewAuthorityHandler(x509c))
+	}
+
+	// Enable Traffic shaping if requested
+	if m.TrafficShaping {
+		tsl := trafficshape.NewListener(m.listener)
+		tsh := trafficshape.NewHandler(tsl)
+		m.handle("/shape-traffic", tsh)
+		m.listener = tsl
 	}
 
 	// Forward traffic that pattern matches in m.mux before applying
