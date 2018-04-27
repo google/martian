@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -46,6 +47,7 @@ type Server struct {
 	trafficShaping  bool
 	apiCertPath     string
 	apiKeyPath      string
+	downstreamProxy *url.URL
 }
 
 // Start starts the proxy server. Blocks until SIGINT or SIGKILL is received.
@@ -73,8 +75,7 @@ func (s *Server) Start() error {
 	go s.proxy.Serve(s.trafficListener)
 
 	if s.apiCertPath != "" && s.apiKeyPath != "" {
-		// todo: why ServeTLS is undefined?
-		// go http.ServeTLS(s.apiListener, s.mux, s.apiCertPath, s.apiKeyPath)
+		go http.ServeTLS(s.apiListener, s.mux, s.apiCertPath, s.apiKeyPath)
 	} else {
 		go http.Serve(s.apiListener, s.mux)
 	}
@@ -165,6 +166,15 @@ func EnableTrafficShaping() func(*Server) error {
 func AllowCORS() func(*Server) error {
 	return func(s *Server) error {
 		s.allowCORS = true
+
+		return nil
+	}
+}
+
+// DownstreamProxy sets the url of a proxy that requests are forwarded to.
+func DownstreamProxy(downstreamProxy *url.URL) func(*Server) error {
+	return func(s *Server) error {
+		s.proxy.SetDownstreamProxy(downstreamProxy)
 
 		return nil
 	}
