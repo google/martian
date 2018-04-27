@@ -67,12 +67,11 @@ func (s *Server) Start() error {
 }
 
 // NewServer returns a Server listening on apiPort and trafficPort.
-func NewServer(trafficPort, apiPort int, allowCORS bool, options ...func(*Server)) (*Server, error) {
+func NewServer(trafficPort, apiPort int, options ...func(*Server)) (*Server, error) {
 	svr := &Server{
 		proxy:       martian.NewProxy(),
 		trafficPort: trafficPort,
 		apiPort:     apiPort,
-		allowCORS:   allowCORS,
 	}
 
 	for _, optionFunc := range options {
@@ -136,6 +135,15 @@ func APIOverTLS(certPath, keyPath string) func(*Server) error {
 func EnableTrafficShaping() func(*Server) error {
 	return func(s *Server) error {
 		s.trafficShaping = true
+
+		return nil
+	}
+}
+
+// AllowCORS allows CORS requests for the API.
+func AllowCORS() func(*Server) error {
+	return func(s *Server) error {
+		s.allowCORS = true
 
 		return nil
 	}
