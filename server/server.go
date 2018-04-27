@@ -58,12 +58,18 @@ func (s *Server) Start() error {
 
 	go s.proxy.Serve(s.trafficListener)
 
-	go http.Serve(s.apiListener, s.mux)
+	if s.apiCertPath != "" && s.apiKeyPath != "" {
+		//go http.ServeTLS(s.apiListener, s.mux, s.apiCertPath, s.apiKeyPath)
+	} else {
+		go http.Serve(s.apiListener, s.mux)
+	}
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, os.Kill)
 
 	<-sigc
+
+	return nil
 }
 
 // NewServer returns a Server listening on apiPort and trafficPort.
