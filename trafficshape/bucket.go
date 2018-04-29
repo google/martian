@@ -72,6 +72,11 @@ func (b *Bucket) SetCapacity(capacity int64) {
 func (b *Bucket) Close() error {
 	log.Debugf("trafficshape: closing bucket")
 
+	// Allow b to be closed multiple times without panicking.
+	if b.closed() {
+		return nil
+	}
+
 	b.t.Stop()
 	close(b.closec)
 

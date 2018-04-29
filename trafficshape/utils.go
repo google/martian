@@ -13,12 +13,12 @@ import (
 // Converts a sorted slice of Throttles to their ChangeBandwidth actions. In adddition, checks for
 // overlapping throttle ranges. Returns a slice of actions and an error specifying if the throttles
 // passed the non-overlapping verification.
-// Idea: For every throttle, add two ChangeBandwidth actions (one for start and one for end), unless the
-// ending byte of one throttle is the same as the starting byte of the next throttle, in which case
-// we do not add the end ChangeBandwidth for the first throttle, or if the end of a throttle is -1
-// (representing till the end of file), in which case we do not add the end ChangeBandwidth action
-// for the throttle. Note, we only allow the last throttle in the sorted list to have an end of -1,
-// since otherwise there would be an overlap.
+// Idea: For every throttle, add two ChangeBandwidth actions (one for start and one for end), unless
+// the ending byte of one throttle is the same as the starting byte of the next throttle, in which
+// case we do not add the end ChangeBandwidth for the first throttle, or if the end of a throttle
+// is -1 (representing till the end of file), in which case we do not add the end ChangeBandwidth
+// action for the throttle. Note, we only allow the last throttle in the sorted list to have an end
+// of -1, since otherwise there would be an overlap.
 func getActionsFromThrottles(throttles []*Throttle, defaultBandwidth int64) ([]Action, error) {
 
 	lenThr := len(throttles)
@@ -73,8 +73,8 @@ func getActionsFromThrottles(throttles []*Throttle, defaultBandwidth int64) ([]A
 	return actions, nil
 }
 
-// Parses the Trafficshape object and populates/updates Traffficshape.Shapes, while performing verifications.
-// Returns an error in case a verification check fails.
+// Parses the Trafficshape object and populates/updates Traffficshape.Shapes,
+// while performing verifications. Returns an error in case a verification check fails.
 func parseShapes(ts *Trafficshape) error {
 	var err error
 	for shapeIndex, shape := range ts.Shapes {
@@ -166,18 +166,23 @@ func parseShapes(ts *Trafficshape) error {
 		offset := len(shape.Halts)
 		for index, value := range shape.CloseConnections {
 			if value == nil {
-				return fmt.Errorf("nil close_connection at index %d in shape index %d", index, shapeIndex)
+				return fmt.Errorf("nil close_connection at index %d in shape index %d",
+					index, shapeIndex)
 			}
 			if value.Byte < 0 {
-				return fmt.Errorf("invalid close_connection at index %d in shape index %d", index, shapeIndex)
+				return fmt.Errorf("invalid close_connection at index %d in shape index %d",
+					index, shapeIndex)
 			}
 			if value.Count == 0 {
-				return fmt.Errorf("0 count for close_connection at index %d in shape index %d", index, shapeIndex)
+				return fmt.Errorf("0 count for close_connection at index %d in shape index %d",
+				 index, shapeIndex)
 			}
 			shape.Actions[offset+index] = Action(value)
 		}
 
-		sort.SliceStable(shape.Throttles, func(i, j int) bool { return shape.Throttles[i].ByteStart < shape.Throttles[j].ByteStart })
+		sort.SliceStable(shape.Throttles, func(i, j int) bool { 
+			return shape.Throttles[i].ByteStart < shape.Throttles[j].ByteStart 
+			})
 
 		defaultBandwidth := DefaultBitrate / 8
 		if shape.MaxBandwidth > 0 {

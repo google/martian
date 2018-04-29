@@ -499,7 +499,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 					// Check if response lies in a throttled byte range.
 					ptsconn.Context.ThrottleContext = ptsconn.GetCurrentThrottle(rangeStart)
 					if ptsconn.Context.ThrottleContext.ThrottleNow {
-						ptsconn.Context.Buckets.WriteBucket.SetCapacity(ptsconn.Context.ThrottleContext.Bandwidth)
+						ptsconn.Context.Buckets.WriteBucket.SetCapacity(
+							ptsconn.Context.ThrottleContext.Bandwidth)
 					}
 					log.Infof("Request %s with Range Start: %d matches a Shaping request %s. Will enforce Traffic shaping.",
 						req.URL, rangeStart, urlregex)
