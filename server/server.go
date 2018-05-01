@@ -27,14 +27,20 @@ import (
 	"time"
 
 	"github.com/google/martian"
+	"github.com/google/martian/api"
 	"github.com/google/martian/cors"
+	"github.com/google/martian/fifo"
+	"github.com/google/martian/httpspec"
 	"github.com/google/martian/mitm"
+	"github.com/google/martian/servemux"
 	"github.com/google/martian/trafficshape"
 )
 
 // Server is a Martian Proxy server.
 type Server struct {
-	proxy           *martian.Proxy
+	Proxy *martian.Proxy
+
+	name            string
 	trafficPort     int
 	apiPort         int
 	trafficListener net.Listener
@@ -48,6 +54,7 @@ type Server struct {
 	apiCertPath     string
 	apiKeyPath      string
 	downstreamProxy *url.URL
+	modifiers       *fifo.Group
 }
 
 // Start starts the proxy server. Blocks until SIGINT or SIGKILL is received.
@@ -65,6 +72,9 @@ func (s *Server) Start() error {
 		s.trafficListener = tsl
 	}
 
+	s.Proxy.SetRequestModifier(s.modifiers)
+	s.Proxy.SetResponseModifier(s.modifiers)
+
 	apil, err := net.Listen("tcp", fmt.Sprintf(":%d", s.apiPort))
 	if err != nil {
 		return err
@@ -72,7 +82,7 @@ func (s *Server) Start() error {
 
 	s.apiListener = apil
 
-	go s.proxy.Serve(s.trafficListener)
+	go s.Proxy.Serve(s.trafficListener)
 
 	if s.apiCertPath != "" && s.apiKeyPath != "" {
 		go http.ServeTLS(s.apiListener, s.mux, s.apiCertPath, s.apiKeyPath)
@@ -89,12 +99,23 @@ func (s *Server) Start() error {
 }
 
 // NewServer returns a Server.
-func NewServer(trafficPort, apiPort int, options ...func(*Server) error) (*Server, error) {
+func NewServer(name string, trafficPort, apiPort int, options ...func(*Server) error) (*Server, error) {
 	svr := &Server{
-		proxy:       martian.NewProxy(),
+		name:        name,
 		trafficPort: trafficPort,
 		apiPort:     apiPort,
+		Proxy:       martian.NewProxy(),
+		modifiers:   fifo.NewGroup(),
 	}
+
+	// Forward api traffic that matches in svr.mux before httpspec and logging modifiers
+	apif := servemux.NewFilter(svr.mux)
+	apif.SetRequestModifier(api.NewForwarder("", svr.apiPort))
+	svr.modifiers.AddRequestModifier(apif)
+
+	stack, _ := httpspec.NewStack(name)
+	svr.modifiers.AddRequestModifier(stack)
+	svr.modifiers.AddResponseModifier(stack)
 
 	for _, optionFunc := range options {
 		optionFunc(svr)
@@ -103,10 +124,10 @@ func NewServer(trafficPort, apiPort int, options ...func(*Server) error) (*Serve
 	return svr, nil
 }
 
-// Roundtripper sets the proxy HTTP roundtripper.
-func Roundtripper(rt http.RoundTripper) func(*Server) error {
+// SetRoundTripper sets the proxy HTTP roundtripper.
+func SetRoundTripper(rt http.RoundTripper) func(*Server) error {
 	return func(s *Server) error {
-		s.proxy.SetRoundTripper(rt)
+		s.Proxy.SetRoundTripper(rt)
 
 		return nil
 	}
@@ -138,7 +159,7 @@ func (s *Server) enableMITM(cert, key string) error {
 	mc.SetValidity(12 * time.Hour)
 	mc.SetOrganization("Martian Proxy")
 
-	s.proxy.SetMITM(mc)
+	s.Proxy.SetMITM(mc)
 
 	return nil
 }
@@ -174,7 +195,7 @@ func AllowCORS() func(*Server) error {
 // DownstreamProxy sets the url of a proxy that requests are forwarded to.
 func DownstreamProxy(downstreamProxy *url.URL) func(*Server) error {
 	return func(s *Server) error {
-		s.proxy.SetDownstreamProxy(downstreamProxy)
+		s.Proxy.SetDownstreamProxy(downstreamProxy)
 
 		return nil
 	}
