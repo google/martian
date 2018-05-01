@@ -75,7 +75,7 @@ type modifierJSON struct {
 }
 
 // NewModifier returns a cache and replay modifier.
-// The returned modifier will be in non-hermetic replay mode using a default bucket name.
+// The returned modifier will be in non-hermetic passthrough mode using a default bucket name.
 // `filepath` is the filepath to the boltdb file containing cached responses.
 func NewModifier(filepath string) (*Modifier, error) {
 	log.Infof("cache.Modifier: opening boltdb file %q", filepath)
@@ -96,7 +96,7 @@ func NewModifier(filepath string) (*Modifier, error) {
 		db:       db,
 		Bucket:   defaultBucket,
 		Update:   false,
-		Replay:   true,
+		Replay:   false,
 		Hermetic: false,
 	}, nil
 }
