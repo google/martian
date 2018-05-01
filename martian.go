@@ -56,3 +56,7 @@ func (f RequestModifierFunc) ModifyRequest(req *http.Request) error {
 func (f ResponseModifierFunc) ModifyResponse(res *http.Response) error {
 	return f(res)
 }
+
+type Logger interface {
+	RequestResponseModifier
+}

@@ -20,6 +20,8 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/google/martian"
+	"github.com/google/martian/har"
 	"github.com/google/martian/log"
 )
 
@@ -35,6 +37,14 @@ type resetHandler struct {
 func NewExportHandler(l *Logger) http.Handler {
 	return &exportHandler{
 		logger: l,
+	}
+}
+
+func ExportHandlerFunc(l martian.Logger) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		hl, _ := l.(har.Logger)
+		eh := exportHandler{logger: hl}
+		eh.ServeHTTP(rw, req)
 	}
 }
 
@@ -69,7 +79,6 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("har: method not allowed: %s", req.Method)
 		return
 	}
-
 
 	v, err := parseBoolQueryParam(req.URL.Query(), "return")
 	if err != nil {

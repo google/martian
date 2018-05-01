@@ -157,7 +157,7 @@ func (s *Server) enableMITM(cert, key string) error {
 	}
 
 	mc.SetValidity(12 * time.Hour)
-	mc.SetOrganization("Martian Proxy")
+	mc.SetOrganization(s.name)
 
 	s.Proxy.SetMITM(mc)
 
@@ -201,6 +201,31 @@ func DownstreamProxy(downstreamProxy *url.URL) func(*Server) error {
 	}
 }
 
+// AddModifiers sets the modifiers.
+func AddModifiers(mods martian.RequestResponseModifier, setPath, resetPath string) func(*Server) error {
+	return func(s *Server) error {
+
+		return nil
+	}
+}
+
+// SetPremodificationLogger sets logging before Runtime Configurable modifiers.
+func SetPremodificationLogger(logger martian.RequestResponseModifier,
+	handlers map[string]func(martian.RequestResponseModifier) http.HandlerFunc) func(*Server) error {
+
+	return func(s *Server) error {
+		smuxf := servemux.NewFilter(s.mux)
+		smuxf.RequestWhenFalse(logger)
+		smuxf.ResponseWhenFalse(logger)
+
+		for pattern, handler := range handlers {
+			s.handlerFunc(pattern, handler(logger))
+		}
+
+		return nil
+	}
+}
+
 func (s *Server) handle(pattern string, handler http.Handler) {
 	if s.allowCORS {
 		handler = cors.NewHandler(handler)
@@ -211,3 +236,12 @@ func (s *Server) handle(pattern string, handler http.Handler) {
 	lhp := path.Join(fmt.Sprintf("localhost:%d", s.apiPort), pattern)
 	s.mux.Handle(lhp, handler)
 }
+
+func (s *Server) handlerFunc(pattern string, handleFunc http.HandlerFunc) {
+	s.mux.HandleFunc(pattern, handleFunc)
+
+	lhp := path.Join(fmt.Sprintf("localhost:%d", s.apiPort), pattern)
+	s.mux.HandleFunc(lhp, handleFunc)
+}
+
+type loggerFunc = func(martian.RequestResponseModifier) http.HandlerFunc

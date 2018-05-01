@@ -13,15 +13,29 @@
 // limitations under the License.
 package server
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+
+	"github.com/google/martian"
+
+	"github.com/google/martian/fifo"
+	"github.com/google/martian/har"
+)
 
 func TestServer(t *testing.T) {
 	t.Skip("not a real test")
 
-	server, _ := NewServer(8080, 8888,
+	phar := har.NewLogger()
+
+	server, _ := NewServer("somenamed", 8080, 8888,
 		EnableTrafficShaping(),
 		AllowCORS(),
 		EnableMITM("cert", "key"),
+		SetPremodificationLogger(har.NewLogger(), map[string]func(martian.Logger) http.HandlerFunc{
+			"/logs": har.ExportHandlerFunc,
+		}),
+		AddModifiers(fifo.NewGroup(), "/config", "/config/reset"),
 	)
 
 	server.Start()
