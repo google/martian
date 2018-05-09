@@ -16,7 +16,7 @@ anywhere that Go can target.
 
 ## Requirements
 
-Go 1.6
+Go 1.8
 
 ## Getting Started
 
