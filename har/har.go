@@ -202,7 +202,7 @@ type PostData struct {
 	// Params is a list of posted parameters (in case of URL encoded parameters).
 	Params []Param `json:"params"`
 	// Text contains the plain text posted data.
-	Text string `json:"text"`
+	Text []byte `json:"text"`
 }
 
 // Param describes an individual posted parameter.
@@ -701,7 +701,7 @@ func postData(req *http.Request, logBody bool) (*PostData, error) {
 			return nil, err
 		}
 
-		pd.Text = string(body)
+		pd.Text = body
 	}
 
 	return pd, nil
