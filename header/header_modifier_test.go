@@ -23,7 +23,7 @@ import (
 )
 
 func TestNewHeaderModifier(t *testing.T) {
-	mod := NewModifier("testing", "true", false)
+	mod := NewModifier("testing", "true")
 
 	req, err := http.NewRequest("GET", "/", nil)
 	if err != nil {
@@ -47,7 +47,7 @@ func TestNewHeaderModifier(t *testing.T) {
 }
 
 func TestModifyRequestWithHostHeader(t *testing.T) {
-	m := NewModifier("Host", "www.google.com", false)
+	m := NewModifier("Host", "www.google.com")
 
 	req, err := http.NewRequest("GET", "www.example.com", nil)
 	if err != nil {
@@ -63,7 +63,8 @@ func TestModifyRequestWithHostHeader(t *testing.T) {
 }
 
 func TestModifyRequestWithMultipleHeaders(t *testing.T) {
-	m := NewModifier("X-Repeated", "modifier", true)
+	m := NewModifier("X-Repeated", "modifier")
+	m.SetBehavior(AppendValues)
 
 	req, err := http.NewRequest("GET", "www.example.com", nil)
 	req.Header.Add("X-Repeated", "original")

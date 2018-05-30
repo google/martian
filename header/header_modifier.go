@@ -16,9 +16,9 @@ package header
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
-	"github.com/google/martian"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"
 )
@@ -27,44 +27,54 @@ func init() {
 	parse.Register("header.Modifier", modifierFromJSON)
 }
 
-type modifier struct {
+type HeaderSetBehavior int
+
+const (
+	ReplaceValues HeaderSetBehavior = iota
+	AppendValues
+)
+
+type Modifier struct {
 	name, value string
-	add         bool
+	behavior    HeaderSetBehavior
 }
 
 type modifierJSON struct {
-	Name  string               `json:"name"`
-	Value string               `json:"value"`
-	Add   bool                 `json:"add"`
-	Scope []parse.ModifierType `json:"scope"`
+	Name     string               `json:"name"`
+	Value    string               `json:"value"`
+	Behavior string               `json:"behavior"`
+	Scope    []parse.ModifierType `json:"scope"`
 }
 
 // ModifyRequest sets the header at name with value on the request.
-func (m *modifier) ModifyRequest(req *http.Request) error {
-	return m.setOrAddHeader(proxyutil.RequestHeader(req))
+func (m *Modifier) ModifyRequest(req *http.Request) error {
+	h := proxyutil.RequestHeader(req)
+	if m.behavior == AppendValues {
+		return h.Add(m.name, m.value)
+	}
+	return h.Set(m.name, m.value)
 }
 
 // ModifyResponse sets the header at name with value on the response.
-func (m *modifier) ModifyResponse(res *http.Response) error {
-	return m.setOrAddHeader(proxyutil.ResponseHeader(res))
+func (m *Modifier) ModifyResponse(res *http.Response) error {
+	h := proxyutil.ResponseHeader(res)
+	if m.behavior == AppendValues {
+		return h.Add(m.name, m.value)
+	}
+	return h.Set(m.name, m.value)
 }
 
-func (m *modifier) setOrAddHeader(h *proxyutil.Header) error {
-	if m.add {
-		return h.Add(m.name, m.value)
-	} else {
-		return h.Set(m.name, m.value)
-	}
+func (m *Modifier) SetBehavior(b HeaderSetBehavior) {
+	m.behavior = b
 }
 
 // NewModifier returns a modifier that will set the header at name with
 // the given value for both requests and responses. If the header name already
 // exists all values will be overwritten.
-func NewModifier(name, value string, add bool) martian.RequestResponseModifier {
-	return &modifier{
+func NewModifier(name, value string) *Modifier {
+	return &Modifier{
 		name:  http.CanonicalHeaderKey(name),
 		value: value,
-		add:   add,
 	}
 }
 
@@ -83,7 +93,15 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	modifier := NewModifier(msg.Name, msg.Value, msg.Add)
+	modifier := NewModifier(msg.Name, msg.Value)
+
+	if msg.Behavior == "" || msg.Behavior == "replace" {
+		modifier.SetBehavior(ReplaceValues)
+	} else if msg.Behavior == "append" {
+		modifier.SetBehavior(AppendValues)
+	} else {
+		return nil, errors.New("Invalid header modifier behavior " + msg.Behavior)
+	}
 
 	return parse.NewResult(modifier, msg.Scope)
 }
