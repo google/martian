@@ -658,10 +658,12 @@ func headers(hs http.Header) []Header {
 	hhs := make([]Header, 0, len(hs))
 
 	for n, vs := range hs {
-		hhs = append(hhs, Header{
-			Name:  n,
-			Value: strings.Join(vs, ", "),
-		})
+		for _, v := range vs {
+			hhs = append(hhs, Header{
+				Name:  n,
+				Value: v,
+			})
+		}
 	}
 
 	return hhs

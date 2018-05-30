@@ -100,27 +100,13 @@ func TestModifyRequest(t *testing.T) {
 		t.Errorf("qs.Value: got %q, want %q", got, want)
 	}
 
-	if got, want := len(hreq.Headers), 3; got != want {
-		t.Fatalf("len(hreq.Headers): got %d, want %d", got, want)
+	wantHeaders := http.Header{
+		"Request-Header": {"first", "second"},
+		"Cookie":         {cookie.String()},
+		"Host":           {"example.com"},
 	}
-
-	for _, h := range hreq.Headers {
-		var want string
-		switch h.Name {
-		case "Request-Header":
-			want = "first, second"
-		case "Cookie":
-			want = cookie.String()
-		case "Host":
-			want = "example.com"
-		default:
-			t.Errorf("hreq.Headers: got %q, want header to not be present", h.Name)
-			continue
-		}
-
-		if got := h.Value; got != want {
-			t.Errorf("hreq.Headers[%q]: got %q, want %q", h.Name, got, want)
-		}
+	if got := headersToHTTP(hreq.Headers); !reflect.DeepEqual(got, wantHeaders) {
+		t.Errorf("headers:\ngot:\n%+v\nwant:\n%+v", got, wantHeaders)
 	}
 
 	if got, want := len(hreq.Cookies), 1; got != want {
@@ -134,6 +120,14 @@ func TestModifyRequest(t *testing.T) {
 	if got, want := hcookie.Value, "cookie"; got != want {
 		t.Errorf("hcookie.Value: got %q, want %q", got, want)
 	}
+}
+
+func headersToHTTP(hs []Header) http.Header {
+	hh := http.Header{}
+	for _, h := range hs {
+		hh[h.Name] = append(hh[h.Name], h.Value)
+	}
+	return hh
 }
 
 func TestModifyResponse(t *testing.T) {
@@ -198,29 +192,14 @@ func TestModifyResponse(t *testing.T) {
 		t.Errorf("hres.Content.Text: got %q, want %q", got, want)
 	}
 
-	if got, want := len(hres.Headers), 4; got != want {
-		t.Fatalf("len(hreq.Headers): got %d, want %d", got, want)
+	wantHeaders := http.Header{
+		"Response-Header": {"first", "second"},
+		"Set-Cookie":      {cookie.String()},
+		"Location":        {"google.com"},
+		"Content-Length":  {"13"},
 	}
-
-	for _, h := range hres.Headers {
-		var want string
-		switch h.Name {
-		case "Response-Header":
-			want = "first, second"
-		case "Location":
-			want = "google.com"
-		case "Set-Cookie":
-			want = cookie.String()
-		case "Content-Length":
-			want = "13"
-		default:
-			t.Errorf("hres.Headers: got %q, want header to not be present", h.Name)
-			continue
-		}
-
-		if got := h.Value; got != want {
-			t.Errorf("hres.Headers[%q]: got %q, want %q", h.Name, got, want)
-		}
+	if got := headersToHTTP(hres.Headers); !reflect.DeepEqual(got, wantHeaders) {
+		t.Errorf("headers:\ngot:\n%+v\nwant:\n%+v", got, wantHeaders)
 	}
 
 	if got, want := len(hres.Cookies), 1; got != want {
