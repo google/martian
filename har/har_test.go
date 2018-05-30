@@ -16,8 +16,10 @@ package har
 
 import (
 	"bytes"
+	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -905,5 +907,27 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 	log = logger.Export().Log
 	if got, want := len(log.Entries[0].Request.PostData.Params), 0; got != want {
 		t.Fatalf("len(log.Entries[0].Request.PostData.Params): got %v, want %v", got, want)
+	}
+}
+
+func TestJSONMarshalPostData(t *testing.T) {
+	// Verify that encoding/json round-trips har.PostData with both text and binary data.
+	for _, text := range []string{"hello", string([]byte{150, 151, 152})} {
+		want := &PostData{
+			MimeType: "m",
+			Params:   []Param{{Name: "n", Value: "v"}},
+			Text:     text,
+		}
+		data, err := json.Marshal(want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got PostData
+		if err := json.Unmarshal(data, &got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(&got, want) {
+			t.Errorf("got %+v, want %+v", &got, want)
+		}
 	}
 }
