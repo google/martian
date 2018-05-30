@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -305,8 +306,8 @@ func TestModifyRequestBodyURLEncoded(t *testing.T) {
 func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
 	logger := NewLogger()
 
-	body := []byte("arbitrary binary data")
-	req, err := http.NewRequest("POST", "http://www.example.com", bytes.NewReader(body))
+	body := "arbitrary binary data"
+	req, err := http.NewRequest("POST", "http://www.example.com", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
@@ -334,7 +335,7 @@ func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
 		t.Errorf("len(PostData.Params): got %d, want %d", got, want)
 	}
 
-	if got, want := pd.Text, body; !bytes.Equal(got, want) {
+	if got, want := pd.Text, body; got != want {
 		t.Errorf("PostData.Text: got %q, want %q", got, want)
 	}
 }
@@ -909,18 +910,24 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 	}
 }
 
-func TestJSONMarshalBinaryPostData(t *testing.T) {
-	// Verify that encoding/json round-trips har.PostData.Text with binary data.
-	want := &PostData{Text: []byte{150, 151, 152}}
-	data, err := json.Marshal(want)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got PostData
-	if err := json.Unmarshal(data, &got); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got.Text, want.Text) {
-		t.Errorf("got %q, want %q", got.Text, want.Text)
+func TestJSONMarshalPostData(t *testing.T) {
+	// Verify that encoding/json round-trips har.PostData with both text and binary data.
+	for _, text := range []string{"hello", string([]byte{150, 151, 152})} {
+		want := &PostData{
+			MimeType: "m",
+			Params:   []Param{{Name: "n", Value: "v"}},
+			Text:     text,
+		}
+		data, err := json.Marshal(want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got PostData
+		if err := json.Unmarshal(data, &got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(&got, want) {
+			t.Errorf("got %+v, want %+v", &got, want)
+		}
 	}
 }

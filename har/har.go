@@ -19,6 +19,8 @@
 package har
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -29,6 +31,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/martian"
 	"github.com/google/martian/log"
@@ -201,8 +204,55 @@ type PostData struct {
 	MimeType string `json:"mimeType"`
 	// Params is a list of posted parameters (in case of URL encoded parameters).
 	Params []Param `json:"params"`
-	// Text contains the plain text posted data.
-	Text []byte `json:"text"`
+	// Text contains the posted data. Although its type is string, it may contain
+	// binary data.
+	Text string `json:"text"`
+}
+
+// pdBinary is the JSON representation of binary PostData.
+type pdBinary struct {
+	MimeType string `json:"mimeType"`
+	// Params is a list of posted parameters (in case of URL encoded parameters).
+	Params   []Param `json:"params"`
+	Text     []byte  `json:"text"`
+	Encoding string  `json:"encoding"`
+}
+
+func (p *PostData) MarshalJSON() ([]byte, error) {
+	if utf8.ValidString(p.Text) {
+		type noMethod PostData // avoid infinite recursion
+		return json.Marshal((*noMethod)(p))
+	}
+	return json.Marshal(pdBinary{
+		MimeType: p.MimeType,
+		Params:   p.Params,
+		Text:     []byte(p.Text),
+		Encoding: "base64",
+	})
+}
+
+func (p *PostData) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte("null")) { // conform to json.Unmarshaler spec
+		return nil
+	}
+	var enc struct {
+		Encoding string `json:"encoding"`
+	}
+	if err := json.Unmarshal(data, &enc); err != nil {
+		return err
+	}
+	if enc.Encoding != "base64" {
+		type noMethod PostData // avoid infinite recursion
+		return json.Unmarshal(data, (*noMethod)(p))
+	}
+	var pb pdBinary
+	if err := json.Unmarshal(data, &pb); err != nil {
+		return err
+	}
+	p.MimeType = pb.MimeType
+	p.Params = pb.Params
+	p.Text = string(pb.Text)
+	return nil
 }
 
 // Param describes an individual posted parameter.
@@ -701,7 +751,7 @@ func postData(req *http.Request, logBody bool) (*PostData, error) {
 			return nil, err
 		}
 
-		pd.Text = body
+		pd.Text = string(body)
 	}
 
 	return pd, nil
