@@ -23,7 +23,7 @@ import (
 )
 
 func TestNewHeaderModifier(t *testing.T) {
-	mod := NewModifier("testing", "true")
+	mod := NewModifier("testing", "true", false)
 
 	req, err := http.NewRequest("GET", "/", nil)
 	if err != nil {
@@ -47,7 +47,7 @@ func TestNewHeaderModifier(t *testing.T) {
 }
 
 func TestModifyRequestWithHostHeader(t *testing.T) {
-	m := NewModifier("Host", "www.google.com")
+	m := NewModifier("Host", "www.google.com", false)
 
 	req, err := http.NewRequest("GET", "www.example.com", nil)
 	if err != nil {
@@ -59,6 +59,26 @@ func TestModifyRequestWithHostHeader(t *testing.T) {
 	}
 	if got, want := req.Host, "www.google.com"; got != want {
 		t.Errorf("req.Host: got %q, want %q", got, want)
+	}
+}
+
+func TestModifyRequestWithMultipleHeaders(t *testing.T) {
+	m := NewModifier("X-Repeated", "modifier", true)
+
+	req, err := http.NewRequest("GET", "www.example.com", nil)
+	req.Header.Add("X-Repeated", "original")
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := m.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+	if got, want := req.Header["X-Repeated"][0], "original"; got != want {
+		t.Errorf("req.Header[\"X-Repeated\"][0]: got %q, want %q", got, want)
+	}
+	if got, want := req.Header["X-Repeated"][1], "modifier"; got != want {
+		t.Errorf("req.Header[\"X-Repeated\"][1]: got %q, want %q", got, want)
 	}
 }
 

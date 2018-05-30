@@ -29,31 +29,42 @@ func init() {
 
 type modifier struct {
 	name, value string
+	add         bool
 }
 
 type modifierJSON struct {
 	Name  string               `json:"name"`
 	Value string               `json:"value"`
+	Add   bool                 `json:"add"`
 	Scope []parse.ModifierType `json:"scope"`
 }
 
 // ModifyRequest sets the header at name with value on the request.
 func (m *modifier) ModifyRequest(req *http.Request) error {
-	return proxyutil.RequestHeader(req).Set(m.name, m.value)
+	return m.setOrAddHeader(proxyutil.RequestHeader(req))
 }
 
 // ModifyResponse sets the header at name with value on the response.
 func (m *modifier) ModifyResponse(res *http.Response) error {
-	return proxyutil.ResponseHeader(res).Set(m.name, m.value)
+	return m.setOrAddHeader(proxyutil.ResponseHeader(res))
+}
+
+func (m *modifier) setOrAddHeader(h *proxyutil.Header) error {
+	if m.add {
+		return h.Add(m.name, m.value)
+	} else {
+		return h.Set(m.name, m.value)
+	}
 }
 
 // NewModifier returns a modifier that will set the header at name with
 // the given value for both requests and responses. If the header name already
 // exists all values will be overwritten.
-func NewModifier(name, value string) martian.RequestResponseModifier {
+func NewModifier(name, value string, add bool) martian.RequestResponseModifier {
 	return &modifier{
 		name:  http.CanonicalHeaderKey(name),
 		value: value,
+		add:   add,
 	}
 }
 
@@ -72,7 +83,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 		return nil, err
 	}
 
-	modifier := NewModifier(msg.Name, msg.Value)
+	modifier := NewModifier(msg.Name, msg.Value, msg.Add)
 
 	return parse.NewResult(modifier, msg.Scope)
 }
