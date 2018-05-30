@@ -510,7 +510,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		}
 	}
 
-	log.Infof("Start of Write for res %s", req.URL)
 	err = res.Write(brw)
 	if err != nil {
 		log.Errorf("martian: got error while writing response back to client: %v", err)
@@ -518,8 +517,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			closing = errClose
 		}
 	}
-	log.Infof("End of Write for req %s", req.URL)
-	log.Infof("Start of Flush for res %s", req.URL)
 	err = brw.Flush()
 	if err != nil {
 		log.Errorf("martian: got error while flushing response back to client: %v", err)
@@ -527,7 +524,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			closing = errClose
 		}
 	}
-	log.Infof("End of Flush for req %v", req.URL)
 	return closing
 }
 
