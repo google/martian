@@ -103,9 +103,7 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 	modifier := NewModifier(msg.Name, msg.Value)
 
 	switch msg.Behavior {
-	case "":
-		fallthrough
-	case "replace":
+	case "replace", "":
 		modifier.SetBehavior(ReplaceValues)
 	case "append":
 		modifier.SetBehavior(AppendValues)
