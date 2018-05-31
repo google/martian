@@ -18,6 +18,7 @@ package log
 import (
 	"fmt"
 	"log"
+	"sync"
 )
 
 const (
@@ -32,15 +33,24 @@ const (
 )
 
 // Default log level is Error.
-var level = Error
+var (
+	level = Error
+	lock  sync.Mutex
+)
 
 // SetLevel sets the global log level.
 func SetLevel(l int) {
+	lock.Lock()
+	defer lock.Unlock()
+
 	level = l
 }
 
 // Infof logs an info message.
 func Infof(format string, args ...interface{}) {
+	lock.Lock()
+	defer lock.Unlock()
+
 	if level < Info {
 		return
 	}
@@ -55,6 +65,9 @@ func Infof(format string, args ...interface{}) {
 
 // Debugf logs a debug message.
 func Debugf(format string, args ...interface{}) {
+	lock.Lock()
+	defer lock.Unlock()
+
 	if level < Debug {
 		return
 	}
@@ -69,6 +82,9 @@ func Debugf(format string, args ...interface{}) {
 
 // Errorf logs an error message.
 func Errorf(format string, args ...interface{}) {
+	lock.Lock()
+	defer lock.Unlock()
+
 	if level < Error {
 		return
 	}
