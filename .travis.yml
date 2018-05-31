@@ -1,4 +1,4 @@
-# Allow Travis to use contianer based infrastructure
+# Allow Travis to use container based infrastructure
 sudo: false
 language: go
 
