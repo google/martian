@@ -1,5 +1,14 @@
+# Allow Travis to use contianer based infrastructure
+sudo: false
 language: go
 
 go:
   - 1.9.x
   - 1.10.x
+
+before_script:
+  - go install ./vendor/github.com/golangci/golangci-lint/cmd/golangci-lint
+
+script:
+  - golangci-lint run
+  - go test -v -race ./...
