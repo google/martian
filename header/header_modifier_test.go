@@ -98,6 +98,7 @@ func TestModifierFromJSON(t *testing.T) {
 	}
 
 	req, err := http.NewRequest("GET", "http://martian.test", nil)
+	req.Header.Add("X-Martian", "false")
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %q, want no error", err)
 	}
@@ -123,11 +124,64 @@ func TestModifierFromJSON(t *testing.T) {
 	}
 
 	res := proxyutil.NewResponse(200, nil, req)
+	res.Header.Add("X-Martian", "false")
 	if err := resmod.ModifyResponse(res); err != nil {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 
 	if got, want := res.Header.Get("X-Martian"), "true"; got != want {
 		t.Errorf("res.Header.Get(%q): got %q, want %q", "X-Martian", got, want)
+	}
+}
+
+func TestAppendModifierFromJSON(t *testing.T) {
+	msg := []byte(`{
+		"header.Modifier": {
+			"scope": ["request", "response"],
+			"name": "X-Martian",
+			"value": "true",
+			"behavior": "append"
+		}
+	}`)
+
+	r, err := parse.FromJSON(msg)
+	if err != nil {
+		t.Fatalf("parse.FromJSON(): got %v, want no error", err)
+	}
+
+	req, err := http.NewRequest("GET", "http://martian.test", nil)
+	req.Header.Add("X-Martian", "false")
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %q, want no error", err)
+	}
+
+	reqmod := r.RequestModifier()
+
+	if reqmod == nil {
+		t.Fatalf("reqmod: got nil, want not nil")
+	}
+
+	if err := reqmod.ModifyRequest(req); err != nil {
+		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
+	}
+
+	if n := len(req.Header["X-Martian"]); n != 2 {
+		t.Errorf("res.Header[%q]: got len %d, want 2", "X-Martian", n)
+	}
+
+	resmod := r.ResponseModifier()
+
+	if resmod == nil {
+		t.Fatalf("resmod: got nil, want not nil")
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	res.Header.Add("X-Martian", "false")
+	if err := resmod.ModifyResponse(res); err != nil {
+		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
+	}
+
+	if n := len(res.Header["X-Martian"]); n != 2 {
+		t.Errorf("res.Header[%q]: got len %d, want 2", "X-Martian", n)
 	}
 }

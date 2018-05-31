@@ -105,10 +105,10 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 	switch msg.Behavior {
 	case "":
 		fallthrough
-	case "append":
-		modifier.SetBehavior(AppendValues)
 	case "replace":
 		modifier.SetBehavior(ReplaceValues)
+	case "append":
+		modifier.SetBehavior(AppendValues)
 	default:
 		return nil, fmt.Errorf("Invalid header modifier behavior %q. Must be either append or replace", msg.Behavior)
 	}
