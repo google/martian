@@ -16,7 +16,7 @@ package header
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/google/martian/parse"
@@ -27,13 +27,17 @@ func init() {
 	parse.Register("header.Modifier", modifierFromJSON)
 }
 
+// Behavior when setting a new header with regard to duplicate header names.
 type HeaderSetBehavior int
 
 const (
+	// Replace all previous headers with the same canonicalized name.
 	ReplaceValues HeaderSetBehavior = iota
+	// Append new header without replacing existing ones.
 	AppendValues
 )
 
+// Modifier adds or replaces headers to requests and responses.
 type Modifier struct {
 	name, value string
 	behavior    HeaderSetBehavior
@@ -64,17 +68,20 @@ func (m *Modifier) ModifyResponse(res *http.Response) error {
 	return h.Set(m.name, m.value)
 }
 
+// SetBehavior sets ReplaceValues or AppendValues as the behavior of the modifier
+// when a header already exists.
 func (m *Modifier) SetBehavior(b HeaderSetBehavior) {
 	m.behavior = b
 }
 
 // NewModifier returns a modifier that will set the header at name with
-// the given value for both requests and responses. If the header name already
-// exists all values will be overwritten.
+// the given value for both requests and responses. By default, if the header name
+// already exists all values will be overwritten.
 func NewModifier(name, value string) *Modifier {
 	return &Modifier{
-		name:  http.CanonicalHeaderKey(name),
-		value: value,
+		name:     http.CanonicalHeaderKey(name),
+		value:    value,
+		behavior: ReplaceValues,
 	}
 }
 
@@ -95,12 +102,15 @@ func modifierFromJSON(b []byte) (*parse.Result, error) {
 
 	modifier := NewModifier(msg.Name, msg.Value)
 
-	if msg.Behavior == "" || msg.Behavior == "replace" {
-		modifier.SetBehavior(ReplaceValues)
-	} else if msg.Behavior == "append" {
+	switch msg.Behavior {
+	case "":
+		fallthrough
+	case "append":
 		modifier.SetBehavior(AppendValues)
-	} else {
-		return nil, errors.New("Invalid header modifier behavior " + msg.Behavior)
+	case "replace":
+		modifier.SetBehavior(ReplaceValues)
+	default:
+		return nil, fmt.Errorf("Invalid header modifier behavior %q. Must be either append or replace", msg.Behavior)
 	}
 
 	return parse.NewResult(modifier, msg.Scope)
