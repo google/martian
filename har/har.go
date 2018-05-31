@@ -218,6 +218,7 @@ type pdBinary struct {
 	Encoding string  `json:"encoding"`
 }
 
+// MarshalJSON returns a JSON representation of binary PostData.
 func (p *PostData) MarshalJSON() ([]byte, error) {
 	if utf8.ValidString(p.Text) {
 		type noMethod PostData // avoid infinite recursion
@@ -231,6 +232,8 @@ func (p *PostData) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON populates PostData based on the []byte representation of
+// the binary PostData.
 func (p *PostData) UnmarshalJSON(data []byte) error {
 	if bytes.Equal(data, []byte("null")) { // conform to json.Unmarshaler spec
 		return nil
