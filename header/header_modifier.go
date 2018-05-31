@@ -27,13 +27,13 @@ func init() {
 	parse.Register("header.Modifier", modifierFromJSON)
 }
 
-// Behavior when setting a new header with regard to duplicate header names.
+// HeaderSetBehavior defines the behavior of setting a new header that already exists.
 type HeaderSetBehavior int
 
 const (
-	// Replace all previous headers with the same canonicalized name.
+	// ReplaceValues replaces all previous headers with the same canonicalized name.
 	ReplaceValues HeaderSetBehavior = iota
-	// Append new header without replacing existing ones.
+	// AppendValues appends the new header without replacing existing ones.
 	AppendValues
 )
 
