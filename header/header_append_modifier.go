@@ -24,41 +24,41 @@ import (
 )
 
 func init() {
-	parse.Register("header.Modifier", modifierFromJSON)
+	parse.Register("header.Append", appendModifierFromJSON)
 }
 
-type modifier struct {
+type appendModifier struct {
 	name, value string
 }
 
-type modifierJSON struct {
+type appendModifierJSON struct {
 	Name  string               `json:"name"`
 	Value string               `json:"value"`
 	Scope []parse.ModifierType `json:"scope"`
 }
 
-// ModifyRequest sets the header at name with value on the request.
-func (m *modifier) ModifyRequest(req *http.Request) error {
-	return proxyutil.RequestHeader(req).Set(m.name, m.value)
+// ModifyRequest appends the header at name with value to the request.
+func (m *appendModifier) ModifyRequest(req *http.Request) error {
+	return proxyutil.RequestHeader(req).Add(m.name, m.value)
 }
 
-// ModifyResponse sets the header at name with value on the response.
-func (m *modifier) ModifyResponse(res *http.Response) error {
-	return proxyutil.ResponseHeader(res).Set(m.name, m.value)
+// ModifyResponse appends the header at name with value to the response.
+func (m *appendModifier) ModifyResponse(res *http.Response) error {
+	return proxyutil.ResponseHeader(res).Add(m.name, m.value)
 }
 
-// NewModifier returns a modifier that will set the header at name with
-// the given value for both requests and responses. If the header name already
-// exists all values will be overwritten.
-func NewModifier(name, value string) martian.RequestResponseModifier {
-	return &modifier{
+// NewAppendModifier returns a appendModifier that will append a header with
+// with the given name and value for both requests and responses. Existing
+// headers with the same name will be left in place.
+func NewAppendModifier(name, value string) martian.RequestResponseModifier {
+	return &appendModifier{
 		name:  http.CanonicalHeaderKey(name),
 		value: value,
 	}
 }
 
-// modifierFromJSON takes a JSON message as a byte slice and returns
-// a headerModifier and an error.
+// appendModifierFromJSON takes a JSON message as a byte slice and returns
+// an appendModifier and an error.
 //
 // Example JSON configuration message:
 // {
@@ -66,13 +66,13 @@ func NewModifier(name, value string) martian.RequestResponseModifier {
 //  "name": "X-Martian",
 //  "value": "true"
 // }
-func modifierFromJSON(b []byte) (*parse.Result, error) {
+func appendModifierFromJSON(b []byte) (*parse.Result, error) {
 	msg := &modifierJSON{}
 	if err := json.Unmarshal(b, msg); err != nil {
 		return nil, err
 	}
 
-	modifier := NewModifier(msg.Name, msg.Value)
+	modifier := NewAppendModifier(msg.Name, msg.Value)
 
 	return parse.NewResult(modifier, msg.Scope)
 }
