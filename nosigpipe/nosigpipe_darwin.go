@@ -3,12 +3,13 @@
 package nosigpipe
 
 import (
-	"github.com/google/martian/log"
 	"net"
 	"syscall"
+
+	"github.com/google/martian/log"
 )
 
-// Prevent SIGPIPE from being raised on TCP sockets when remote hangs up
+// IgnoreSIGPIPE prevents SIGPIPE from being raised on TCP sockets when remote hangs up
 // See: https://github.com/golang/go/issues/17393
 func IgnoreSIGPIPE(c net.Conn) {
 	if c == nil {
