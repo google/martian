@@ -47,7 +47,7 @@ func (m *appendModifier) ModifyResponse(res *http.Response) error {
 	return proxyutil.ResponseHeader(res).Add(m.name, m.value)
 }
 
-// NewAppendModifier returns a appendModifier that will append a header with
+// NewAppendModifier returns an appendModifier that will append a header with
 // with the given name and value for both requests and responses. Existing
 // headers with the same name will be left in place.
 func NewAppendModifier(name, value string) martian.RequestResponseModifier {
