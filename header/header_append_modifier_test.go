@@ -22,34 +22,11 @@ import (
 	"github.com/google/martian/proxyutil"
 )
 
-func TestNewHeaderModifier(t *testing.T) {
-	mod := NewModifier("testing", "true")
-
-	req, err := http.NewRequest("GET", "/", nil)
-	if err != nil {
-		t.Fatalf("NewRequest(): got %v, want no error", err)
-	}
-
-	if err := mod.ModifyRequest(req); err != nil {
-		t.Fatalf("ModifyRequest(): got %v, want no error", err)
-	}
-	if got, want := req.Header.Get("testing"), "true"; got != want {
-		t.Errorf("req.Header.Get(%q): got %q, want %q", "testing", got, want)
-	}
-
-	res := proxyutil.NewResponse(200, nil, req)
-	if err := mod.ModifyResponse(res); err != nil {
-		t.Fatalf("ModifyResponse(): got %v, want no error", err)
-	}
-	if got, want := req.Header.Get("testing"), "true"; got != want {
-		t.Errorf("req.Header.Get(%q): got %q, want %q", "testing", got, want)
-	}
-}
-
-func TestModifyRequestWithHostHeader(t *testing.T) {
-	m := NewModifier("Host", "www.google.com")
+func TestModifyRequestWithMultipleHeaders(t *testing.T) {
+	m := NewAppendModifier("X-Repeated", "modifier")
 
 	req, err := http.NewRequest("GET", "www.example.com", nil)
+	req.Header.Add("X-Repeated", "original")
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
@@ -57,18 +34,21 @@ func TestModifyRequestWithHostHeader(t *testing.T) {
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
-	if got, want := req.Host, "www.google.com"; got != want {
-		t.Errorf("req.Host: got %q, want %q", got, want)
+	if got, want := req.Header["X-Repeated"][0], "original"; got != want {
+		t.Errorf("req.Header[\"X-Repeated\"][0]: got %q, want %q", got, want)
+	}
+	if got, want := req.Header["X-Repeated"][1], "modifier"; got != want {
+		t.Errorf("req.Header[\"X-Repeated\"][1]: got %q, want %q", got, want)
 	}
 }
 
-func TestModifierFromJSON(t *testing.T) {
+func TestAppendModifierFromJSON(t *testing.T) {
 	msg := []byte(`{
-	  "header.Modifier": {
-		  "scope": ["request", "response"],
+		"header.Append": {
+			"scope": ["request", "response"],
 			"name": "X-Martian",
 			"value": "true"
-    }
+		}
 	}`)
 
 	r, err := parse.FromJSON(msg)
@@ -92,8 +72,8 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
 	}
 
-	if got, want := req.Header.Get("X-Martian"), "true"; got != want {
-		t.Errorf("req.Header.Get(%q): got %q, want %q", "X-Martian", got, want)
+	if n := len(req.Header["X-Martian"]); n != 2 {
+		t.Errorf("res.Header[%q]: got len %d, want 2", "X-Martian", n)
 	}
 
 	resmod := r.ResponseModifier()
@@ -108,7 +88,7 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
 	}
 
-	if got, want := res.Header.Get("X-Martian"), "true"; got != want {
-		t.Errorf("res.Header.Get(%q): got %q, want %q", "X-Martian", got, want)
+	if n := len(res.Header["X-Martian"]); n != 2 {
+		t.Errorf("res.Header[%q]: got len %d, want 2", "X-Martian", n)
 	}
 }
