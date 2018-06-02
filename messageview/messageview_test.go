@@ -672,6 +672,30 @@ func TestResponseViewDecodeGzipContentEncoding(t *testing.T) {
 	}
 }
 
+func TestResponseViewDecodeGzipContentEncodingPartial(t *testing.T) {
+	bodywant := "partial content"
+	res := proxyutil.NewResponse(206, strings.NewReader(bodywant), nil)
+	res.TransferEncoding = []string{"chunked"}
+	res.Header.Set("Content-Encoding", "gzip")
+
+	mv := New()
+	if err := mv.SnapshotResponse(res); err != nil {
+		t.Fatalf("SnapshotResponse(): got %v, want no error", err)
+	}
+	br, err := mv.BodyReader(Decode())
+	if err != nil {
+		t.Fatalf("mv.BodyReader(): got %v, want no error", err)
+	}
+
+	got, err := ioutil.ReadAll(br)
+	if err != nil {
+		t.Fatalf("ioutil.ReadAll(mv.BodyReader()): got %v, wt o error", err)
+	}
+	if !bytes.Equal(got, []byte(bodywant)) {
+		t.Fatalf("mv.BodyReader(): got %q, want %q", got, bodywant)
+	}
+}
+
 func TestResponseViewDecodeDeflateContentEncoding(t *testing.T) {
 	body := new(bytes.Buffer)
 	dw, err := flate.NewWriter(body, -1)
