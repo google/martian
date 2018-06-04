@@ -157,6 +157,10 @@ func (mv *MessageView) SnapshotResponse(res *http.Response) error {
 	}
 
 	mv.compress = res.Header.Get("Content-Encoding")
+	// Do not uncompress if we have don't have the full contents.
+	if res.StatusCode == http.StatusNoContent || res.StatusCode == http.StatusPartialContent {
+		mv.compress = ""
+	}
 
 	res.Header.WriteSubset(buf, map[string]bool{
 		"Content-Length":    true,
