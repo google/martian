@@ -135,6 +135,7 @@ type Conn struct {
 	Established      time.Time
 	Context          *Context
 	DefaultBandwidth Bandwidth
+	Listener         *Listener
 }
 
 // NewListener returns a new bandwidth constrained listener. Defaults to
@@ -241,6 +242,7 @@ func (l *Listener) GetTrafficShapedConn(oc net.Conn) *Conn {
 		Context:          curinfo,
 		Established:      time.Now(),
 		DefaultBandwidth: defaultBandwidth,
+		Listener:         l,
 	}
 	return lc
 }
@@ -623,20 +625,20 @@ func (c *Conn) Write(b []byte) (int, error) {
 				switch action := actions[ind].(type) {
 				case *Halt:
 					d := action.Duration
-					log.Infof("Sleeping for time %d ms for urlregex %s at byte offset %d",
+					log.Infof("trafficshape: Sleeping for time %d ms for urlregex %s at byte offset %d",
 						d, c.Context.URLRegex, c.Context.ByteOffset)
 					c.Shapes.M[c.Context.URLRegex].Unlock()
 					c.Shapes.RUnlock()
 					time.Sleep(time.Duration(d) * time.Millisecond)
 				case *CloseConnection:
-					log.Infof("Closing connection for urlregex %s at byte offset %d",
+					log.Infof("trafficshape: Closing connection for urlregex %s at byte offset %d",
 						c.Context.URLRegex, c.Context.ByteOffset)
 					c.Shapes.M[c.Context.URLRegex].Unlock()
 					c.Shapes.RUnlock()
 					return int(total), &ErrForceClose{message: "Forcing close connection"}
 				case *ChangeBandwidth:
 					bw := action.Bandwidth
-					log.Infof("Changing connection bandwidth to %d for urlregex %s at byte offset %d",
+					log.Infof("trafficshape: Changing connection bandwidth to %d for urlregex %s at byte offset %d",
 						bw, c.Context.URLRegex, c.Context.ByteOffset)
 					c.Shapes.M[c.Context.URLRegex].Unlock()
 					c.Shapes.RUnlock()
@@ -657,7 +659,6 @@ func (c *Conn) Write(b []byte) (int, error) {
 }
 
 func (c *Conn) sleepLatency() {
-	log.Infof("trafficshape: simulating latency: %s", c.latency)
+	log.Debugf("trafficshape: simulating latency: %s", c.latency)
 	time.Sleep(c.latency)
 }
-
