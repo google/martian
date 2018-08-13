@@ -44,10 +44,14 @@ func (h *Handler) Write(b []byte) (int, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	for _, framec := range h.subs {
-		go func(framec chan<- []byte) {
-			framec <- b
-		}(framec)
+	for id, framec := range h.subs {
+		select {
+		case framec <- b:
+		default:
+			log.Errorf("logstream: buffer full for connection, dropping")
+			close(framec)
+			delete(h.subs, id)
+		}
 	}
 
 	return len(b), nil
@@ -65,7 +69,7 @@ func (h *Handler) streamLogs(conn *websocket.Conn) {
 		log.Errorf("logstream: failed to create ID: %v", err)
 		return
 	}
-	framec := make(chan []byte, 10)
+	framec := make(chan []byte, 16384)
 
 	h.subscribe(id, framec)
 	defer h.unsubscribe(id)
