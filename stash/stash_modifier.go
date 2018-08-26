@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/martian/parse"
+	"github.com/google/martian/v2/parse"
 )
 
 func init() {

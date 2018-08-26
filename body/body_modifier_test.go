@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/martian/messageview"
-	"github.com/google/martian/parse"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v2/messageview"
+	"github.com/google/martian/v2/parse"
+	"github.com/google/martian/v2/proxyutil"
 )
 
 func TestBodyModifier(t *testing.T) {

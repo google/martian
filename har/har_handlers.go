@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/google/martian/log"
+	"github.com/google/martian/v2/log"
 )
 
 type exportHandler struct {
@@ -69,7 +69,6 @@ func (h *resetHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		log.Errorf("har: method not allowed: %s", req.Method)
 		return
 	}
-
 
 	v, err := parseBoolQueryParam(req.URL.Query(), "return")
 	if err != nil {

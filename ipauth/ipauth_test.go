@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
-	"github.com/google/martian/auth"
-	"github.com/google/martian/martiantest"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v2"
+	"github.com/google/martian/v2/auth"
+	"github.com/google/martian/v2/martiantest"
+	"github.com/google/martian/v2/proxyutil"
 )
 
 func TestModifyRequest(t *testing.T) {

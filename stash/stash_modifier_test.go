@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian/fifo"
-	"github.com/google/martian/parse"
-	"github.com/google/martian/port"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v2/fifo"
+	"github.com/google/martian/v2/parse"
+	"github.com/google/martian/v2/port"
+	"github.com/google/martian/v2/proxyutil"
 )
 
 func TestStashRequest(t *testing.T) {

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/martian/log"
-	"github.com/google/martian/martiantest"
-	"github.com/google/martian/trafficshape"
+	"github.com/google/martian/v2/log"
+	"github.com/google/martian/v2/martiantest"
+	"github.com/google/martian/v2/trafficshape"
 )
 
 // Tests that sending data of length 600 bytes with max bandwidth of 100 bytes/s takes
@@ -696,4 +696,3 @@ func TestConcurrentResponseActions(t *testing.T) {
 		t.Errorf("res.Body: got %s, want %s", bodystr2, want2)
 	}
 }
-
