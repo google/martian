@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/martian"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v2"
+	"github.com/google/martian/v2/proxyutil"
 )
 
 func TestModifyRequest(t *testing.T) {

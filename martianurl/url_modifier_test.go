@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/google/martian/parse"
+	"github.com/google/martian/v2/parse"
 )
 
 func TestNewModifier(t *testing.T) {

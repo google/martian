@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/google/martian/log"
+	"github.com/google/martian/v2/log"
 )
 
 // Matcher is a conditional evaluator of request urls to be used in

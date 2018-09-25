@@ -22,7 +22,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/martian"
+	"github.com/google/martian/v2"
 )
 
 func TestHandlerServeHTTPUnsupportedMethod(t *testing.T) {

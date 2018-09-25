@@ -18,7 +18,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/google/martian"
+	"github.com/google/martian/v2"
 )
 
 // NewForwardedModifier sets the X-Forwarded-For, X-Forwarded-Proto, and

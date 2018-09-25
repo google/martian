@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v2/proxyutil"
 )
 
 func TestRemoveHopByHopHeaders(t *testing.T) {
@@ -39,11 +39,11 @@ func TestRemoveHopByHopHeaders(t *testing.T) {
 		"Keep-Alive":          []string{},
 		"Proxy-Authenticate":  []string{},
 		"Proxy-Authorization": []string{},
-		"Te":                []string{},
-		"Trailer":           []string{},
-		"Transfer-Encoding": []string{},
-		"Upgrade":           []string{},
-		"Proxy-Connection":  []string{},
+		"Te":                  []string{},
+		"Trailer":             []string{},
+		"Transfer-Encoding":   []string{},
+		"Upgrade":             []string{},
+		"Proxy-Connection":    []string{},
 
 		// Hop-by-hop headers listed in the Connection header.
 		"X-Connection": []string{},

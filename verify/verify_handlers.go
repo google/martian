@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/martian"
-	"github.com/google/martian/log"
+	"github.com/google/martian/v2"
+	"github.com/google/martian/v2/log"
 )
 
 // Handler is an http.Handler that returns the request and response

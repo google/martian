@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"regexp"
 
-	"github.com/google/martian/filter"
-	"github.com/google/martian/parse"
+	"github.com/google/martian/v2/filter"
+	"github.com/google/martian/v2/parse"
 )
 
 func init() {

@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian/parse"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v2/parse"
+	"github.com/google/martian/v2/proxyutil"
 )
 
 func TestBlacklistModifierOnRequest(t *testing.T) {

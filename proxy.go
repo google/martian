@@ -28,11 +28,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/martian/log"
-	"github.com/google/martian/mitm"
-	"github.com/google/martian/nosigpipe"
-	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/trafficshape"
+	"github.com/google/martian/v2/log"
+	"github.com/google/martian/v2/mitm"
+	"github.com/google/martian/v2/nosigpipe"
+	"github.com/google/martian/v2/proxyutil"
+	"github.com/google/martian/v2/trafficshape"
 )
 
 var errClose = errors.New("closing connection")

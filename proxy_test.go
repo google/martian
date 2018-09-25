@@ -31,10 +31,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/martian/log"
-	"github.com/google/martian/martiantest"
-	"github.com/google/martian/mitm"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v2/log"
+	"github.com/google/martian/v2/martiantest"
+	"github.com/google/martian/v2/mitm"
+	"github.com/google/martian/v2/proxyutil"
 )
 
 type tempError struct{}
