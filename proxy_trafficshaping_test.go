@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"strings"
 	"testing"
 	"time"
@@ -63,9 +62,6 @@ func TestConstantThrottleAndClose(t *testing.T) {
 	tsh.ServeHTTP(rw, tsReq)
 	res := rw.Result()
 
-	body, _ := ioutil.ReadAll(res.Body)
-	t.Logf("%s", string(body))
-
 	if got, want := res.StatusCode, 200; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
@@ -105,7 +101,6 @@ func TestConstantThrottleAndClose(t *testing.T) {
 	}
 
 	go func() {
-		t.Logf("starting %v", time.Now())
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		if err != nil {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -121,7 +116,6 @@ func TestConstantThrottleAndClose(t *testing.T) {
 		}
 		body, _ := ioutil.ReadAll(res.Body)
 		bodystr := string(body)
-		t.Logf("after reading all %v", time.Now())
 		c1 <- bodystr
 	}()
 
@@ -194,9 +188,6 @@ func TestSleepAndClose(t *testing.T) {
 	tsh.ServeHTTP(rw, tsReq)
 	res := rw.Result()
 
-	body, _ := ioutil.ReadAll(res.Body)
-	t.Logf("%s", string(body))
-
 	if got, want := res.StatusCode, 200; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
@@ -236,7 +227,6 @@ func TestSleepAndClose(t *testing.T) {
 	}
 
 	go func() {
-		t.Logf("starting %v", time.Now())
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		if err != nil {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -252,7 +242,6 @@ func TestSleepAndClose(t *testing.T) {
 		}
 		body, _ := ioutil.ReadAll(res.Body)
 		bodystr := string(body)
-		t.Logf("after reading all %v", time.Now())
 		c1 <- bodystr
 	}()
 
@@ -317,9 +306,6 @@ func TestConstantThrottleAndCloseByteRange(t *testing.T) {
 	tsh.ServeHTTP(rw, tsReq)
 	res := rw.Result()
 
-	body, _ := ioutil.ReadAll(res.Body)
-	t.Logf("%s", string(body))
-
 	if got, want := res.StatusCode, 200; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
@@ -360,7 +346,6 @@ func TestConstantThrottleAndCloseByteRange(t *testing.T) {
 	}
 
 	go func() {
-		t.Logf("starting %v", time.Now())
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		if err != nil {
 			t.Fatalf("http.NewRequest(): got %v, want no error", err)
@@ -377,9 +362,6 @@ func TestConstantThrottleAndCloseByteRange(t *testing.T) {
 
 		body, _ := ioutil.ReadAll(res.Body)
 		bodystr := string(body)
-		dump, err := httputil.DumpResponse(res, true)
-		t.Logf("%s %d", dump, int64(len(dump)))
-		t.Logf("after reading all %v", time.Now())
 		c1 <- bodystr
 	}()
 
@@ -442,9 +424,6 @@ func TestMaxBandwidth(t *testing.T) {
 	tsh.ServeHTTP(rw, tsReq)
 	res := rw.Result()
 
-	body, _ := ioutil.ReadAll(res.Body)
-	t.Logf("%s", string(body))
-
 	if got, want := res.StatusCode, 200; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
@@ -486,7 +465,6 @@ func TestMaxBandwidth(t *testing.T) {
 
 	for i := 0; i < numChannels; i++ {
 		go func(i int) {
-			t.Logf("%d starting %v", i, time.Now())
 			conn, err := net.Dial("tcp", l.Addr().String())
 			defer conn.Close()
 			if err != nil {
@@ -508,7 +486,6 @@ func TestMaxBandwidth(t *testing.T) {
 
 			body, _ := ioutil.ReadAll(res.Body)
 			bodystr := string(body)
-			t.Logf("%d after reading all %v", i, time.Now())
 
 			if i != 0 {
 				<-channels[i-1]
@@ -585,9 +562,6 @@ func TestConcurrentResponseActions(t *testing.T) {
 	tsh.ServeHTTP(rw, tsReq)
 	res := rw.Result()
 
-	body, _ := ioutil.ReadAll(res.Body)
-	t.Logf("%s", string(body))
-
 	if got, want := res.StatusCode, 200; got != want {
 		t.Fatalf("res.StatusCode: got %d, want %d", got, want)
 	}
@@ -628,7 +602,6 @@ func TestConcurrentResponseActions(t *testing.T) {
 	c2 := make(chan string)
 
 	go func() {
-		t.Logf("starting 1 %v", time.Now())
 		conn, err := net.Dial("tcp", l.Addr().String())
 		defer conn.Close()
 		if err != nil {
@@ -651,14 +624,10 @@ func TestConcurrentResponseActions(t *testing.T) {
 
 		body, _ := ioutil.ReadAll(res.Body)
 		bodystr := string(body)
-		dump, err := httputil.DumpResponse(res, true)
-		t.Logf("%s %d", dump, int64(len(dump)))
-		t.Logf("1 after reading all %v", time.Now())
 		c1 <- bodystr
 	}()
 
 	go func() {
-		t.Logf("2 starting %v", time.Now())
 		conn, err := net.Dial("tcp", l.Addr().String())
 		defer conn.Close()
 		if err != nil {
@@ -680,9 +649,6 @@ func TestConcurrentResponseActions(t *testing.T) {
 
 		body, _ := ioutil.ReadAll(res.Body)
 		bodystr := string(body)
-		dump, err := httputil.DumpResponse(res, true)
-		t.Logf("%s %d", dump, int64(len(dump)))
-		t.Logf("2 after reading all %v", time.Now())
 		c2 <- bodystr
 	}()
 
@@ -696,4 +662,3 @@ func TestConcurrentResponseActions(t *testing.T) {
 		t.Errorf("res.Body: got %s, want %s", bodystr2, want2)
 	}
 }
-
