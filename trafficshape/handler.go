@@ -227,5 +227,4 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	rw.WriteHeader(http.StatusOK)
 	io.WriteString(rw, bodystr)
-	log.Infof("trafficshape: Configured from json %s", bodystr)
 }

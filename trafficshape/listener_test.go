@@ -473,14 +473,10 @@ func TestActionsAndThrottles(t *testing.T) {
 
 		h.ServeHTTP(rw, req)
 
-		body, _ := ioutil.ReadAll(rw.Result().Body)
-		t.Logf("%d\n %s", i+1, string(body))
-
 		if got, want := rw.Code, 200; got != want {
 			t.Errorf("%d. rw.Code: got %d, want %d", i+1, got, want)
 		}
 
-		t.Logf("%d starting %v", i, time.Now())
 		conn, err := net.Dial("tcp", l.Addr().String())
 		defer conn.Close()
 		if err != nil {
@@ -526,9 +522,6 @@ func TestActionsAfterUpdatingCounts(t *testing.T) {
 
 	h.ServeHTTP(rw, req)
 
-	body, _ := ioutil.ReadAll(rw.Result().Body)
-	t.Logf("%s", string(body))
-
 	if got, want := rw.Code, 200; got != want {
 		t.Errorf("rw.Code: got %d, want %d", got, want)
 	}
@@ -573,4 +566,3 @@ func TestActionsAfterUpdatingCounts(t *testing.T) {
 		t.Errorf("NextActionInfo at %d got %+v, want %+v", 1015, got, want)
 	}
 }
-
