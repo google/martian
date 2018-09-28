@@ -579,7 +579,6 @@ func (c *Conn) Write(b []byte) (int, error) {
 
 			return c.Context.GlobalBucket.FillThrottleLocked(func(rem int64) (int64, error) {
 				max = min(rem, max)
-				log.Debugf("Writing %d into connection", max)
 				n, err := c.Conn.Write(b[:max])
 
 				return int64(n), err

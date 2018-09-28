@@ -27,7 +27,7 @@ import (
 )
 
 func TestStreamsInSentOrder(t *testing.T) {
-	t.Skip("skipping test to deflake.")
+	//t.Skip("skipping test to deflake.")
 
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
