@@ -604,8 +604,6 @@ func (c *Conn) Write(b []byte) (int, error) {
 			c.Context.ByteOffset >= c.Context.NextActionInfo.ByteOffset {
 			// Note here, we check again that the url shape map is still valid and that the action still has
 			// a non zero count, since that could have been modified since the last time we checked.
-			log.Debugf("Performing action if there for regex %s byte offset %d",
-				c.Context.URLRegex, c.Context.ByteOffset)
 			ind := c.Context.NextActionInfo.Index
 			c.Shapes.RLock()
 			if !c.CheckExistenceAndValidity(c.Context.URLRegex) {
@@ -625,7 +623,7 @@ func (c *Conn) Write(b []byte) (int, error) {
 				switch action := actions[ind].(type) {
 				case *Halt:
 					d := action.Duration
-					log.Infof("trafficshape: Sleeping for time %d ms for urlregex %s at byte offset %d",
+					log.Debugf("trafficshape: Sleeping for time %d ms for urlregex %s at byte offset %d",
 						d, c.Context.URLRegex, c.Context.ByteOffset)
 					c.Shapes.M[c.Context.URLRegex].Unlock()
 					c.Shapes.RUnlock()
