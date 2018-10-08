@@ -587,3 +587,4 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 	return proxyutil.NewResponse(200, nil, req), conn, nil
 }
+
