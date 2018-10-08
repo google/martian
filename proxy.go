@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"encoding/base64"
 	"github.com/google/martian/log"
 	"github.com/google/martian/mitm"
 	"github.com/google/martian/nosigpipe"
@@ -565,15 +566,22 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 		}
 		pbw := bufio.NewWriter(conn)
 		pbr := bufio.NewReader(conn)
-
+		r := new(http.Request)
+		*r = *req
+		r.Header.Del("Proxy-Authorization")
+		if p.proxyURL.User != nil {
+			r.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(p.proxyURL.User.String())))
+		}
 		req.Write(pbw)
 		pbw.Flush()
 
-		res, err := http.ReadResponse(pbr, req)
+		res, err := http.ReadResponse(pbr, r)
 		if err != nil {
 			return nil, nil, err
 		}
-
+		if res.StatusCode == 200 {
+			return proxyutil.NewResponse(200, nil, r), conn, nil
+		}
 		return res, conn, nil
 	}
 
