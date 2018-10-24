@@ -208,10 +208,6 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	rw.WriteHeader(http.StatusOK)
-	io.WriteString(rw, bodystr)
-	log.Infof("Configured from json %s", bodystr)
-
 	// Update the Listener with the new traffic shape.
 	h.l.Shapes.Lock()
 
@@ -228,5 +224,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Update the time that the map was last modified to the current time.
 	h.l.Shapes.LastModifiedTime = time.Now()
 	h.l.Shapes.Unlock()
-}
 
+	rw.WriteHeader(http.StatusOK)
+	io.WriteString(rw, bodystr)
+}

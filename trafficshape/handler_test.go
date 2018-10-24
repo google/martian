@@ -17,7 +17,6 @@ package trafficshape
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -136,9 +135,6 @@ func TestHandlerIncorrectInputs(t *testing.T) {
 
 		h.ServeHTTP(rw, req)
 
-		body, _ := ioutil.ReadAll(rw.Result().Body)
-		t.Logf("%d\n %s", i+1, string(body))
-
 		if got := rw.Code; got != 400 {
 			t.Errorf("%d. rw.Code: got %d, want %d", i+1, got, 400)
 		}
@@ -166,9 +162,6 @@ func TestHandlerClear(t *testing.T) {
 	rw := httptest.NewRecorder()
 
 	h.ServeHTTP(rw, req)
-
-	body, _ := ioutil.ReadAll(rw.Result().Body)
-	t.Logf("%s", string(body))
 
 	if got, want := rw.Code, 200; got != want {
 		t.Errorf(" rw.Code: got %d, want %d", got, want)
@@ -244,9 +237,6 @@ func TestHandlerActions(t *testing.T) {
 
 		h.ServeHTTP(rw, req)
 
-		body, _ := ioutil.ReadAll(rw.Result().Body)
-		t.Logf("%d\n %s", i+1, string(body))
-
 		if got, want := rw.Code, 200; got != want {
 			t.Errorf("%d. rw.Code: got %d, want %d", i+1, got, want)
 		}
@@ -266,4 +256,3 @@ func TestHandlerActions(t *testing.T) {
 		}
 	}
 }
-

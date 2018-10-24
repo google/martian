@@ -360,10 +360,16 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 					return err
 				}
 
-				brw.Writer.Reset(tlsconn)
-				brw.Reader.Reset(tlsconn)
-
-				return p.handle(ctx, tlsconn, brw)
+				var finalTLSconn net.Conn
+				finalTLSconn = tlsconn
+				// If the original connection was a traffic shaped connection, wrap the tls
+				// connection inside a traffic shaped connection too.
+				if ptsconn, ok := conn.(*trafficshape.Conn); ok {
+					finalTLSconn = ptsconn.Listener.GetTrafficShapedConn(tlsconn)
+				}
+				brw.Writer.Reset(finalTLSconn)
+				brw.Reader.Reset(finalTLSconn)
+				return p.handle(ctx, finalTLSconn, brw)
 			}
 
 			// Prepend the previously read data to be read again by http.ReadRequest.
@@ -503,7 +509,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 						ptsconn.Context.Buckets.WriteBucket.SetCapacity(
 							ptsconn.Context.ThrottleContext.Bandwidth)
 					}
-					log.Infof("Request %s with Range Start: %d matches a Shaping request %s. Will enforce Traffic shaping.",
+					log.Infof(
+						"trafficshape: Request %s with Range Start: %d matches a Shaping request %s. Will enforce Traffic shaping.",
 						req.URL, rangeStart, urlregex)
 				}
 				break
@@ -587,4 +594,3 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 
 	return proxyutil.NewResponse(200, nil, req), conn, nil
 }
-
