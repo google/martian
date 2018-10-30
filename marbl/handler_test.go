@@ -42,6 +42,12 @@ func TestStreamsInSentOrder(t *testing.T) {
 		t.Fatalf("websocket.Dial(): got %v, want no error", err)
 	}
 
+	ws.SetDeadline(time.Now().Add(5 * time.Second))
+
+	// server could still be in the processs of registering the client
+	// no easy way to synchronize so we just wait a bit
+	time.Sleep(300 * time.Millisecond)
+
 	var iterations int64 = 5000
 	go func() {
 		for i := int64(0); i < iterations; i++ {
