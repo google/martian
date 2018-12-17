@@ -22,10 +22,10 @@ import (
 )
 
 // NewForwardedModifier sets the X-Forwarded-For, X-Forwarded-Proto,
-// X-Forwarded-Host and X-Forwarded-Url headers.
+// X-Forwarded-Host, and X-Forwarded-Url headers.
 //
 // If X-Forwarded-For is already present, the client IP is appended to
-// the existing value. X-Forwarded-Proto, X-Forwarded-Host and
+// the existing value. X-Forwarded-Proto, X-Forwarded-Host, and
 // X-Forwarded-Url are preserved if already present.
 //
 // TODO: Support "Forwarded" header.

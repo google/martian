@@ -60,7 +60,7 @@ func TestSetForwardHeaders(t *testing.T) {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", xff, got, want)
 	}
 
-	// Test that proto, host and URL headers are preserved if already present.
+	// Test that proto, host, and URL headers are preserved if already present.
 	req, err = http.NewRequest("GET", "http://example.com/path?k=v", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
