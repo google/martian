@@ -59,4 +59,27 @@ func TestSetForwardHeaders(t *testing.T) {
 	if got, want := req.Header.Get(xff), "10.0.0.1, 12.12.12.12"; got != want {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", xff, got, want)
 	}
+
+	// Test that proto, host, and URL headers are preserved if already present.
+	req, err = http.NewRequest("GET", "http://example.com/path?k=v", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	req.Header.Set(xfp, "https")
+	req.Header.Set(xfh, "preserved.host.com")
+	req.Header.Set(xfu, "https://preserved.host.com/foo?x=y")
+
+	if m.ModifyRequest(req); err != nil {
+		t.Fatalf("ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.Header.Get(xfp), "https"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", xfh, got, want)
+	}
+	if got, want := req.Header.Get(xfh), "preserved.host.com"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", xfh, got, want)
+	}
+	if got, want := req.Header.Get(xfu), "https://preserved.host.com/foo?x=y"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", xfh, got, want)
+	}
 }
