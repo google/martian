@@ -98,7 +98,7 @@ func (bsi ByStartIndex) Len() int      { return len(bsi) }
 func (bsi ByStartIndex) Swap(i, j int) { bsi[i], bsi[j] = bsi[j], bsi[i] }
 func (bsi ByStartIndex) Less(i, j int) bool {
 	if bsi[i].start == bsi[j].start {
-		return bsi[i].end < bsi[j].end
+		return bsi[i].end > bsi[j].end
 	}
 	return bsi[i].start < bsi[j].start
 }

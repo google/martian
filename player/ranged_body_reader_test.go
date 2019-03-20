@@ -25,6 +25,7 @@ func TestRangedBodyReader(t *testing.T) {
 	}{
 		{0, 8},
 		{5, 12},
+		{0, 20},
 		{12, 20},
 		{10, 300},
 		{299, 999},
@@ -62,8 +63,8 @@ func TestRangedBodyReader(t *testing.T) {
 		start int
 		end   int
 	}{
+		//{0, 20},
 		{0, 20},
-		{0, 301},
 		//{50, 150},
 		//{29, 300},
 		//{30, 50},
