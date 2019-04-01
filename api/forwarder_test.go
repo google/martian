@@ -53,4 +53,8 @@ func TestApiForwarder(t *testing.T) {
 	if !ctx.IsAPIRequest() {
 		t.Errorf("ctx.IsApiRequest: got false, want true")
 	}
+
+	if !ctx.SkippingRoundTrip() {
+		t.Errorf("ctx.SkippingRoundTrip: got false, want true")
+	}
 }
