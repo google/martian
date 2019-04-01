@@ -127,7 +127,6 @@ func (f *Filter) ModifyRequest(req *http.Request) error {
 	}
 
 	match := f.reqcond.MatchRequest(req)
-
 	if match {
 		log.Debugf("filter.ModifyRequest: matched %s", req.URL)
 		return f.treqmod.ModifyRequest(req)
