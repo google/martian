@@ -48,6 +48,24 @@ func TestRequestWhenTrueCondition(t *testing.T) {
 	}
 }
 
+func TestRequestWithoutSettingCondition(t *testing.T) {
+	filter := New()
+
+	// neglect to set a matcher
+
+	tmod := martiantest.NewModifier()
+	filter.RequestWhenFalse(tmod)
+
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := filter.ModifyRequest(req); err == nil {
+		t.Fatalf("ModifyRequest(): got no error, want error")
+	}
+}
+
 func TestRequestWhenFalseCondition(t *testing.T) {
 	filter := New()
 
@@ -69,6 +87,20 @@ func TestRequestWhenFalseCondition(t *testing.T) {
 
 	if got, want := tmod.RequestModified(), true; got != want {
 		t.Errorf("tmod.RequestModified(): got %t, want %t", got, want)
+	}
+}
+func TestResponseWithoutSettingCondition(t *testing.T) {
+	filter := New()
+
+	// neglect to set a matcher
+
+	tmod := martiantest.NewModifier()
+	filter.ResponseWhenFalse(tmod)
+
+	res := proxyutil.NewResponse(200, nil, nil)
+
+	if err := filter.ModifyResponse(res); err == nil {
+		t.Fatalf("ModifyResponse(): got no error, want error")
 	}
 }
 
