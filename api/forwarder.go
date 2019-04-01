@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/martian"
 	"github.com/google/martian/log"
-	"github.com/google/martian/skip"
 )
 
 // Forwarder is a request modifier that routes the request to the API server and
@@ -54,7 +53,5 @@ func (f *Forwarder) ModifyRequest(req *http.Request) error {
 	out := req.URL.String()
 	log.Infof("api.Forwarder: forwarding %s to %s", in, out)
 
-	skp := skip.NewRoundTrip()
-
-	return skp.ModifyRequest(req)
+	return nil
 }
