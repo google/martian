@@ -1314,3 +1314,34 @@ func TestServerClosesConnection(t *testing.T) {
 	}
 	defer res.Body.Close()
 }
+
+// TestRacyClose checks that creating a proxy, serving from it, and closing
+// it in rapid succession doesn't result in race warnings.
+// See https://github.com/google/martian/issues/286.
+func TestRacyClose(t *testing.T) {
+	t.Parallel()
+
+	log.SetLevel(log.Silent) // avoid "failed to accept" messages because we close l
+	openAndConnect := func() {
+		l, err := net.Listen("tcp", "[::]:0")
+		if err != nil {
+			t.Fatalf("net.Listen(): got %v, want no error", err)
+		}
+		defer l.Close() // to make p.Serve exit
+
+		p := NewProxy()
+		go p.Serve(l)
+		defer p.Close()
+
+		conn, err := net.Dial("tcp", l.Addr().String())
+		if err != nil {
+			t.Fatalf("net.Dial(): got %v, want no error", err)
+		}
+		defer conn.Close()
+	}
+
+	// Repeat a bunch of times to make failures more repeatable.
+	for i := 0; i < 100; i++ {
+		openAndConnect()
+	}
+}

@@ -58,7 +58,8 @@ type Proxy struct {
 	timeout      time.Duration
 	mitm         *mitm.Config
 	proxyURL     *url.URL
-	conns        *sync.WaitGroup
+	conns        sync.WaitGroup
+	connsMu      sync.Mutex // protects conns.Add/Wait from concurrent access
 	closing      chan bool
 
 	reqmod RequestModifier
@@ -77,7 +78,6 @@ func NewProxy() *Proxy {
 			ExpectContinueTimeout: time.Second,
 		},
 		timeout: 5 * time.Minute,
-		conns:   &sync.WaitGroup{},
 		closing: make(chan bool),
 		reqmod:  noop,
 		resmod:  noop,
@@ -142,7 +142,9 @@ func (p *Proxy) Close() {
 	close(p.closing)
 
 	log.Infof("martian: waiting for connections to close")
+	p.connsMu.Lock()
 	p.conns.Wait()
+	p.connsMu.Unlock()
 	log.Infof("martian: all connections closed")
 }
 
@@ -218,9 +220,14 @@ func (p *Proxy) Serve(l net.Listener) error {
 }
 
 func (p *Proxy) handleLoop(conn net.Conn) {
+	p.connsMu.Lock()
 	p.conns.Add(1)
+	p.connsMu.Unlock()
 	defer p.conns.Done()
 	defer conn.Close()
+	if p.Closing() {
+		return
+	}
 
 	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
