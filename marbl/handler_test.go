@@ -27,8 +27,6 @@ import (
 )
 
 func TestStreamsInSentOrder(t *testing.T) {
-	//t.Skip("skipping test to deflake.")
-
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
@@ -41,6 +39,10 @@ func TestStreamsInSentOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("websocket.Dial(): got %v, want no error", err)
 	}
+	defer ws.Close()
+
+	// Gives handler time to create the subscription channel.
+	time.Sleep(100 * time.Millisecond)
 
 	var iterations int64 = 5000
 	go func() {
@@ -61,7 +63,7 @@ func TestStreamsInSentOrder(t *testing.T) {
 			t.Fatalf("strconv.ParseInt(): got %v, want no error", err)
 		}
 		if parsed != i {
-			t.Errorf("Messages arrived out of order, expected %d got %d", i, parsed)
+			t.Fatalf("Messages arrived out of order, got %d want %d", parsed, i)
 		}
 	}
 }
@@ -75,19 +77,24 @@ func TestUnreadsDontBlock(t *testing.T) {
 	handler := NewHandler()
 	go http.Serve(l, handler)
 
-	_, err = websocket.Dial(fmt.Sprintf("ws://%s", l.Addr()), "", "http://localhost/")
+	ws, err := websocket.Dial(fmt.Sprintf("ws://%s", l.Addr()), "", "http://localhost/")
 	if err != nil {
 		t.Fatalf("websocket.Dial(): got %v, want no error", err)
 	}
+	defer ws.Close()
+
+	// Gives handler time to create the subscription channel.
+	time.Sleep(100 * time.Millisecond)
 
 	bytes := make([]byte, 1024)
 	_, err = rand.Read(bytes)
 	if err != nil {
 		t.Fatalf("rand.Read(): got %v, want no error", err)
 	}
+	// Purposely using more iterations than frame channel size.
 	var iterations int64 = 50000
 	for i := int64(0); i < iterations; i++ {
-		to := doOrTimeout(3*time.Second, func() {
+		to := doOrTimeout(1*time.Second, func() {
 			handler.Write(bytes)
 		})
 		if to {
