@@ -42,7 +42,7 @@ func TestStreamsInSentOrder(t *testing.T) {
 	defer ws.Close()
 
 	// Gives handler time to create the subscription channel.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	var iterations int64 = 5000
 	go func() {
@@ -84,7 +84,7 @@ func TestUnreadsDontBlock(t *testing.T) {
 	defer ws.Close()
 
 	// Gives handler time to create the subscription channel.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	bytes := make([]byte, 1024)
 	_, err = rand.Read(bytes)
@@ -94,7 +94,7 @@ func TestUnreadsDontBlock(t *testing.T) {
 	// Purposely using more iterations than frame channel size.
 	var iterations int64 = 50000
 	for i := int64(0); i < iterations; i++ {
-		to := doOrTimeout(1*time.Second, func() {
+		to := doOrTimeout(3*time.Second, func() {
 			handler.Write(bytes)
 		})
 		if to {
