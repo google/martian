@@ -47,10 +47,10 @@ func (h *Handler) Write(b []byte) (int, error) {
 	var wg sync.WaitGroup
 	for id, framec := range h.subs {
 		wg.Add(1)
-		go func(id string, framec chan<- []byte) {
+		go func(id string, fc chan<- []byte) {
 			defer wg.Done()
 			select {
-			case framec <- b:
+			case fc <- b:
 			default:
 				log.Errorf("logstream: buffer full for connection, dropping")
 				go h.unsubscribe(id)
@@ -100,8 +100,8 @@ func (h *Handler) unsubscribe(id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if framec, ok := h.subs[id]; ok {
-		close(framec)
+	if fc, ok := h.subs[id]; ok {
+		close(fc)
 		delete(h.subs, id)
 	}
 }
@@ -110,12 +110,12 @@ func (h *Handler) subscribe(id string, framec chan<- []byte) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if framec, ok := h.subs[id]; ok {
+	if fc, ok := h.subs[id]; ok {
 		// TODO: Re-pick the id.
 		log.Errorf("Resubscribing with ID: %v", id)
 		// Close the channel for now so the websocket gets disconnected,
 		// instead of silently failing.
-		close(framec)
+		close(fc)
 	}
 	h.subs[id] = framec
 }
