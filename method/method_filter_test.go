@@ -18,9 +18,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian/proxyutil"
-
 	"github.com/google/martian/martiantest"
+	"github.com/google/martian/parse"
+	"github.com/google/martian/proxyutil"
 )
 
 func TestFilterModifyRequest(t *testing.T) {
@@ -109,4 +109,82 @@ func TestFilterModifyResponse(t *testing.T) {
 		}
 	}
 
+}
+
+func TestFilterFromJSON(t *testing.T) {
+	msg := []byte(`{
+		"method.Filter": {
+          "scope": ["request", "response"],
+          "method": "GET",
+          "modifier": {
+            "header.Modifier": {
+              "scope": ["request", "response"],
+              "name": "Mod-Run",
+              "value": "true"
+            } 
+		  },
+		  "else": {
+            "header.Modifier": {
+              "scope": ["request", "response"],
+              "name": "Else-Run",
+              "value": "true"
+            } 
+          }
+        }
+	}`)
+
+	r, err := parse.FromJSON(msg)
+	if err != nil {
+		t.Fatalf("FilterFromJSON(): got %v, want no error", err)
+	}
+
+	reqmod := r.RequestModifier()
+	if reqmod == nil {
+		t.Fatal("reqmod: got nil, want not nil")
+	}
+
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := reqmod.ModifyRequest(req); err != nil {
+		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.Header.Get("Mod-Run"), "true"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	}
+
+	resmod := r.ResponseModifier()
+	if resmod == nil {
+		t.Fatalf("resmod: got nil, want not nil")
+	}
+
+	res := proxyutil.NewResponse(200, nil, req)
+	if err := resmod.ModifyResponse(res); err != nil {
+		t.Fatalf("resmod.ModifyResponse(): got %v, want no error", err)
+	}
+
+	if got, want := res.Header.Get("Mod-Run"), "true"; got != want {
+		t.Errorf("res.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	}
+
+	// test else conditional modifier with POST
+	req, err = http.NewRequest("POST", "http://example.com", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	if err := reqmod.ModifyRequest(req); err != nil {
+		t.Fatalf("reqmod.ModifyRequest(): got %v, want no error", err)
+	}
+
+	if got, want := req.Header.Get("Mod-Run"), ""; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	}
+
+	if got, want := req.Header.Get("Else-Run"), "true"; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	}
 }
