@@ -72,7 +72,6 @@ func filterFromJSON(b []byte) (*parse.Result, error) {
 	}
 
 	return parse.NewResult(filter, msg.Scope)
-
 }
 
 // NewFilter constructs a filter that applies the modifer when the
