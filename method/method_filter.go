@@ -96,7 +96,7 @@ func NewMatcher(method string) *Matcher {
 func (m *Matcher) MatchRequest(req *http.Request) bool {
 	matched := m.matches(req.Method)
 	if matched {
-		log.Debugf("method.MatchRequest: matched request: %s", req.URL)
+		log.Debugf("method.MatchRequest: matched %s request: %s", req.Method, req.URL)
 	}
 	return matched
 }
@@ -105,7 +105,7 @@ func (m *Matcher) MatchRequest(req *http.Request) bool {
 func (m *Matcher) MatchResponse(res *http.Response) bool {
 	matched := m.matches(res.Request.Method)
 	if matched {
-		log.Debugf("method.MatchResponse: matched: %s", res.Request.URL)
+		log.Debugf("method.MatchResponse: matched %s request: %s", res.Request.Method, res.Request.URL)
 	}
 	return matched
 }
