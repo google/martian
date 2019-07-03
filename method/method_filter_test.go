@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"testing"
 
+	_ "github.com/google/martian/header"
 	"github.com/google/martian/martiantest"
 	"github.com/google/martian/parse"
 	"github.com/google/martian/proxyutil"

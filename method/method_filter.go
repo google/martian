@@ -19,10 +19,17 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/martian"
 	"github.com/google/martian/filter"
 	"github.com/google/martian/log"
 	"github.com/google/martian/parse"
 )
+
+var noop = martian.Noop("method.Filter")
+
+func init() {
+	parse.Register("method.Filter", filterFromJSON)
+}
 
 // Filter runs modifier iff the request method matches the specified method.
 type Filter struct {
