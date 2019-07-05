@@ -19,8 +19,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/martian"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v3"
+	"github.com/google/martian/v3/proxyutil"
 )
 
 func TestViaModifier(t *testing.T) {

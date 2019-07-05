@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/google/martian/log"
+	"github.com/google/martian/v3/log"
 )
 
 type exportHandler struct {

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/martian/log"
-	"github.com/google/martian/martiantest"
-	"github.com/google/martian/trafficshape"
+	"github.com/google/martian/v3/log"
+	"github.com/google/martian/v3/martiantest"
+	"github.com/google/martian/v3/trafficshape"
 )
 
 // Tests that sending data of length 600 bytes with max bandwidth of 100 bytes/s takes

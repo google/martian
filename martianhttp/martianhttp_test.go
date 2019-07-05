@@ -22,11 +22,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/martian/martiantest"
-	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/verify"
+	"github.com/google/martian/v3/martiantest"
+	"github.com/google/martian/v3/proxyutil"
+	"github.com/google/martian/v3/verify"
 
-	_ "github.com/google/martian/header"
+	_ "github.com/google/martian/v3/header"
 )
 
 func TestNoModifiers(t *testing.T) {

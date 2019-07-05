@@ -14,9 +14,17 @@ Martian is a great tool to use if you want to:
 By taking advantage of Go cross-compilation, Martian can be deployed
 anywhere that Go can target.
 
+## Latest Version
+
+v3.0.0
+
 ## Requirements
 
-Go 1.9
+Go 1.11
+
+## Go Modules Support
+
+Martian Proxy added support for Go modules since v3.0.0.  If you use a Go version that does not support modules, this will break you.  The latest version without Go modules support was tagged v2.1.0.
 
 ## Getting Started
 
