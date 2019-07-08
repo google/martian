@@ -34,6 +34,10 @@ func TestFilterModifyRequest(t *testing.T) {
 			want:   true,
 		},
 		{
+			method: "get",
+			want:   true,
+		},
+		{
 			method: "POST",
 			want:   false,
 		},
@@ -43,6 +47,10 @@ func TestFilterModifyRequest(t *testing.T) {
 		},
 		{
 			method: "CONNECT",
+			want:   false,
+		},
+		{
+			method: "connect",
 			want:   false,
 		},
 	}
@@ -77,6 +85,10 @@ func TestFilterModifyResponse(t *testing.T) {
 			want:   true,
 		},
 		{
+			method: "get",
+			want:   true,
+		},
+		{
 			method: "POST",
 			want:   false,
 		},
@@ -86,6 +98,10 @@ func TestFilterModifyResponse(t *testing.T) {
 		},
 		{
 			method: "CONNECT",
+			want:   false,
+		},
+		{
+			method: "connect",
 			want:   false,
 		},
 	}
@@ -113,26 +129,28 @@ func TestFilterModifyResponse(t *testing.T) {
 }
 
 func TestFilterFromJSON(t *testing.T) {
-	msg := []byte(`{
-		"method.Filter": {
-          "scope": ["request", "response"],
-          "method": "GET",
-          "modifier": {
-            "header.Modifier": {
+	j := `{
+		    "method.Filter": {
               "scope": ["request", "response"],
-              "name": "Mod-Run",
-              "value": "true"
-            } 
-		  },
-		  "else": {
-            "header.Modifier": {
-              "scope": ["request", "response"],
-              "name": "Else-Run",
-              "value": "true"
-            } 
-          }
-        }
-	}`)
+              "method": "GET",
+              "modifier": {
+                "header.Modifier": {
+                  "scope": ["request", "response"],
+                  "name": "Mod-Run",
+                  "value": "true"
+                } 
+		      },
+		      "else": {
+                "header.Modifier": {
+                  "scope": ["request", "response"],
+                  "name": "Else-Run",
+                  "value": "true"
+                } 
+              }
+            }
+	      }`
+
+	msg := []byte(j)
 
 	r, err := parse.FromJSON(msg)
 	if err != nil {
@@ -155,6 +173,10 @@ func TestFilterFromJSON(t *testing.T) {
 
 	if got, want := req.Header.Get("Mod-Run"), "true"; got != want {
 		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+	}
+
+	if got, want := req.Header.Get("Else-Run"), ""; got != want {
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Else-Run", got, want)
 	}
 
 	resmod := r.ResponseModifier()
@@ -186,6 +208,6 @@ func TestFilterFromJSON(t *testing.T) {
 	}
 
 	if got, want := req.Header.Get("Else-Run"), "true"; got != want {
-		t.Errorf("req.Header.Get(%q): got %q, want %q", "Mod-Run", got, want)
+		t.Errorf("req.Header.Get(%q): got %q, want %q", "Else-Run", got, want)
 	}
 }
