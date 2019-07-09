@@ -6,7 +6,7 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/google/martian/log"
+	"github.com/google/martian/v3/log"
 )
 
 // IgnoreSIGPIPE prevents SIGPIPE from being raised on TCP sockets when remote hangs up

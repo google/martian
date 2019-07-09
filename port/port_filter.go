@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/martian"
-	"github.com/google/martian/parse"
+	"github.com/google/martian/v3"
+	"github.com/google/martian/v3/parse"
 )
 
 var noop = martian.Noop("port.Filter")

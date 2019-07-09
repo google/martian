@@ -18,10 +18,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian"
-	"github.com/google/martian/parse"
-	"github.com/google/martian/proxyutil"
-	"github.com/google/martian/verify"
+	"github.com/google/martian/v3"
+	"github.com/google/martian/v3/parse"
+	"github.com/google/martian/v3/proxyutil"
+	"github.com/google/martian/v3/verify"
 )
 
 func TestVerifyResponses(t *testing.T) {

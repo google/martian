@@ -30,7 +30,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/google/martian/marbl"
+	"github.com/google/martian/v3/marbl"
 )
 
 var (

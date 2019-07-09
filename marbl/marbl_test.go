@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/martian"
-	"github.com/google/martian/proxyutil"
+	"github.com/google/martian/v3"
+	"github.com/google/martian/v3/proxyutil"
 )
 
 func TestMarkAPIRequestsWithHeader(t *testing.T) {

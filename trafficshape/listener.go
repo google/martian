@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/martian/log"
+	"github.com/google/martian/v3/log"
 )
 
 // ErrForceClose is an error that communicates the need to close the connection.

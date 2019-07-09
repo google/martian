@@ -18,10 +18,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/martian"
-	"github.com/google/martian/filter"
-	"github.com/google/martian/log"
-	"github.com/google/martian/parse"
+	"github.com/google/martian/v3"
+	"github.com/google/martian/v3/filter"
+	"github.com/google/martian/v3/log"
+	"github.com/google/martian/v3/parse"
 )
 
 var noop = martian.Noop("cookie.Filter")
