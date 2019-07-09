@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package method provides utilities for verifying method type in martian.Proxy.
+// Package method provides utilities for working with request methods.
 package method
 
 import (
