@@ -221,7 +221,7 @@ these different types of interactions:
   the group
 * Verifiers: Tracks network traffic against expectations
 
-Modifiers, filters and groups all implement `RequestModifer`,
+Modifiers, filters and groups all implement `RequestModifier`,
 `ResponseModifier` or `RequestResponseModifier` (defined in
 [`martian.go`](https://github.com/google/martian/blob/master/martian.go)).
 
