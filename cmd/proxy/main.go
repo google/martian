@@ -435,6 +435,7 @@ func main() {
 	<-sigc
 
 	log.Println("martian: shutting down")
+	os.Exit(0)
 }
 
 func init() {
