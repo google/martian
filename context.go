@@ -54,11 +54,20 @@ var (
 	ctxs  = make(map[*http.Request]*Context)
 )
 
+func newNoopContext() *Context {
+	return &Context{
+		vals: make(map[string]interface{}),
+	}
+}
+
 // NewContext returns a context for the in-flight HTTP request.
 func NewContext(req *http.Request) *Context {
 	ctxmu.RLock()
 	defer ctxmu.RUnlock()
 
+	if ctxs[req] == nil {
+		return newNoopContext()
+	}
 	return ctxs[req]
 }
 
