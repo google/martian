@@ -19,8 +19,8 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/google/martian/v3"
-	"github.com/google/martian/v3/auth"
+	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian/v3/auth"
 )
 
 var noop = martian.Noop("ipauth.Modifier")

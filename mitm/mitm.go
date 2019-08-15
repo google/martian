@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/martian/v3/log"
+	"github.com/zema1/martian/v3/log"
 )
 
 // MaxSerialNumber is the upper boundary that is used to create unique serial

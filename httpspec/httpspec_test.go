@@ -19,9 +19,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/martian/v3"
-	"github.com/google/martian/v3/martiantest"
-	"github.com/google/martian/v3/proxyutil"
+	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian/v3/martiantest"
+	"github.com/zema1/martian/v3/proxyutil"
 )
 
 func TestNewStack(t *testing.T) {

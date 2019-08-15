@@ -25,10 +25,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/google/martian/v3"
-	"github.com/google/martian/v3/log"
-	"github.com/google/martian/v3/parse"
-	"github.com/google/martian/v3/verify"
+	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian/v3/log"
+	"github.com/zema1/martian/v3/parse"
+	"github.com/zema1/martian/v3/verify"
 )
 
 // Group is a martian.RequestResponseModifier that maintains lists of

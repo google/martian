@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/martian/v3/log"
+	"github.com/zema1/martian/v3/log"
 )
 
 // Handler configures a trafficshape.Listener.

@@ -18,9 +18,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/martian/v3"
-	"github.com/google/martian/v3/parse"
-	"github.com/google/martian/v3/verify"
+	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian/v3/parse"
+	"github.com/zema1/martian/v3/verify"
 )
 
 func TestVerifyRequestPasses(t *testing.T) {
