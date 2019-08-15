@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/filter"
-	"github.com/zema1/martian/v3/log"
-	"github.com/zema1/martian/v3/parse"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/filter"
+	"github.com/zema1/martian/log"
+	"github.com/zema1/martian/parse"
 )
 
 var noop = martian.Noop("method.Filter")

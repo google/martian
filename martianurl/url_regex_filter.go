@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"regexp"
 
-	"github.com/zema1/martian/v3/filter"
-	"github.com/zema1/martian/v3/parse"
+	"github.com/zema1/martian/filter"
+	"github.com/zema1/martian/parse"
 )
 
 func init() {

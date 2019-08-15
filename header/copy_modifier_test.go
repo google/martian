@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/zema1/martian/v3/parse"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian/parse"
+	"github.com/zema1/martian/proxyutil"
 )
 
 func TestCopyModifier(t *testing.T) {

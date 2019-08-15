@@ -20,12 +20,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/zema1/martian/v3/martiantest"
-	"github.com/zema1/martian/v3/parse"
-	"github.com/zema1/martian/v3/proxyutil"
-	"github.com/zema1/martian/v3/verify"
+	"github.com/zema1/martian/martiantest"
+	"github.com/zema1/martian/parse"
+	"github.com/zema1/martian/proxyutil"
+	"github.com/zema1/martian/verify"
 
-	_ "github.com/zema1/martian/v3/header"
+	_ "github.com/zema1/martian/header"
 )
 
 func TestFilterModifyRequest(t *testing.T) {

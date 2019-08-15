@@ -19,10 +19,10 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/zema1/martian/v3"
-	_ "github.com/zema1/martian/v3/header"
-	"github.com/zema1/martian/v3/parse"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian"
+	_ "github.com/zema1/martian/header"
+	"github.com/zema1/martian/parse"
+	"github.com/zema1/martian/proxyutil"
 )
 
 func TestRegexFilterModifyRequest(t *testing.T) {

@@ -1,7 +1,5 @@
-module github.com/zema1/martian/v3
+module github.com/zema1/martian
 
 go 1.11
-
-replace github.com/google/martian/v3 => ./
 
 require golang.org/x/net v0.0.0-20190628185345-da137c7871d7

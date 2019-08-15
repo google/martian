@@ -17,7 +17,7 @@ package auth
 import (
 	"sync"
 
-	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian"
 )
 
 const key = "auth.Context"

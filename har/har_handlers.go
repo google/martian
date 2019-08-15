@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/zema1/martian/v3/log"
+	"github.com/zema1/martian/log"
 )
 
 type exportHandler struct {

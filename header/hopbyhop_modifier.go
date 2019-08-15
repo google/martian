@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian"
 )
 
 // Hop-by-hop headers as defined by RFC2616.

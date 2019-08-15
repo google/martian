@@ -17,7 +17,7 @@ package cookie
 import (
 	"net/http"
 
-	"github.com/zema1/martian/v3/log"
+	"github.com/zema1/martian/log"
 )
 
 // Matcher is a conditonal evalutor of request or

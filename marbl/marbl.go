@@ -43,9 +43,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/log"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/log"
+	"github.com/zema1/martian/proxyutil"
 )
 
 // MessageType incicates whether the message represents an HTTP request or response.

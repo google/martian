@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zema1/martian/v3/log"
+	"github.com/zema1/martian/log"
 )
 
 // DefaultBitrate represents the bitrate that will be for all url regexs for which a shape

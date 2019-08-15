@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/log"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/log"
 )
 
 // Forwarder is a request modifier that routes the request to the API server and

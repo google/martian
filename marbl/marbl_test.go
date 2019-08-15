@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/proxyutil"
 )
 
 func TestMarkAPIRequestsWithHeader(t *testing.T) {

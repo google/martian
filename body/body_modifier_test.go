@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zema1/martian/v3/messageview"
-	"github.com/zema1/martian/v3/parse"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian/messageview"
+	"github.com/zema1/martian/parse"
+	"github.com/zema1/martian/proxyutil"
 )
 
 func TestBodyModifier(t *testing.T) {

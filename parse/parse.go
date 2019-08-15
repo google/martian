@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian"
 )
 
 // ModifierType is the HTTP message type.

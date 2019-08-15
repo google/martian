@@ -18,7 +18,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian"
 )
 
 // NewForwardedModifier sets the X-Forwarded-For, X-Forwarded-Proto,

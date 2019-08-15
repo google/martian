@@ -28,11 +28,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zema1/martian/v3/log"
-	"github.com/zema1/martian/v3/mitm"
-	"github.com/zema1/martian/v3/nosigpipe"
-	"github.com/zema1/martian/v3/proxyutil"
-	"github.com/zema1/martian/v3/trafficshape"
+	"github.com/zema1/martian/log"
+	"github.com/zema1/martian/mitm"
+	"github.com/zema1/martian/nosigpipe"
+	"github.com/zema1/martian/proxyutil"
+	"github.com/zema1/martian/trafficshape"
 )
 
 var errClose = errors.New("closing connection")

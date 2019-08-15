@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian"
 )
 
 // NewBadFramingModifier makes a best effort to fix inconsistencies in the

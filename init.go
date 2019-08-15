@@ -17,7 +17,7 @@ package martian
 import (
 	"flag"
 
-	mlog "github.com/zema1/martian/v3/log"
+	mlog "github.com/zema1/martian/log"
 )
 
 var (

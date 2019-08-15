@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/log"
-	"github.com/zema1/martian/v3/parse"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/log"
+	"github.com/zema1/martian/parse"
 )
 
 func init() {

@@ -6,7 +6,7 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/zema1/martian/v3/log"
+	"github.com/zema1/martian/log"
 )
 
 // IgnoreSIGPIPE prevents SIGPIPE from being raised on TCP sockets when remote hangs up

@@ -17,7 +17,7 @@ package header
 import (
 	"net/http"
 
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian/proxyutil"
 )
 
 // Matcher is a conditonal evalutor of request or

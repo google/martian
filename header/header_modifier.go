@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/parse"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/parse"
+	"github.com/zema1/martian/proxyutil"
 )
 
 func init() {

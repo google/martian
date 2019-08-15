@@ -19,10 +19,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/auth"
-	"github.com/zema1/martian/v3/martiantest"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/auth"
+	"github.com/zema1/martian/martiantest"
+	"github.com/zema1/martian/proxyutil"
 )
 
 func TestModifyRequest(t *testing.T) {

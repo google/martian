@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/zema1/martian/v3/parse"
+	"github.com/zema1/martian/parse"
 )
 
 func init() {

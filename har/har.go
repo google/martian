@@ -33,10 +33,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/log"
-	"github.com/zema1/martian/v3/messageview"
-	"github.com/zema1/martian/v3/proxyutil"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/log"
+	"github.com/zema1/martian/messageview"
+	"github.com/zema1/martian/proxyutil"
 )
 
 // Logger maintains request and response log entries.

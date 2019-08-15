@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian"
 )
 
 // Filter filters RequestModifiers and ResponseModifiers by auth ID.

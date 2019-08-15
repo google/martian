@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zema1/martian/v3/log"
-	"github.com/zema1/martian/v3/martiantest"
-	"github.com/zema1/martian/v3/trafficshape"
+	"github.com/zema1/martian/log"
+	"github.com/zema1/martian/martiantest"
+	"github.com/zema1/martian/trafficshape"
 )
 
 // Tests that sending data of length 600 bytes with max bandwidth of 100 bytes/s takes

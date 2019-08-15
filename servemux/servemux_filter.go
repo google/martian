@@ -19,8 +19,8 @@ package servemux
 import (
 	"net/http"
 
-	"github.com/zema1/martian/v3"
-	"github.com/zema1/martian/v3/filter"
+	"github.com/zema1/martian"
+	"github.com/zema1/martian/filter"
 )
 
 var noop = martian.Noop("mux.Filter")

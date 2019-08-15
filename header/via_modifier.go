@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/zema1/martian/v3"
+	"github.com/zema1/martian"
 )
 
 const viaLoopKey = "via.LoopDetection"

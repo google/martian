@@ -17,7 +17,7 @@ package martian
 import (
 	"net/http"
 
-	"github.com/zema1/martian/v3/log"
+	"github.com/zema1/martian/log"
 )
 
 type noopModifier struct {
