@@ -54,7 +54,7 @@ func (m *ViaModifier) ModifyRequest(req *http.Request) error {
 
 	if v := req.Header.Get("Via"); v != "" {
 		if m.hasLoop(v) {
-			err := fmt.Errorf("via: detected request loop, header contains %s", via)
+			err := fmt.Errorf("via.ModifyRequest: detected request loop, header contains %s", via)
 
 			ctx := martian.NewContext(req)
 			ctx.Set(viaLoopKey, err)
@@ -76,11 +76,10 @@ func (m *ViaModifier) ModifyRequest(req *http.Request) error {
 func (m *ViaModifier) ModifyResponse(res *http.Response) error {
 	ctx := martian.NewContext(res.Request)
 
-	if err, _ := ctx.Get(viaLoopKey); err != nil {
+	if _, ok := ctx.Get(viaLoopKey); ok {
 		res.StatusCode = 400
 		res.Status = http.StatusText(400)
-
-		return err.(error)
+		return fmt.Errorf("via.ModifyResponse: detected request loop")
 	}
 
 	return nil
