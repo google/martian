@@ -424,9 +424,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			if err := res.Write(brw); err != nil {
 				log.Errorf("martian: got error while writing response back to client: %v", err)
 			}
-		}
-		if err := brw.Flush(); err != nil {
-			log.Errorf("martian: got error while flushing response back to client: %v", err)
+			if err := brw.Flush(); err != nil {
+				log.Errorf("martian: got error while flushing response back to client: %v", err)
+			}
 		}
 
 		cbw := bufio.NewWriter(cconn)
@@ -452,6 +452,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				defer w.Close()
 				if err := res.Write(w); err != nil {
 					log.Errorf("martian: got error while writing response back to client: %v", err)
+				}
+				if err := brw.Flush(); err != nil {
+					log.Errorf("martian: got error while flushing response back to client: %v", err)
 				}
 			}()
 
