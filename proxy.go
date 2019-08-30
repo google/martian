@@ -420,11 +420,13 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			return nil
 		}
 		res.ContentLength = -1
-		if err := res.Write(brw); err != nil {
-			log.Errorf("martian: got error while writing response back to client: %v", err)
-		}
-		if err := brw.Flush(); err != nil {
-			log.Errorf("martian: got error while flushing response back to client: %v", err)
+		if p.proxyURL == nil {
+			if err := res.Write(brw); err != nil {
+				log.Errorf("martian: got error while writing response back to client: %v", err)
+			}
+			if err := brw.Flush(); err != nil {
+				log.Errorf("martian: got error while flushing response back to client: %v", err)
+			}
 		}
 
 		cbw := bufio.NewWriter(cconn)
@@ -442,7 +444,22 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 		donec := make(chan bool, 2)
 		go copySync(cbw, brw, donec)
-		go copySync(brw, cbr, donec)
+		if p.proxyURL == nil {
+			go copySync(brw, cbr, donec)
+		} else {
+			r, w := io.Pipe()
+			go func() {
+				defer w.Close()
+				if err := res.Write(w); err != nil {
+					log.Errorf("martian: got error while writing response back to client: %v", err)
+				}
+				if err := brw.Flush(); err != nil {
+					log.Errorf("martian: got error while flushing response back to client: %v", err)
+				}
+			}()
+
+			go copySync(brw, r, donec)
+		}
 
 		log.Debugf("martian: established CONNECT tunnel, proxying traffic")
 		<-donec
