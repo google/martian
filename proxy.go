@@ -420,9 +420,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 			return nil
 		}
 		res.ContentLength = -1
+		/*
 		if err := res.Write(brw); err != nil {
 			log.Errorf("martian: got error while writing response back to client: %v", err)
 		}
+		*/
 		if err := brw.Flush(); err != nil {
 			log.Errorf("martian: got error while flushing response back to client: %v", err)
 		}
@@ -571,17 +573,19 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 			return nil, nil, err
 		}
 		pbw := bufio.NewWriter(conn)
-		pbr := bufio.NewReader(conn)
+		//pbr := bufio.NewReader(conn)
 
 		req.Write(pbw)
 		pbw.Flush()
 
+		/*
 		res, err := http.ReadResponse(pbr, req)
 		if err != nil {
 			return nil, nil, err
 		}
+		*/
 
-		return res, conn, nil
+		return proxyutil.NewResponse(200, nil, req), conn, nil
 	}
 
 	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
