@@ -24,6 +24,15 @@ import (
 // has not been specified.
 var DefaultBitrate int64 = 500000000000 // 500Gbps (unlimited)
 
+// ErrForceClose is an error that communicates the need to close the connection.
+type ErrForceClose struct {
+	message string
+}
+
+func (efc *ErrForceClose) Error() string {
+	return efc.message
+}
+
 // Context represents the current information that is needed while writing back to the client.
 // Only if Shaping is true, that is we are currently writing back a response that matches a certain
 // url_regex will the other values be set correctly. If so, the Buckets represent the buckets
@@ -60,15 +69,6 @@ type Listener struct {
 	GlobalBuckets map[string]*Bucket
 	Shapes        *urlShapes
 	defaults      *Default
-}
-
-// ErrForceClose is an error that communicates the need to close the connection.
-type ErrForceClose struct {
-	message string
-}
-
-func (efc *ErrForceClose) Error() string {
-	return efc.message
 }
 
 // urlShape contains a rw lock protected shape of a url_regex.

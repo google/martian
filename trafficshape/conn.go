@@ -27,11 +27,8 @@ import (
 // Conn wraps a net.Conn and simulates connection latency and bandwidth
 // charateristics.
 type Conn struct {
-	conn    net.Conn
-	latency time.Duration
-	ronce   sync.Once
-	wonce   sync.Once
 	Context *Context
+
 	// Shapes represents the traffic shape map inherited from the listener.
 	Shapes        *urlShapes
 	GlobalBuckets map[string]*Bucket
@@ -43,6 +40,11 @@ type Conn struct {
 	Listener         *Listener
 	ReadBucket       *Bucket // Shared by listener.
 	WriteBucket      *Bucket // Shared by listener.
+
+	conn    net.Conn
+	latency time.Duration
+	ronce   sync.Once
+	wonce   sync.Once
 }
 
 // Read reads bytes from connection into b, optionally simulating connection
@@ -149,7 +151,7 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.conn.SetWriteDeadline(t)
 }
 
-// GetWrappedConn returns the undrelying net.Conn.
+// GetWrappedConn returns the undrelying trafficshaped net.Conn.
 func (c *Conn) GetWrappedConn() net.Conn {
 	return c.conn
 }
