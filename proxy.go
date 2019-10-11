@@ -291,17 +291,15 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		proxyutil.Warning(req.Header, err)
 	}
 	if session.Hijacked() {
-		log.Infof("martian: connection hijacked by request modifier")
+		log.Debugf("martian: connection hijacked by request modifier")
 		return nil
 	}
 
 	if p.mitm != nil {
-		log.Infof("martian: attempting MITM for connection: %s / %s", req.Host, req.URL.String())
-		log.Infof("session.IsSecure(): %t", session.IsSecure())
+		log.Debugf("martian: attempting MITM for connection: %s / %s", req.Host, req.URL.String())
 
 		res := proxyutil.NewResponse(200, nil, req)
 
-		// does this make sense?
 		if err := p.resmod.ModifyResponse(res); err != nil {
 			log.Errorf("martian: error modifying CONNECT response: %v", err)
 			proxyutil.Warning(res.Header, err)
@@ -358,7 +356,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		return p.handle(ctx, conn, brw)
 	}
 
-	log.Infof("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
+	log.Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
 	res, cconn, cerr := p.connect(req)
 	if cerr != nil {
 		log.Errorf("martian: failed to CONNECT: %v", cerr)
@@ -437,8 +435,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 	defer req.Body.Close()
 
-	log.Infof("martian.handle: scheme://host: %s://%s", req.URL.Scheme, req.URL.Host)
-
 	session := ctx.Session()
 	ctx, err = withSession(session)
 	if err != nil {
@@ -453,7 +449,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		wrconn := tsconn.GetWrappedConn()
 		if sconn, ok := wrconn.(*tls.Conn); ok {
 			session.MarkSecure()
-			log.Infof("martian.handle: Marking Secure: scheme://host: %s://%s", req.URL.Scheme, req.URL.Host)
 
 			cs := sconn.ConnectionState()
 			req.TLS = &cs
@@ -462,7 +457,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	if tconn, ok := conn.(*tls.Conn); ok {
 		session.MarkSecure()
-		log.Infof("martian.handle: Marking Secure: scheme://host: %s://%s", req.URL.Scheme, req.URL.Host)
 
 		cs := tconn.ConnectionState()
 		req.TLS = &cs
@@ -480,7 +474,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	if req.Method == "CONNECT" {
-		log.Infof("martian: CONNECT request for host: %v", req.URL.Host)
 		return p.handleConnectRequest(ctx, req, session, brw, conn)
 	}
 
@@ -490,12 +483,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		proxyutil.Warning(req.Header, err)
 	}
 	if session.Hijacked() {
-		log.Infof("martian: connection hijacked by request modifier")
 		return nil
 	}
 
-	log.Infof("martian: attempting roundTrip for: %s\t\t%s", req.Host, req.URL.String())
-	log.Infof("session.IsSecure(): %t", session.IsSecure())
 	// perform the HTTP roundtrip
 	res, err := p.roundTrip(ctx, req)
 	if err != nil {
@@ -552,7 +542,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 							ptsconn.Context.ThrottleContext.Bandwidth)
 					}
 					log.Infof(
-						"trafficshape: Request %s with Range Start: %d matches a Shaping request %s. Will enforce Traffic shaping.",
+						"trafficshape: Request %s with Range Start: %d matches a Shaping request %s. Enforcing Traffic shaping.",
 						req.URL, rangeStart, urlregex)
 				}
 				break
