@@ -18,6 +18,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/google/martian/v3/log"
 )
 
 // DefaultBitrate represents the bitrate that will be for all url regexs for which a shape
@@ -31,6 +33,49 @@ type ErrForceClose struct {
 
 func (efc *ErrForceClose) Error() string {
 	return efc.message
+}
+
+// urlShape contains a rw lock protected shape of a url_regex.
+type urlShape struct {
+	sync.RWMutex
+	Shape *Shape
+}
+
+// urlShapes contains a rw lock protected map of url regexs to their URLShapes.
+type urlShapes struct {
+	sync.RWMutex
+	M                map[string]*urlShape
+	LastModifiedTime time.Time
+}
+
+// Buckets contains the read and write buckets for a url_regex.
+type Buckets struct {
+	ReadBucket  *Bucket
+	WriteBucket *Bucket
+}
+
+// NewBuckets returns a *Buckets with the specified up and down bandwidths.
+func NewBuckets(up int64, down int64) *Buckets {
+	return &Buckets{
+		ReadBucket:  NewBucket(up, time.Second),
+		WriteBucket: NewBucket(down, time.Second),
+	}
+}
+
+// ThrottleContext represents whether we are currently in a throttle interval for a particular
+// url_regex. If ThrottleNow is true, only then will the current throttle 'Bandwidth' be set
+// correctly.
+type ThrottleContext struct {
+	ThrottleNow bool
+	Bandwidth   int64
+}
+
+// NextActionInfo represents whether there is an upcoming action. Only if ActionNext is true will the
+// Index and ByteOffset be set correctly.
+type NextActionInfo struct {
+	ActionNext bool
+	Index      int64
+	ByteOffset int64
 }
 
 // Context represents the current information that is needed while writing back to the client.
@@ -71,45 +116,137 @@ type Listener struct {
 	defaults      *Default
 }
 
-// urlShape contains a rw lock protected shape of a url_regex.
-type urlShape struct {
-	sync.RWMutex
-	Shape *Shape
-}
-
-// urlShapes contains a rw lock protected map of url regexs to their URLShapes.
-type urlShapes struct {
-	sync.RWMutex
-	M                map[string]*urlShape
-	LastModifiedTime time.Time
-}
-
-// Buckets contains the read and write buckets for a url_regex.
-type Buckets struct {
-	ReadBucket  *Bucket
-	WriteBucket *Bucket
-}
-
-// NewBuckets returns a *Buckets with the specified up and down bandwidths.
-func NewBuckets(up int64, down int64) *Buckets {
-	return &Buckets{
-		ReadBucket:  NewBucket(up, time.Second),
-		WriteBucket: NewBucket(down, time.Second),
+// NewListener returns a new bandwidth constrained listener. Defaults to
+// DefaultBitrate (uncapped).
+func NewListener(l net.Listener) *Listener {
+	return &Listener{
+		Listener:      l,
+		ReadBucket:    NewBucket(DefaultBitrate/8, time.Second),
+		WriteBucket:   NewBucket(DefaultBitrate/8, time.Second),
+		Shapes:        &urlShapes{M: make(map[string]*urlShape)},
+		GlobalBuckets: make(map[string]*Bucket),
+		defaults: &Default{
+			Bandwidth: Bandwidth{
+				Up:   DefaultBitrate / 8,
+				Down: DefaultBitrate / 8,
+			},
+			Latency: 0,
+		},
 	}
 }
 
-// ThrottleContext represents whether we are currently in a throttle interval for a particular
-// url_regex. If ThrottleNow is true, only then will the current throttle 'Bandwidth' be set
-// correctly.
-type ThrottleContext struct {
-	ThrottleNow bool
-	Bandwidth   int64
+// ReadBitrate returns the bitrate in bits per second for reads.
+func (l *Listener) ReadBitrate() int64 {
+	return l.ReadBucket.Capacity() * 8
 }
 
-// NextActionInfo represents whether there is an upcoming action. Only if ActionNext is
-// true will the Index and ByteOffset be set correctly.
-type NextActionInfo struct {
-	ActionNext bool
-	Index      int64
-	ByteOffset int64
+// SetReadBitrate sets the bitrate in bits per second for reads.
+func (l *Listener) SetReadBitrate(bitrate int64) {
+	l.ReadBucket.SetCapacity(bitrate / 8)
+}
+
+// WriteBitrate returns the bitrate in bits per second for writes.
+func (l *Listener) WriteBitrate() int64 {
+	return l.WriteBucket.Capacity() * 8
+}
+
+// SetWriteBitrate sets the bitrate in bits per second for writes.
+func (l *Listener) SetWriteBitrate(bitrate int64) {
+	l.WriteBucket.SetCapacity(bitrate / 8)
+}
+
+// SetDefaults sets the default traffic shaping parameters for the listener.
+func (l *Listener) SetDefaults(defaults *Default) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.defaults = defaults
+}
+
+// Defaults returns the default traffic shaping parameters for the listener.
+func (l *Listener) Defaults() *Default {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	return l.defaults
+}
+
+// Latency returns the latency for connections.
+func (l *Listener) Latency() time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.latency
+}
+
+// SetLatency sets the initial latency for connections.
+func (l *Listener) SetLatency(latency time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.latency = latency
+}
+
+// GetTrafficShapedConn takes in a normal connection and returns a traffic shaped connection.
+func (l *Listener) GetTrafficShapedConn(oc net.Conn) *Conn {
+	if tsconn, ok := oc.(*Conn); ok {
+		return tsconn
+	}
+	urlbuckets := make(map[string]*Buckets)
+	globalurlbuckets := make(map[string]*Bucket)
+
+	l.Shapes.RLock()
+	defaults := l.Defaults()
+	latency := l.Latency()
+	defaultBandwidth := defaults.Bandwidth
+	for regex, shape := range l.Shapes.M {
+		// It should be ok to not acquire the read lock on shape, since WriteBucket is never mutated.
+		globalurlbuckets[regex] = shape.Shape.WriteBucket
+		urlbuckets[regex] = NewBuckets(DefaultBitrate/8, shape.Shape.MaxBandwidth)
+	}
+
+	l.Shapes.RUnlock()
+
+	curinfo := &Context{}
+
+	lc := &Conn{
+		conn:             oc,
+		latency:          latency,
+		ReadBucket:       l.ReadBucket,
+		WriteBucket:      l.WriteBucket,
+		Shapes:           l.Shapes,
+		GlobalBuckets:    globalurlbuckets,
+		LocalBuckets:     urlbuckets,
+		Context:          curinfo,
+		Established:      time.Now(),
+		DefaultBandwidth: defaultBandwidth,
+		Listener:         l,
+	}
+	return lc
+}
+
+// Accept waits for and returns the next connection to the listener.
+func (l *Listener) Accept() (net.Conn, error) {
+	oc, err := l.Listener.Accept()
+	if err != nil {
+		log.Errorf("trafficshape: failed accepting connection: %v", err)
+		return nil, err
+	}
+
+	if tconn, ok := oc.(*net.TCPConn); ok {
+		log.Debugf("trafficshape: setting keep-alive for TCP connection")
+		tconn.SetKeepAlive(true)
+		tconn.SetKeepAlivePeriod(3 * time.Minute)
+	}
+	return l.GetTrafficShapedConn(oc), nil
+}
+
+// Close closes the read and write buckets along with the underlying listener.
+func (l *Listener) Close() error {
+	defer log.Debugf("trafficshape: closed read/write buckets and connection")
+
+	l.ReadBucket.Close()
+	l.WriteBucket.Close()
+
+	return l.Listener.Close()
 }
