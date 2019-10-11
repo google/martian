@@ -341,7 +341,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 
 			var nconn net.Conn
 			nconn = tlsconn
-			// If the original connection was a traffic shaped connection, wrap the tls
+			// If the original connection is a traffic shaped connection, wrap the tls
 			// connection inside a traffic shaped connection too.
 			if ptsconn, ok := conn.(*trafficshape.Conn); ok {
 				nconn = ptsconn.Listener.GetTrafficShapedConn(tlsconn)
