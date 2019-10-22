@@ -117,5 +117,5 @@ func (m *Matcher) MatchResponse(res *http.Response) bool {
 }
 
 func (m *Matcher) matches(method string) bool {
-	return strings.ToUpper(method) == strings.ToUpper(m.method)
+	return strings.EqualFold(method, m.method)
 }
