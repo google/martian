@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -298,7 +299,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	if p.mitm != nil {
 		log.Debugf("martian: attempting MITM for connection: %s / %s", req.Host, req.URL.String())
 
-		res := proxyutil.NewResponse(200, nil, req)
+		res := p.connectResponse(req)
 
 		if err := p.resmod.ModifyResponse(res); err != nil {
 			log.Errorf("martian: error modifying CONNECT response: %v", err)
@@ -616,6 +617,17 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	return p.connectResponse(req), conn, nil
+}
 
-	return proxyutil.NewResponse(200, nil, req), conn, nil
+func (p *Proxy) connectResponse(req *http.Request) *http.Response {
+	// modified by zema1, 200 Connection Established is the standard status for connect request.
+	// Content-Length  should not be set, otherwise awvs will not work (:.
+	resp := proxyutil.NewResponse(200, nil, req)
+	resp.Status = fmt.Sprintf("%d %s", 200, "Connection established")
+	resp.Proto = "HTTP/1.0"
+	resp.ProtoMajor = 1
+	resp.ProtoMinor = 0
+	resp.ContentLength = -1
+	return resp
 }
