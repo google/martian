@@ -55,7 +55,15 @@ var (
 )
 
 func newNoopContext() *Context {
+	sid, err := newID()
+	if err != nil {
+		sid = ""
+	}
 	return &Context{
+		session: &Session{
+			id:   sid,
+			vals: make(map[string]interface{}),
+		},
 		vals: make(map[string]interface{}),
 	}
 }
