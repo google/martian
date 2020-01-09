@@ -495,6 +495,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 	defer res.Body.Close()
 
+	// set request to original request manually, res.Request may be changed in transport.
+	// see https://github.com/google/martian/issues/298
+	res.Request = req
+
 	if err := p.resmod.ModifyResponse(res); err != nil {
 		log.Errorf("martian: error modifying response: %v", err)
 		proxyutil.Warning(res.Header, err)
