@@ -38,6 +38,16 @@ import (
 	"github.com/google/martian/v3/proxyutil"
 )
 
+// EntryContainer is an interface for the storage of the har entries
+type EntryContainer interface {
+	AddEntry(entry *Entry)
+	Entries() []*Entry
+	RemoveCompleted() []*Entry
+	RemoveEntry(id string) *Entry
+	Reset()
+	RetrieveEntry(id string) *Entry
+}
+
 // Logger maintains request and response log entries.
 type Logger struct {
 	bodyLogging     func(*http.Response) bool
@@ -45,7 +55,7 @@ type Logger struct {
 
 	creator *Creator
 
-	Entries *EntryList
+	Entries EntryContainer
 }
 
 // HAR is the top level object of a HAR log.
@@ -395,6 +405,12 @@ func NewLogger() *Logger {
 	return l
 }
 
+// SetEntries allows the changing of the entry container to another struct which
+// implements the EntryContainer interface
+func (l *Logger) SetEntries(ec EntryContainer) {
+	l.Entries = ec
+}
+
 // SetOption sets configurable options on the logger.
 func (l *Logger) SetOption(opts ...Option) {
 	for _, opt := range opts {
@@ -548,14 +564,14 @@ func NewResponse(res *http.Response, withBody bool) (*Response, error) {
 
 // Export returns the in-memory log.
 func (l *Logger) Export() *HAR {
-	return l.makeHAR(l.Entries.Entries())
+	es := l.Entries.Entries()
+
+	return l.makeHAR(es)
 }
 
 // ExportAndReset returns the in-memory log for completed requests, clearing them.
 func (l *Logger) ExportAndReset() *HAR {
-	matcher := func(e *Entry) bool { return e.Response != nil }
-
-	es := l.Entries.RemoveMatches(matcher)
+	es := l.Entries.RemoveCompleted()
 
 	return l.makeHAR(es)
 }

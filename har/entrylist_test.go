@@ -16,7 +16,6 @@ package har
 
 import (
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/google/martian/v3"
@@ -57,20 +56,12 @@ func TestEntryList(t *testing.T) {
 		}
 	}
 
-	matcher := func(e *Entry) bool {
-		return strings.Contains(e.Request.URL, "1.example.com")
-	}
-
 	if got, want := logger.Entries.RemoveEntry(ids[0]).Request.URL, urls[0]; got != want {
 		t.Errorf("RemoveEntry: got %q, want %q", got, want)
 	}
 
 	if got := logger.Entries.RemoveEntry(ids[0]); got != nil {
 		t.Errorf("RemoveEntry: should not have retrieve an entry")
-	}
-
-	if got, want := logger.Entries.RemoveMatches(matcher)[0].Request.URL, urls[1]; got != want {
-		t.Errorf("RemoveMatches: got %q, want %q", got, want)
 	}
 
 	if got, want := logger.Entries.RetrieveEntry(ids[2]).Request.URL, urls[2]; got != want {

@@ -19,41 +19,34 @@ import (
 	"sync"
 )
 
+// EntryList implements the har.EntryContainer interface for the storage of har.Entry
 type EntryList struct {
 	lock  sync.Mutex
-	Items *list.List
+	items *list.List
 }
 
 func NewEntryList() *EntryList {
 	return &EntryList{
-		Items: list.New(),
+		items: list.New(),
 	}
-}
-
-func (el *EntryList) Lock() {
-	el.lock.Lock()
-}
-
-func (el *EntryList) Unlock() {
-	el.lock.Unlock()
 }
 
 // AddEntry adds an entry to the entry list
 func (el *EntryList) AddEntry(entry *Entry) {
-	el.Lock()
-	defer el.Unlock()
+	el.lock.Lock()
+	defer el.lock.Unlock()
 
-	el.Items.PushBack(entry)
+	el.items.PushBack(entry)
 }
 
 // Entries returns a slice containing all entries
 func (el *EntryList) Entries() []*Entry {
-	el.Lock()
-	defer el.Unlock()
+	el.lock.Lock()
+	defer el.lock.Unlock()
 
-	es := make([]*Entry, 0, el.Items.Len())
+	es := make([]*Entry, 0, el.items.Len())
 
-	for e := el.Items.Front(); e != nil; e = e.Next() {
+	for e := el.items.Front(); e != nil; e = e.Next() {
 		es = append(es, e.Value.(*Entry))
 	}
 
@@ -61,20 +54,20 @@ func (el *EntryList) Entries() []*Entry {
 }
 
 // RemoveMatches takes a matcher function and returns all entries that return true from the function
-func (el *EntryList) RemoveMatches(matcher func(*Entry) bool) []*Entry {
-	el.Lock()
-	defer el.Unlock()
+func (el *EntryList) RemoveCompleted() []*Entry {
+	el.lock.Lock()
+	defer el.lock.Unlock()
 
-	es := make([]*Entry, 0, el.Items.Len())
+	es := make([]*Entry, 0, el.items.Len())
 	var next *list.Element
 
-	for e := el.Items.Front(); e != nil; e = next {
+	for e := el.items.Front(); e != nil; e = next {
 		next = e.Next()
 
 		entry := getEntry(e)
-		if matcher(entry) {
+		if entry.Response != nil {
 			es = append(es, entry)
-			el.Items.Remove(e)
+			el.items.Remove(e)
 		}
 	}
 
@@ -83,11 +76,11 @@ func (el *EntryList) RemoveMatches(matcher func(*Entry) bool) []*Entry {
 
 // RemoveEntry removes and entry from the entry list via the entry's id
 func (el *EntryList) RemoveEntry(id string) *Entry {
-	el.Lock()
-	defer el.Unlock()
+	el.lock.Lock()
+	defer el.lock.Unlock()
 
 	if e, en := el.retrieveElementEntry(id); e != nil {
-		el.Items.Remove(e)
+		el.items.Remove(e)
 
 		return en
 	}
@@ -97,16 +90,16 @@ func (el *EntryList) RemoveEntry(id string) *Entry {
 
 // Reset reinitializes the entrylist
 func (el *EntryList) Reset() {
-	el.Lock()
-	defer el.Unlock()
+	el.lock.Lock()
+	defer el.lock.Unlock()
 
-	el.Items.Init()
+	el.items.Init()
 }
 
 // RetrieveEntry returns an entry from the entrylist via the entry's id
 func (el *EntryList) RetrieveEntry(id string) *Entry {
-	el.Lock()
-	defer el.Unlock()
+	el.lock.Lock()
+	defer el.lock.Unlock()
 
 	_, en := el.retrieveElementEntry(id)
 
@@ -122,7 +115,7 @@ func getEntry(e *list.Element) *Entry {
 }
 
 func (el *EntryList) retrieveElementEntry(id string) (*list.Element, *Entry) {
-	for e := el.Items.Front(); e != nil; e = e.Next() {
+	for e := el.items.Front(); e != nil; e = e.Next() {
 		if en := getEntry(e); en.ID == id {
 			return e, en
 		}
