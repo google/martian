@@ -21,7 +21,7 @@ import (
 
 // EntryList implements the har.EntryContainer interface for the storage of har.Entry
 type EntryList struct {
-	lock  sync.Mutex
+	mu    sync.Mutex
 	items *list.List
 }
 
@@ -33,16 +33,16 @@ func NewEntryList() *EntryList {
 
 // AddEntry adds an entry to the entry list
 func (el *EntryList) AddEntry(entry *Entry) {
-	el.lock.Lock()
-	defer el.lock.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	el.items.PushBack(entry)
 }
 
 // Entries returns a slice containing all entries
 func (el *EntryList) Entries() []*Entry {
-	el.lock.Lock()
-	defer el.lock.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	es := make([]*Entry, 0, el.items.Len())
 
@@ -55,8 +55,8 @@ func (el *EntryList) Entries() []*Entry {
 
 // RemoveMatches takes a matcher function and returns all entries that return true from the function
 func (el *EntryList) RemoveCompleted() []*Entry {
-	el.lock.Lock()
-	defer el.lock.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	es := make([]*Entry, 0, el.items.Len())
 	var next *list.Element
@@ -76,8 +76,8 @@ func (el *EntryList) RemoveCompleted() []*Entry {
 
 // RemoveEntry removes and entry from the entry list via the entry's id
 func (el *EntryList) RemoveEntry(id string) *Entry {
-	el.lock.Lock()
-	defer el.lock.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	if e, en := el.retrieveElementEntry(id); e != nil {
 		el.items.Remove(e)
@@ -90,16 +90,16 @@ func (el *EntryList) RemoveEntry(id string) *Entry {
 
 // Reset reinitializes the entrylist
 func (el *EntryList) Reset() {
-	el.lock.Lock()
-	defer el.lock.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	el.items.Init()
 }
 
 // RetrieveEntry returns an entry from the entrylist via the entry's id
 func (el *EntryList) RetrieveEntry(id string) *Entry {
-	el.lock.Lock()
-	defer el.lock.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	_, en := el.retrieveElementEntry(id)
 
