@@ -430,7 +430,7 @@ func main() {
 	go http.Serve(lAPI, mux)
 
 	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt, os.Kill)
+	signal.Notify(sigc, os.Interrupt)
 
 	<-sigc
 
