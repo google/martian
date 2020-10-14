@@ -20,6 +20,7 @@ package har
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -280,15 +281,77 @@ type Content struct {
 	// response header).
 	MimeType string `json:"mimeType"`
 	// Text contains the response body sent from the server or loaded from the
+	// browser cache. This field is populated with fully decoded version of the
+	// respose body.
+	Text []byte `json:"text,omitempty"`
+	// The desired encoding to use for the text field when encoding to JSON.
+	Encoding string `json:"encoding,omitempty"`
+}
+
+// For marshaling Content to and from json. This works around the json library's
+// default conversion of []byte to base64 encoded string.
+type contentJSON struct {
+	Size     int64  `json:"size"`
+	MimeType string `json:"mimeType"`
+
+	// Text contains the response body sent from the server or loaded from the
 	// browser cache. This field is populated with textual content only. The text
 	// field is either HTTP decoded text or a encoded (e.g. "base64")
 	// representation of the response body. Leave out this field if the
 	// information is not available.
-	Text []byte `json:"text,omitempty"`
+	Text string `json:"text,omitempty"`
+
 	// Encoding used for response text field e.g "base64". Leave out this field
 	// if the text field is HTTP decoded (decompressed & unchunked), than
 	// trans-coded from its original character set into UTF-8.
 	Encoding string `json:"encoding,omitempty"`
+}
+
+func (c Content) MarshalJSON() ([]byte, error) {
+	var txt string
+	switch c.Encoding {
+	case "base64":
+		txt = base64.StdEncoding.EncodeToString(c.Text)
+	case "":
+		txt = string(c.Text)
+	default:
+		return nil, fmt.Errorf("unsupported encoding for Content.Text: %s", c.Encoding)
+	}
+
+	cj := contentJSON{
+		Size:     c.Size,
+		MimeType: c.MimeType,
+		Text:     txt,
+		Encoding: c.Encoding,
+	}
+	return json.Marshal(cj)
+}
+
+func (c *Content) UnmarshalJSON(data []byte) error {
+	var cj contentJSON
+	if err := json.Unmarshal(data, &cj); err != nil {
+		return err
+	}
+
+	var txt []byte
+	var err error
+	switch cj.Encoding {
+	case "base64":
+		txt, err = base64.StdEncoding.DecodeString(cj.Text)
+		if err != nil {
+			return fmt.Errorf("failed to decode base64-encoded Content.Text: %v", err)
+		}
+	case "":
+		txt = []byte(cj.Text)
+	default:
+		return fmt.Errorf("unsupported encoding for Content.Text: %s", cj.Encoding)
+	}
+
+	c.Size = cj.Size
+	c.MimeType = cj.MimeType
+	c.Text = txt
+	c.Encoding = cj.Encoding
+	return nil
 }
 
 // Option is a configurable setting for the logger.

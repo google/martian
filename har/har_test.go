@@ -910,3 +910,46 @@ func TestJSONMarshalPostData(t *testing.T) {
 		}
 	}
 }
+
+func TestJSONMarshalContent(t *testing.T) {
+	testCases := []struct {
+		name     string
+		text     []byte
+		encoding string
+	}{
+		{
+			name:     "binary data with base64 encoding",
+			text:     []byte{120, 31, 99, 3},
+			encoding: "base64",
+		},
+		{
+			name: "ascii data with no encoding",
+			text: []byte("hello martian"),
+		},
+		{
+			name:     "ascii data with base64 encoding",
+			text:     []byte("hello martian"),
+			encoding: "base64",
+		},
+	}
+
+	for _, c := range testCases {
+		want := Content{
+			Size:     int64(len(c.text)),
+			MimeType: "application/x-test",
+			Text:     c.text,
+			Encoding: c.encoding,
+		}
+		data, err := json.Marshal(want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got Content
+		if err := json.Unmarshal(data, &got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %+v, want %+v", got, want)
+		}
+	}
+}
