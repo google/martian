@@ -24,7 +24,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/martian/v3/h2"
 	mgrpc "github.com/google/martian/v3/h2/grpc"
 	ht "github.com/google/martian/v3/h2/testing"
@@ -32,6 +31,7 @@ import (
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding/gzip"
+	"google.golang.org/protobuf/proto"
 
 	tspb "github.com/google/martian/v3/h2/testservice"
 )

@@ -7,12 +7,12 @@ go:
   - 1.11.x
 
 install:
+  - go get -u golang.org/x/net
   - go get -u golang.org/x/net/websocket
   - go get -u golang.org/x/lint/golint
-  - go get -u github.com/golang/protobuf
+  - go get -u google.golang.org/protobuf
   - go get -u google.golang.org/grpc
   - go get -u github.com/golang/snappy
-  - go get -u golang.org/x/net
 
 script:
   - golint ./...
