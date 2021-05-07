@@ -338,6 +338,9 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 				p.mitm.HandshakeErrorCallback(req, err)
 				return err
 			}
+			if tlsconn.ConnectionState().NegotiatedProtocol == "h2" {
+				return p.mitm.H2Config().Proxy(p.closing, tlsconn, req.URL)
+			}
 
 			var nconn net.Conn
 			nconn = tlsconn

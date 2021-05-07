@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package test_service;
+
+option go_package = "github.com/google/martian/h2/testservice";
+
+message EchoRequest {
+  string payload = 1;
+}
+
+message EchoResponse {
+  string payload = 1;
+}
+
+message SumRequest {
+  repeated int32 values = 1;
+}
+
+message SumResponse {
+  int32 value = 1;
+}
+
+service TestService {
+  // The server returns the client message as-is.
+  rpc Echo(EchoRequest) returns (EchoResponse) {}
+
+  // The server returns the sum of the input values.
+  rpc Sum(SumRequest) returns (SumResponse) {}
+
+  // The server returns every message twice.
+  rpc DoubleEcho(stream EchoRequest) returns (stream EchoResponse) {}
+}
