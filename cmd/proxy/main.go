@@ -253,6 +253,8 @@ var (
 )
 
 func main() {
+	martian.Init()
+
 	p := martian.NewProxy()
 	defer p.Close()
 
@@ -435,10 +437,6 @@ func main() {
 	<-sigc
 
 	log.Println("martian: shutting down")
-}
-
-func init() {
-	martian.Init()
 }
 
 // configure installs a configuration handler at path.
