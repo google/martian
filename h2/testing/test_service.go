@@ -26,13 +26,14 @@ type Server struct {
 	tspb.UnimplementedTestServiceServer
 }
 
-// Echo handles TestService.Echo RPC.
+// Echo handles TestService.Echo RPCs.
 func (s *Server) Echo(ctx context.Context, in *tspb.EchoRequest) (*tspb.EchoResponse, error) {
 	return &tspb.EchoResponse{
 		Payload: in.GetPayload(),
 	}, nil
 }
 
+// Sum handles TestService.Sum RPCs.
 func (s *Server) Sum(_ context.Context, in *tspb.SumRequest) (*tspb.SumResponse, error) {
 	sum := int32(0)
 	for _, v := range in.GetValues() {
@@ -43,6 +44,7 @@ func (s *Server) Sum(_ context.Context, in *tspb.SumRequest) (*tspb.SumResponse,
 	}, nil
 }
 
+// DoubleEcho handles TestService.DoubleEcho RPCs.
 func (s *Server) DoubleEcho(stream tspb.TestService_DoubleEchoServer) error {
 	for {
 		req, err := stream.Recv()
