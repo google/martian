@@ -49,44 +49,57 @@ const (
 // ProcessorFactory creates gRPC processors that implement the Processor interface, which abstracts
 // away some of the details of the underlying HTTP/2 protocol. A processor must forward
 // invocations to the given `server` or `client` processors, which will arrange to have the data
-// forwarded to the destination, with possible edits. Any returned nil value will be treated as a
-// noop processor.
+// forwarded to the destination, with possible edits. Nil values are safe to return and no
+// processing occurs in such cases.
+//
+// NOTE: an interface may have a non-nil type with a nil value. Such values are treated as valid
+// processors.
 type ProcessorFactory func(url *url.URL, server, client Processor) (Processor, Processor)
 
 // AsStreamProcessorFactory converts a ProcessorFactory into a StreamProcessorFactory. It creates
 // an adapter that abstracts HTTP/2 frames into a representation that is closer to gRPC.
 func AsStreamProcessorFactory(f ProcessorFactory) h2.StreamProcessorFactory {
-	return func(url *url.URL, sinks *h2.Processors) (interface{}, interface{}) {
-		cToS := &emitter{sink: sinks.ForDirection(h2.ClientToServer)}
-		sToC := &emitter{sink: sinks.ForDirection(h2.ServerToClient)}
+	return func(url *url.URL, sinks *h2.Processors) (h2.Processor, h2.Processor) {
+		var cToS, sToC h2.Processor
 
-		cToSProcessor, sToCProcessor := f(url, cToS, sToC)
-		if cToSProcessor == nil {
-			cToSProcessor = &noop{cToS}
-		}
-		if sToCProcessor == nil {
-			sToCProcessor = &noop{sToC}
-		}
+		// A grpc.Processor is translated into an h2.Processor in layers.
+		//
+		// adapter → processor → emitter → sink
+		//    \_____________________________↗
+		//
+		// * The adapter wraps the grpc.Processor interface so that it conforms with h2.Processor. It
+		//   performs some processing to translate HTTP/2 frames into gRPC concepts. Frames that are
+		//   not relevant to gRPC are forwarded directly to the sink.
+		// * The processor is the gRPC processing logic provided by the client factory.
+		// * The emitter wraps an h2.Processor sink and translates the processed gRPC data into HTTP/2
+		//   frames.
+		cToSEmitter := &emitter{sink: sinks.ForDirection(h2.ClientToServer)}
+		sToCEmitter := &emitter{sink: sinks.ForDirection(h2.ServerToClient)}
+		cToSProcessor, sToCProcessor := f(url, cToSEmitter, sToCEmitter)
 
 		// enabled indicates whether the stream should be processed as gRPC. It is shared between the
 		// the two adapters because its detection is on a client-to-server HEADER frame and the state
 		// applies bidirectionally.
 		enabled := int32(0)
-		cToS.adapter = &adapter{
-			enabled:   &enabled,
-			dir:       h2.ClientToServer,
-			processor: cToSProcessor,
-			sink:      sinks.ForDirection(h2.ClientToServer),
+		if cToSProcessor != nil {
+			cToSEmitter.adapter = &adapter{
+				enabled:   &enabled,
+				dir:       h2.ClientToServer,
+				processor: cToSProcessor,
+				sink:      sinks.ForDirection(h2.ClientToServer),
+			}
+			cToS = cToSEmitter.adapter
 		}
-
-		sToC.adapter = &adapter{
-			enabled:   &enabled,
-			dir:       h2.ServerToClient,
-			processor: sToCProcessor,
-			sink:      sinks.ForDirection(h2.ServerToClient),
+		if sToCProcessor != nil {
+			sToCEmitter.adapter = &adapter{
+				enabled:   &enabled,
+				dir:       h2.ServerToClient,
+				processor: sToCProcessor,
+				sink:      sinks.ForDirection(h2.ServerToClient),
+			}
+			sToC = sToCEmitter.adapter
 		}
-
-		return cToS.adapter, sToC.adapter
+		return cToS, sToC
 	}
 }
 
@@ -97,24 +110,7 @@ type Processor interface {
 	Message(data []byte, streamEnded bool) error
 }
 
-// noop implements a processor that only forwards data. This is useful when only one side of the
-// stream needs to be processed.
-type noop struct {
-	dest Processor
-}
-
-func (n *noop) Header(
-	headers []hpack.HeaderField,
-	streamEnded bool,
-	priority http2.PriorityParam,
-) error {
-	return n.dest.Header(headers, streamEnded, priority)
-}
-
-func (n *noop) Message(data []byte, streamEnded bool) error {
-	return n.dest.Message(data, streamEnded)
-}
-
+// dataState represents one of two possible states when consuming gRPC DATA frames.
 type dataState uint8
 
 const (
@@ -122,8 +118,8 @@ const (
 	readingMessageData
 )
 
-// adapter wraps the Processor interface with a partial h2.Processor interface. It also filters
-// streams that are not gRPC and handles decompressing the message data.
+// adapter wraps the Processor interface with an h2.Processor interface. It filters streams that
+// are not gRPC and handles decompressing the message data.
 type adapter struct {
 	enabled *int32
 
@@ -254,6 +250,18 @@ func (a *adapter) Data(data []byte, streamEnded bool) error {
 			return nil
 		}
 	}
+}
+
+func (a *adapter) Priority(priority http2.PriorityParam) error {
+	return a.sink.Priority(priority)
+}
+
+func (a *adapter) RSTStream(errCode http2.ErrCode) error {
+	return a.sink.RSTStream(errCode)
+}
+
+func (a *adapter) PushPromise(promiseID uint32, headers []hpack.HeaderField) error {
+	return a.sink.PushPromise(promiseID, headers)
 }
 
 func (a *adapter) isEnabled() bool {

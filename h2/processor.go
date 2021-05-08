@@ -37,14 +37,13 @@ const (
 // processor consumes frames then calls the corresponding sink methods to forward frames to the
 // destination, modifying the frame if needed.
 //
-// Returns the client-to-server and server-to-client processors. The processors implement any
-// number of the "Processor" interfaces below based on the frames it needs to edit.
+// Returns the client-to-server and server-to-client processors.
 //
 // Concurrency: there is a separate client-to-server and server-to-client thread. Calls against
 // the `ClientToServer` sink must be made on the client-to-server thread and calls against
 // the `ServerToClient` sink must be made on the server-to-client thread. Implementors should
 // guard interactions across threads.
-type StreamProcessorFactory func(url *url.URL, sinks *Processors) (interface{}, interface{})
+type StreamProcessorFactory func(url *url.URL, sinks *Processors) (Processor, Processor)
 
 // Processors encapsulates the two traffic receiving endpoints.
 type Processors struct {
@@ -137,66 +136,4 @@ func (r *relayAdapter) RSTStream(errCode http2.ErrCode) error {
 
 func (r *relayAdapter) PushPromise(promiseID uint32, headers []hpack.HeaderField) error {
 	return r.relay.pushPromise(r.id, promiseID, headers)
-}
-
-// partialProcessorAdapter takes a partially implemented Processor and turns it into a fully
-// implemented Processor by falling back on a given Processor implementation.
-type partialProcessorAdapter struct {
-	partial  interface{}
-	fallback Processor
-}
-
-// newPartialProcessorAdapter instantiates a partialProcesorAdapter. This function primarily exists
-// as a compile-time check that the Processor interface has been implemented.
-func newPartialProcessorAdapter(partial interface{}, fallback Processor) Processor {
-	return &partialProcessorAdapter{partial, fallback}
-}
-
-func (p *partialProcessorAdapter) Data(data []byte, streamEnded bool) error {
-	var fp DataFrameProcessor
-	var ok bool
-	if fp, ok = p.partial.(DataFrameProcessor); !ok {
-		fp = p.fallback
-	}
-	return fp.Data(data, streamEnded)
-}
-
-func (p *partialProcessorAdapter) Header(
-	headers []hpack.HeaderField,
-	streamEnded bool,
-	priority http2.PriorityParam,
-) error {
-	var fp HeaderProcessor
-	var ok bool
-	if fp, ok = p.partial.(HeaderProcessor); !ok {
-		fp = p.fallback
-	}
-	return fp.Header(headers, streamEnded, priority)
-}
-
-func (p *partialProcessorAdapter) Priority(priority http2.PriorityParam) error {
-	var fp PriorityFrameProcessor
-	var ok bool
-	if fp, ok = p.partial.(PriorityFrameProcessor); !ok {
-		fp = p.fallback
-	}
-	return fp.Priority(priority)
-}
-
-func (p *partialProcessorAdapter) RSTStream(errCode http2.ErrCode) error {
-	var fp RSTStreamProcessor
-	var ok bool
-	if fp, ok = p.partial.(RSTStreamProcessor); !ok {
-		fp = p.fallback
-	}
-	return fp.RSTStream(errCode)
-}
-
-func (p *partialProcessorAdapter) PushPromise(promiseID uint32, headers []hpack.HeaderField) error {
-	var fp PushPromiseProcessor
-	var ok bool
-	if fp, ok = p.partial.(PushPromiseProcessor); !ok {
-		fp = p.fallback
-	}
-	return fp.PushPromise(promiseID, headers)
 }

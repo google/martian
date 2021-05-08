@@ -334,70 +334,116 @@ func TestLargeEcho(t *testing.T) {
 	}
 }
 
+type noopProcessor struct {
+	sink mgrpc.Processor
+}
+
+func (p *noopProcessor) Header(
+	headers []hpack.HeaderField,
+	streamEnded bool,
+	priority http2.PriorityParam,
+) error {
+	return p.sink.Header(headers, streamEnded, priority)
+}
+
+func (p *noopProcessor) Message(data []byte, streamEnded bool) error {
+	return p.sink.Message(data, streamEnded)
+}
+
 func TestStream(t *testing.T) {
-	fixture, err := ht.New([]h2.StreamProcessorFactory{
-		mgrpc.AsStreamProcessorFactory(
-			func(_ *url.URL, server, client mgrpc.Processor) (mgrpc.Processor, mgrpc.Processor) {
+	tests := []struct {
+		name    string
+		factory h2.StreamProcessorFactory
+	}{
+		{
+			"NilH2Processor",
+			func(_ *url.URL, _ *h2.Processors) (h2.Processor, h2.Processor) {
 				return nil, nil
-			}),
-	})
-	if err != nil {
-		t.Fatalf("ht.New(...) = %v, want nil", err)
+			},
+		},
+		{
+			// This differs from NilH2Processor only in how mgrpc.AsStreamProcessorFactory handles nil
+			// grpc.Processor values. It should end up processing exactly the same as
+			// h2.StreamProcessorFactory afterwards.
+			"NilGRPCProcessor",
+			mgrpc.AsStreamProcessorFactory(
+				func(_ *url.URL, _, _ mgrpc.Processor) (mgrpc.Processor, mgrpc.Processor) {
+					return nil, nil
+				}),
+		},
+		{
+			// This differs from NilGRPCProcessor in that NilGRPCProcessor ends up behaving like
+			// NilH2Processor and no gRPC processing takes place. NoopProcessor causes the frames to
+			// be processed as gRPC.
+			"NoopGRPCProcessor",
+			mgrpc.AsStreamProcessorFactory(
+				func(_ *url.URL, server, client mgrpc.Processor) (mgrpc.Processor, mgrpc.Processor) {
+					return &noopProcessor{server}, &noopProcessor{client}
+				}),
+		},
 	}
-	defer func() {
-		if err := fixture.Close(); err != nil {
-			t.Fatalf("f.Close() = %v, want nil", err)
-		}
-	}()
-	ctx := context.Background()
-	stream, err := fixture.DoubleEcho(ctx)
-	if err != nil {
-		t.Fatalf("fixture.DoubleEcho(ctx) = _, %v, want _, nil", err)
-	}
-
-	var received []*tspb.EchoResponse
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			resp, err := stream.Recv()
-			if err == io.EOF {
-				return
-			}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture, err := ht.New([]h2.StreamProcessorFactory{tc.factory})
 			if err != nil {
-				t.Errorf("stream.Recv() = %v, want nil", err)
-				return
+				t.Fatalf("ht.New(...) = %v, want nil", err)
 			}
-			received = append(received, resp)
-		}
-	}()
+			defer func() {
+				if err := fixture.Close(); err != nil {
+					t.Fatalf("f.Close() = %v, want nil", err)
+				}
+			}()
+			ctx := context.Background()
+			stream, err := fixture.DoubleEcho(ctx)
+			if err != nil {
+				t.Fatalf("fixture.DoubleEcho(ctx) = _, %v, want _, nil", err)
+			}
 
-	var sent []*tspb.EchoRequest
-	for i := 0; i < 5; i++ {
-		payload := make([]byte, 20*1024)
-		rand.Read(payload)
-		req := &tspb.EchoRequest{
-			Payload: base64.StdEncoding.EncodeToString(payload),
-		}
-		if err := stream.Send(req); err != nil {
-			t.Fatalf("stream.Send(req) = %v, want nil", err)
-		}
-		sent = append(sent, req)
-	}
-	if err := stream.CloseSend(); err != nil {
-		t.Fatalf("stream.CloseSend() = %v, want nil", err)
-	}
-	wg.Wait()
+			var received []*tspb.EchoResponse
 
-	for i, req := range sent {
-		want := req.GetPayload()
-		if got := received[2*i].GetPayload(); got != want {
-			t.Errorf("received[2*i].GetPayload() = %s, want %s", got, want)
-		}
-		if got := received[2*i+1].GetPayload(); got != want {
-			t.Errorf("received[2*i+1].GetPayload() = %s, want %s", got, want)
-		}
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					resp, err := stream.Recv()
+					if err == io.EOF {
+						return
+					}
+					if err != nil {
+						t.Errorf("stream.Recv() = %v, want nil", err)
+						return
+					}
+					received = append(received, resp)
+				}
+			}()
+
+			var sent []*tspb.EchoRequest
+			for i := 0; i < 5; i++ {
+				payload := make([]byte, 20*1024)
+				rand.Read(payload)
+				req := &tspb.EchoRequest{
+					Payload: base64.StdEncoding.EncodeToString(payload),
+				}
+				if err := stream.Send(req); err != nil {
+					t.Fatalf("stream.Send(req) = %v, want nil", err)
+				}
+				sent = append(sent, req)
+			}
+			if err := stream.CloseSend(); err != nil {
+				t.Fatalf("stream.CloseSend() = %v, want nil", err)
+			}
+			wg.Wait()
+
+			for i, req := range sent {
+				want := req.GetPayload()
+				if got := received[2*i].GetPayload(); got != want {
+					t.Errorf("received[2*i].GetPayload() = %s, want %s", got, want)
+				}
+				if got := received[2*i+1].GetPayload(); got != want {
+					t.Errorf("received[2*i+1].GetPayload() = %s, want %s", got, want)
+				}
+			}
+		})
 	}
 }

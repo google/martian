@@ -63,7 +63,6 @@ func (c *Config) Proxy(closing chan bool, cc io.ReadWriter, url *url.URL) error 
 		NextProtos: []string{"h2"},
 	})
 	if err != nil {
-		fmt.Printf("dial failed: %v\n", err)
 		return fmt.Errorf("connecting h2 to %v: %w", url, err)
 	}
 	if err := forwardPreface(sc, cc); err != nil {
@@ -87,10 +86,14 @@ func (c *Config) Proxy(closing chan bool, cc io.ReadWriter, url *url.URL) error 
 			// Chains the pipeline of processors together.
 			for i := len(c.StreamProcessorFactories) - 1; i >= 0; i-- {
 				cToS, sToC := c.StreamProcessorFactories[i](url, p)
-				p = &Processors{
-					cToS: newPartialProcessorAdapter(cToS, p.ForDirection(ClientToServer)),
-					sToC: newPartialProcessorAdapter(sToC, p.ForDirection(ServerToClient)),
+				// Bypasses any nil processors.
+				if cToS == nil {
+					cToS = p.ForDirection(ClientToServer)
 				}
+				if sToC == nil {
+					sToC = p.ForDirection(ServerToClient)
+				}
+				p = &Processors{cToS: cToS, sToC: sToC}
 			}
 			return p
 		},
