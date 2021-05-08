@@ -50,10 +50,8 @@ const (
 // away some of the details of the underlying HTTP/2 protocol. A processor must forward
 // invocations to the given `server` or `client` processors, which will arrange to have the data
 // forwarded to the destination, with possible edits. Nil values are safe to return and no
-// processing occurs in such cases.
-//
-// NOTE: an interface may have a non-nil type with a nil value. Such values are treated as valid
-// processors.
+// processing occurs in such cases. NOTE: an interface may have a non-nil type with a nil value.
+// Such values are treated as valid processors.
 type ProcessorFactory func(url *url.URL, server, client Processor) (Processor, Processor)
 
 // AsStreamProcessorFactory converts a ProcessorFactory into a StreamProcessorFactory. It creates

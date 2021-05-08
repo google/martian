@@ -37,7 +37,9 @@ const (
 // processor consumes frames then calls the corresponding sink methods to forward frames to the
 // destination, modifying the frame if needed.
 //
-// Returns the client-to-server and server-to-client processors.
+// Returns the client-to-server and server-to-client processors. Nil values are safe to return and
+// no processing occurs in such cases. NOTE: an interface may have a non-nil type with a nil value.
+// Such values are treated as valid processors.
 //
 // Concurrency: there is a separate client-to-server and server-to-client thread. Calls against
 // the `ClientToServer` sink must be made on the client-to-server thread and calls against
