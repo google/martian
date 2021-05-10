@@ -32,7 +32,7 @@ const (
 	ServerToClient
 )
 
-// StreamProcessorFactory is implemented by clients that wish to observe or edit http/2 frames
+// StreamProcessorFactory is implemented by clients that wish to observe or edit HTTP/2 frames
 // flowing through the proxy. It creates a pair of processors for the bidirectional stream. A
 // processor consumes frames then calls the corresponding sink methods to forward frames to the
 // destination, modifying the frame if needed.

@@ -142,32 +142,54 @@ func newRelay(
 
 // relayFrames reads frames from `f.src` to `f.dest` until an error occurs or the connection closes.
 func (r *relay) relayFrames(closing chan bool) error {
-	errChan := make(chan error)
+	// Shutting down producer-consumers linked by channels is subtle. In this function, the writer
+	// goroutine consumes frames from `r.output`, which are populated by the reader goroutine. If
+	// the writer shuts down before the reader, the reader may deadlock on inserting frames into
+	// `r.output`. The writer therefore has to keep processing until the reader is done. This is
+	// coordinated via `readerDone`.
+	//
+	// A second subtlely is that errors on the writer goroutine should stop the reader goroutine.
+	// This is communicated via `writeErr`. To avoid deadlocks, even after the error occurs, the
+	// writer thread must still wait until `readerDone` has been communicated to stop processing.
+
+	// Communicates to the consuming writer goroutine that the reader (the calling goroutine of this
+	// method) is done.
+	readerDone := make(chan struct{})
+	defer func() { readerDone <- struct{}{} }()
+
+	// Communicates errors occuring on the writer goroutine to the reader goroutine.
+	writerErr := make(chan error, 1)
+
+	// This writer goroutine consumes the strictly ordered frames in `r.output` and delivers them.
 	go func() {
-		// Delivers the strictly ordered stream output.
+		var err error
 		for {
 			select {
 			case f := <-r.output:
-				r.destMu.Lock()
-				err := f.send(r.dest)
-				r.destMu.Unlock()
-				if err != nil {
-					errChan <- err
-					return
+				if err == nil {
+					r.destMu.Lock()
+					err = f.send(r.dest)
+					r.destMu.Unlock()
+					if err != nil {
+						writerErr <- err
+					}
 				}
-			case <-closing:
+				// Once an output error has occurred, the remaining frames are drained from the channel
+				// without sending them.
+			case <-readerDone:
 				return
 			}
 		}
 	}()
 
-	// This channel is buffered to allow the frame reader to drain on cancellation.
+	// This channel is buffered to allow the ReadFrame goroutine to drain on closing.
 	frameReady := make(chan struct{}, 1)
 	for {
-		// Reads the frame from a goroutine to make this function responsive to cancellation.
 		var frame http2.Frame
 		var err error
 		go func() {
+			// ReadFrame is called in its own goroutine to make this function responsive to closing. It
+			// does not need to block here to close.
 			frame, err = r.src.ReadFrame()
 			frameReady <- struct{}{}
 		}()
@@ -185,10 +207,10 @@ func (r *relay) relayFrames(closing chan bool) error {
 			if *r.enableDebugLogs {
 				log.Infof("%s--%v-->%s", r.srcLabel, frame, r.destLabel)
 			}
-		case err := <-errChan:
+		case err := <-writerErr:
 			return fmt.Errorf("sending frame: %w", err)
 		case <-closing:
-			// The reader goroutine is abandoned at this point. It completes as soon as the blocking
+			// The ReadFrame goroutine is abandoned at this point. It completes as soon as the blocking
 			// ReadFrame call completes, but could potentially leak for an unspecified duration.
 			return nil
 		}
@@ -323,8 +345,8 @@ func (r *relay) updateInitialWindowSize(v uint32) {
 // updateWindow updates the specified window size and may result in the sending of data frames.
 func (r *relay) updateWindow(f *http2.WindowUpdateFrame) {
 	if f.StreamID == 0 {
-		// A stream ID of 0 means to updating the global connection window size. This may cause any
-		// queued frame belonging to any frame to become eligible for sending.
+		// A stream ID of 0 means updating the global connection window size. This may cause any
+		// queued frame belonging to any stream to become eligible for sending.
 		r.flowMu.Lock()
 		r.connectionWindowSize += int(f.Increment)
 		r.flowMu.Unlock()
