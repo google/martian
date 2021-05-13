@@ -21,7 +21,7 @@ import (
 	"compress/gzip"
 	"encoding/binary"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/url"
 	"sync/atomic"
 
@@ -220,7 +220,7 @@ func (a *adapter) Data(data []byte, streamEnded bool) error {
 					}
 				case Snappy:
 					var err error
-					data, err = readAll(snappy.NewReader(bytes.NewReader(data)))
+					data, err = ioutil.ReadAll(snappy.NewReader(bytes.NewReader(data)))
 					if err != nil {
 						return fmt.Errorf("uncompressing snappy: %w", err)
 					}
@@ -328,7 +328,7 @@ func gunzip(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return readAll(r)
+	return ioutil.ReadAll(r)
 }
 
 func deflate(data []byte) (_ []byte, rerr error) {
@@ -338,25 +338,5 @@ func deflate(data []byte) (_ []byte, rerr error) {
 			rerr = err
 		}
 	}()
-	return readAll(r)
-}
-
-const (
-	defaultChunkSize = 1 << 14
-)
-
-// readAll is similar to io.ReadAll, but that seems to be unavailable for App Engine.
-func readAll(r io.Reader) ([]byte, error) {
-	chunk := make([]byte, defaultChunkSize)
-	var buf bytes.Buffer
-	for {
-		n, err := r.Read(chunk)
-		buf.Write(chunk[:n])
-		if err != nil {
-			if err == io.EOF {
-				return buf.Bytes(), nil
-			}
-			return nil, err
-		}
-	}
+	return ioutil.ReadAll(r)
 }
