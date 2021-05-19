@@ -8,4 +8,5 @@ require (
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 	google.golang.org/grpc v1.37.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0 // indirect
+	google.golang.org/protobuf v1.26.0 // indirect
 )
