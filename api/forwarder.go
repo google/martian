@@ -33,6 +33,9 @@ type Forwarder struct {
 
 // NewForwarder returns a Forwarder that rewrites requests to host.
 func NewForwarder(host string, port int) *Forwarder {
+	if host == "" {
+		host = "localhost"
+	}
 	return &Forwarder{
 		host: host,
 		port: port,
@@ -49,7 +52,7 @@ func (f *Forwarder) ModifyRequest(req *http.Request) error {
 
 	in := req.URL.String()
 	req.URL.Scheme = "http"
-	req.URL.Host = fmt.Sprintf("%s:%d", "localhost", f.port)
+	req.URL.Host = fmt.Sprintf("%s:%d", f.host, f.port)
 	out := req.URL.String()
 	log.Infof("api.Forwarder: forwarding %s to %s", in, out)
 

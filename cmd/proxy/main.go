@@ -256,6 +256,18 @@ func main() {
 	p := martian.NewProxy()
 	defer p.Close()
 
+	l, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	lAPI, err := net.Listen("tcp", *apiAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("martian: starting proxy on %s and api on %s", l.Addr().String(), lAPI.Addr().String())
+
 	tr := &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -335,15 +347,17 @@ func main() {
 
 	// Redirect API traffic to API server.
 	if *apiAddr != "" {
-		apip := strings.Replace(*apiAddr, ":", "", 1)
+		addrParts := strings.Split(lAPI.Addr().String(), ":")
+		apip := addrParts[len(addrParts)-1]
 		port, err := strconv.Atoi(apip)
 		if err != nil {
 			log.Fatal(err)
 		}
+		host := strings.Join(addrParts[:len(addrParts)-1], ":")
 
 		// Forward traffic that pattern matches in http.DefaultServeMux
 		apif := servemux.NewFilter(mux)
-		apif.SetRequestModifier(mapi.NewForwarder("", port))
+		apif.SetRequestModifier(mapi.NewForwarder(host, port))
 		topg.AddRequestModifier(apif)
 	}
 	topg.AddRequestModifier(stack)
@@ -405,11 +419,6 @@ func main() {
 	rh.SetResponseVerifier(m)
 	configure("/verify/reset", rh, mux)
 
-	l, err := net.Listen("tcp", *addr)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if *trafficShaping {
 		tsl := trafficshape.NewListener(l)
 		tsh := trafficshape.NewHandler(tsl)
@@ -417,13 +426,6 @@ func main() {
 
 		l = tsl
 	}
-
-	lAPI, err := net.Listen("tcp", *apiAddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("martian: starting proxy on %s and api on %s", l.Addr().String(), lAPI.Addr().String())
 
 	go p.Serve(l)
 
