@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"google3/third_party/golang/martian/log/log"
-	"google3/third_party/golang/martian/martian"
-	"google3/third_party/golang/martian/parse/parse"
+	"github.com/google/martian/log/log"
+	"github.com/google/martian/martian"
+	"github.com/google/martian/parse/parse"
 )
 
 func init() {
