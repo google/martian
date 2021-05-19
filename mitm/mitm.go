@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/martian/v3/h2"
 	"github.com/google/martian/v3/log"
 )
 
@@ -49,6 +50,7 @@ type Config struct {
 	keyID                  []byte
 	validity               time.Duration
 	org                    string
+	h2Config               *h2.Config
 	getCertificate         func(*tls.ClientHelloInfo) (*tls.Certificate, error)
 	roots                  *x509.CertPool
 	skipVerify             bool
@@ -164,6 +166,16 @@ func (c *Config) SetOrganization(org string) {
 	c.org = org
 }
 
+// SetH2Config configures processing of HTTP/2 streams.
+func (c *Config) SetH2Config(h2Config *h2.Config) {
+	c.h2Config = h2Config
+}
+
+// H2Config returns the current HTTP/2 configuration.
+func (c *Config) H2Config() *h2.Config {
+	return c.h2Config
+}
+
 // SetHandshakeErrorCallback sets the handshakeErrorCallback function.
 func (c *Config) SetHandshakeErrorCallback(cb func(*http.Request, error)) {
 	c.handshakeErrorCallback = cb
@@ -197,6 +209,10 @@ func (c *Config) TLS() *tls.Config {
 // TLSForHost returns a *tls.Config that will generate certificates on-the-fly
 // using SNI from the connection, or fall back to the provided hostname.
 func (c *Config) TLSForHost(hostname string) *tls.Config {
+	nextProtos := []string{"http/1.1"}
+	if c.h2AllowedHost(hostname) {
+		nextProtos = []string{"h2", "http/1.1"}
+	}
 	return &tls.Config{
 		InsecureSkipVerify: c.skipVerify,
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -207,8 +223,14 @@ func (c *Config) TLSForHost(hostname string) *tls.Config {
 
 			return c.cert(host)
 		},
-		NextProtos: []string{"http/1.1"},
+		NextProtos: nextProtos,
 	}
+}
+
+func (c *Config) h2AllowedHost(host string) bool {
+	return c.h2Config != nil &&
+		c.h2Config.AllowedHostsFilter != nil &&
+		c.h2Config.AllowedHostsFilter(host)
 }
 
 func (c *Config) cert(hostname string) (*tls.Certificate, error) {

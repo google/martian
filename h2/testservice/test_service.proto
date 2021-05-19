@@ -1,0 +1,46 @@
+// Copyright 2021 Google Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package test_service;
+
+option go_package = "github.com/google/martian/h2/testservice";
+
+message EchoRequest {
+  string payload = 1;
+}
+
+message EchoResponse {
+  string payload = 1;
+}
+
+message SumRequest {
+  repeated int32 values = 1;
+}
+
+message SumResponse {
+  int32 value = 1;
+}
+
+service TestService {
+  // The server returns the client message as-is.
+  rpc Echo(EchoRequest) returns (EchoResponse) {}
+
+  // The server returns the sum of the input values.
+  rpc Sum(SumRequest) returns (SumResponse) {}
+
+  // The server returns every message twice.
+  rpc DoubleEcho(stream EchoRequest) returns (stream EchoResponse) {}
+}

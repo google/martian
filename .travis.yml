@@ -3,12 +3,16 @@ sudo: false
 language: go
 
 go:
-  - 1.10.x
-  - 1.11.x
+  - 1.13.x
 
 install:
+  - go get -u golang.org/x/net/http2
+  - go get -u golang.org/x/net/http2/hpack
   - go get -u golang.org/x/net/websocket
   - go get -u golang.org/x/lint/golint
+  - go get -u google.golang.org/protobuf/proto
+  - go get -u google.golang.org/grpc
+  - go get -u github.com/golang/snappy
 
 script:
   - golint ./...

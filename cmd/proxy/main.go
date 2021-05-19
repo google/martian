@@ -253,6 +253,8 @@ var (
 )
 
 func main() {
+	martian.Init()
+
 	p := martian.NewProxy()
 	defer p.Close()
 
@@ -438,10 +440,6 @@ func main() {
 
 	log.Println("martian: shutting down")
 	os.Exit(0)
-}
-
-func init() {
-	martian.Init()
 }
 
 // configure installs a configuration handler at path.
