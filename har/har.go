@@ -307,6 +307,7 @@ type contentJSON struct {
 	Encoding string `json:"encoding,omitempty"`
 }
 
+// MarshalJSON marshals the byte slice into json after encoding based on c.Encoding.
 func (c Content) MarshalJSON() ([]byte, error) {
 	var txt string
 	switch c.Encoding {
@@ -327,6 +328,7 @@ func (c Content) MarshalJSON() ([]byte, error) {
 	return json.Marshal(cj)
 }
 
+// UnmarshalJSON unmarshals the bytes slice into Content.
 func (c *Content) UnmarshalJSON(data []byte) error {
 	var cj contentJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
