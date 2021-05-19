@@ -89,6 +89,11 @@ func NewProxy() *Proxy {
 	return proxy
 }
 
+// GetRoundTripper gets the http.RoundTripper of the proxy.
+func (p *Proxy) GetRoundTripper() http.RoundTripper {
+	return p.roundTripper
+}
+
 // SetRoundTripper sets the http.RoundTripper of the proxy.
 func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	p.roundTripper = rt

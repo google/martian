@@ -869,6 +869,11 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 
 	tr := martiantest.NewTransport()
 	p.SetRoundTripper(tr)
+
+	if got, want := p.GetRoundTripper(), tr; got != want {
+		t.Errorf("proxy.GetRoundTripper: got %v, want %v", got, want)
+	}
+
 	p.SetTimeout(200 * time.Millisecond)
 
 	tm := martiantest.NewModifier()
