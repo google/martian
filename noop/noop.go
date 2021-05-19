@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/martian/log/log"
-	"github.com/google/martian/martian"
-	"github.com/google/martian/parse/parse"
+	"github.com/google/martian/v3/log/log"
+	"github.com/google/martian/v3/martian"
+	"github.com/google/martian/v3/parse/parse"
 )
 
 func init() {
