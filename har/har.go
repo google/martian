@@ -30,7 +30,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -40,6 +39,16 @@ import (
 	"github.com/google/martian/v3/proxyutil"
 )
 
+// EntryContainer is an interface for the storage of the har entries
+type EntryContainer interface {
+	AddEntry(entry *Entry)
+	Entries() []*Entry
+	RemoveCompleted() []*Entry
+	RemoveEntry(id string) *Entry
+	Reset()
+	RetrieveEntry(id string) *Entry
+}
+
 // Logger maintains request and response log entries.
 type Logger struct {
 	bodyLogging     func(*http.Response) bool
@@ -47,9 +56,7 @@ type Logger struct {
 
 	creator *Creator
 
-	mu      sync.Mutex
-	entries map[string]*Entry
-	tail    *Entry
+	Entries EntryContainer
 }
 
 // HAR is the top level object of a HAR log.
@@ -92,7 +99,6 @@ type Entry struct {
 	// Timings describes various phases within request-response round trip. All
 	// times are specified in milliseconds.
 	Timings *Timings `json:"timings"`
-	next    *Entry
 }
 
 // Request holds data about an individual HTTP request.
@@ -457,11 +463,17 @@ func NewLogger() *Logger {
 			Name:    "martian proxy",
 			Version: "2.0.0",
 		},
-		entries: make(map[string]*Entry),
+		Entries: NewEntryList(),
 	}
 	l.SetOption(BodyLogging(true))
 	l.SetOption(PostDataLogging(true))
 	return l
+}
+
+// SetEntries allows the changing of the entry container to another struct which
+// implements the EntryContainer interface
+func (l *Logger) SetEntries(ec EntryContainer) {
+	l.Entries = ec
 }
 
 // SetOption sets configurable options on the logger.
@@ -499,19 +511,11 @@ func (l *Logger) RecordRequest(id string, req *http.Request) error {
 		Timings:         &Timings{},
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if _, exists := l.entries[id]; exists {
+	if l.Entries.RetrieveEntry(id) != nil {
 		return fmt.Errorf("Duplicate request ID: %s", id)
 	}
-	l.entries[id] = entry
-	if l.tail == nil {
-		l.tail = entry
-	}
-	entry.next = l.tail.next
-	l.tail.next = entry
-	l.tail = entry
+
+	l.Entries.AddEntry(entry)
 
 	return nil
 }
@@ -569,10 +573,7 @@ func (l *Logger) RecordResponse(id string, res *http.Response) error {
 		return err
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if e, ok := l.entries[id]; ok {
+	if e := l.Entries.RetrieveEntry(id); e != nil {
 		e.Response = hres
 		e.Time = time.Since(e.StartedDateTime).Nanoseconds() / 1000000
 	}
@@ -628,53 +629,14 @@ func NewResponse(res *http.Response, withBody bool) (*Response, error) {
 
 // Export returns the in-memory log.
 func (l *Logger) Export() *HAR {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	es := make([]*Entry, 0, len(l.entries))
-	curr := l.tail
-	for curr != nil {
-		curr = curr.next
-		es = append(es, curr)
-		if curr == l.tail {
-			break
-		}
-	}
+	es := l.Entries.Entries()
 
 	return l.makeHAR(es)
 }
 
 // ExportAndReset returns the in-memory log for completed requests, clearing them.
 func (l *Logger) ExportAndReset() *HAR {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	es := make([]*Entry, 0, len(l.entries))
-	curr := l.tail
-	prev := l.tail
-	var first *Entry
-	for curr != nil {
-		curr = curr.next
-		if curr.Response != nil {
-			es = append(es, curr)
-			delete(l.entries, curr.ID)
-		} else {
-			if first == nil {
-				first = curr
-			}
-			prev.next = curr
-			prev = curr
-		}
-		if curr == l.tail {
-			break
-		}
-	}
-	if len(l.entries) == 0 {
-		l.tail = nil
-	} else {
-		l.tail = prev
-		l.tail.next = first
-	}
+	es := l.Entries.RemoveCompleted()
 
 	return l.makeHAR(es)
 }
@@ -691,11 +653,7 @@ func (l *Logger) makeHAR(es []*Entry) *HAR {
 
 // Reset clears the in-memory log of entries.
 func (l *Logger) Reset() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.entries = make(map[string]*Entry)
-	l.tail = nil
+	l.Entries.Reset()
 }
 
 func cookies(cs []*http.Cookie) []Cookie {
