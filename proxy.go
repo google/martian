@@ -209,6 +209,11 @@ func (p *Proxy) Serve(l net.Listener) error {
 				continue
 			}
 
+			if errors.Is(err, net.ErrClosed) {
+				log.Debugf("martian: listener closed, returning")
+				return err
+			}
+
 			log.Errorf("martian: failed to accept: %v", err)
 			return err
 		}
