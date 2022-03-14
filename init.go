@@ -26,6 +26,5 @@ var (
 
 // Init runs common initialization code for a martian proxy.
 func Init() {
-	flag.Parse()
 	mlog.SetLevel(*level)
 }

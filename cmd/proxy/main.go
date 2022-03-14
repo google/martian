@@ -253,6 +253,7 @@ var (
 )
 
 func main() {
+	flag.Parse()
 	martian.Init()
 
 	p := martian.NewProxy()
