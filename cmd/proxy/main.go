@@ -211,6 +211,7 @@ import (
 	"github.com/google/martian/v3/fifo"
 	"github.com/google/martian/v3/har"
 	"github.com/google/martian/v3/httpspec"
+	mlog "github.com/google/martian/v3/log"
 	"github.com/google/martian/v3/marbl"
 	"github.com/google/martian/v3/martianhttp"
 	"github.com/google/martian/v3/martianlog"
@@ -250,11 +251,13 @@ var (
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
 	dsProxyURL     = flag.String("downstream-proxy-url", "", "URL of downstream proxy")
+	level          = flag.Int("v", 0, "log level")
 )
 
 func main() {
+
 	flag.Parse()
-	martian.Init()
+	mlog.SetLevel(*level)
 
 	p := martian.NewProxy()
 	defer p.Close()
