@@ -93,7 +93,7 @@ func initLocalhostCert(ca *x509.Certificate, caPriv crypto.PrivateKey) (*tls.Cer
 	hasher.Write(pkixpub)
 	keyID := hasher.Sum(nil)
 
-	serial, err := rand.Int(rand.Reader, mitm.MaxSerialNumber)
+	serial, err := mitm.GenerateSerial()
 	if err != nil {
 		return nil, fmt.Errorf("generating serial number: %w", err)
 	}

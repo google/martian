@@ -36,9 +36,30 @@ import (
 	"github.com/google/martian/v3/log"
 )
 
+// GenerateSerial generates a RFC 5280 conformant serial number for use in
+// X.509 certificates.
+func GenerateSerial() (serial *big.Int, err error) {
+	for {
+		serial, err = rand.Int(rand.Reader, MaxSerialNumber)
+		if err != nil {
+			return nil, err
+		}
+		// If the generated serial is 20 bytes, check that the MSB is not set. If
+		// it is set, generate a new serial, as encoding/asn1 will prefix the serial
+		// with 0x00 so that it isn't interpreted as a negative integer, resulting
+		// in a 21 byte serial number.
+		if serialBytes := serial.Bytes(); len(serialBytes) < 20 || len(serialBytes) > 0 && serialBytes[0]&0x80 == 0 {
+			return serial, nil
+		}
+	}
+}
+
 // MaxSerialNumber is the upper boundary that is used to create unique serial
 // numbers for the certificate. This can be any unsigned integer up to 20
 // bytes (2^(8*20)-1).
+//
+// NOTE: Rather than using this as an input to crypto/rand.Int, GenerateSerial
+// should be used.
 var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 
 // Config is a set of configuration values that are used to build TLS configs
@@ -81,7 +102,7 @@ func NewAuthority(name, organization string, validity time.Duration) (*x509.Cert
 
 	// TODO: keep a map of used serial numbers to avoid potentially reusing a
 	// serial multiple times.
-	serial, err := rand.Int(rand.Reader, MaxSerialNumber)
+	serial, err := GenerateSerial()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,7 +282,7 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 
 	log.Debugf("mitm: cache miss for %s", hostname)
 
-	serial, err := rand.Int(rand.Reader, MaxSerialNumber)
+	serial, err := GenerateSerial()
 	if err != nil {
 		return nil, err
 	}
