@@ -37,7 +37,27 @@ import (
 
 var errClose = errors.New("closing connection")
 var noop = Noop("martian")
+var ProxyIdleTimeout = 1 * time.Minute
 
+//增加idle conn
+
+type IdleTimeoutConn struct {
+	Conn net.Conn
+}
+
+func (self IdleTimeoutConn) Read(buf []byte) (int, error) {
+	go self.UpdateIdleTime(self.Conn, time.Now().Add(ProxyIdleTimeout))
+	return self.Conn.Read(buf)
+}
+
+func (self IdleTimeoutConn) UpdateIdleTime(c net.Conn, t time.Time) {
+	_ = c.SetDeadline(t)
+}
+
+func (self IdleTimeoutConn) Write(buf []byte) (int, error) {
+	go self.UpdateIdleTime(self.Conn, time.Now().Add(ProxyIdleTimeout))
+	return self.Conn.Write(buf)
+}
 func isCloseable(err error) bool {
 	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
 		return true
@@ -254,8 +274,9 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	}
 
 	for {
-		deadline := time.Now().Add(p.timeout)
-		conn.SetDeadline(deadline)
+		//DO  NOT SET DEADLINE HERE, may break up/down stream
+		//deadline := time.Now().Add(p.timeout)
+		//conn.SetDeadline(deadline)
 
 		if err := p.handle(ctx, conn, brw); isCloseable(err) {
 			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
@@ -395,7 +416,8 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		return err
 	}
 	defer res.Body.Close()
-	defer cconn.Close()
+	//Do not close early, may break up/down stream
+	//defer cconn.Close()
 
 	if err := p.resmod.ModifyResponse(res); err != nil {
 		log.Errorf("martian: error modifying CONNECT response: %v", err)
@@ -414,9 +436,15 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		log.Errorf("martian: got error while flushing response back to client: %v", err)
 	}
 
-	cbw := bufio.NewWriter(cconn)
-	cbr := bufio.NewReader(cconn)
-	defer cbw.Flush()
+	//cbw := bufio.NewWriter(cconn)
+	//cbr := bufio.NewReader(cconn)
+	idleCbw := IdleTimeoutConn{
+		Conn: cconn,
+	}
+	idleCbr := IdleTimeoutConn{
+		Conn: cconn,
+	}
+	//defer idleCbw.Flush()
 
 	copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
 		if _, err := io.Copy(w, r); err != nil && err != io.EOF {
@@ -428,14 +456,16 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	}
 
 	donec := make(chan bool, 2)
-	go copySync(cbw, brw, donec)
-	go copySync(brw, cbr, donec)
+	go copySync(idleCbw, brw, donec)
+	go copySync(brw, idleCbr, donec)
 
 	log.Debugf("martian: established CONNECT tunnel, proxying traffic")
 	<-donec
 	<-donec
 	log.Debugf("martian: closed CONNECT tunnel")
-
+	if cconn != nil {
+		defer conn.Close()
+	}
 	return errClose
 }
 
