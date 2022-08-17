@@ -61,7 +61,6 @@ func main() {
 		}
 		if err != nil {
 			log.Fatalf("reader.ReadFrame(): got %v, want no error or io.EOF\n", err)
-			break
 		}
 
 		// Print current frame to stdout.
