@@ -132,7 +132,7 @@ func TestCert(t *testing.T) {
 		t.Fatal("x509c: got nil, want *x509.Certificate")
 	}
 
-	if got := x509c.SerialNumber; got.Cmp(MaxSerialNumber) >= 0 {
+	if got := x509c.SerialNumber; got.Cmp(MaxSerialNumber) > 0 {
 		t.Errorf("x509c.SerialNumber: got %v, want <= MaxSerialNumber", got)
 	}
 	if got, want := x509c.Subject.CommonName, "example.com"; got != want {
@@ -201,5 +201,19 @@ func TestCert(t *testing.T) {
 
 	if got, want := x509c.IPAddresses[0], net.ParseIP("10.0.0.1"); !got.Equal(want) {
 		t.Fatalf("x509c.IPAddresses: got %v, want %v", got, want)
+	}
+}
+
+func TestGenerateSerial(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		serial, err := GenerateSerial()
+		if err != nil {
+			t.Fatalf("GenerateSerial(): got %v, want no error", err)
+		}
+		if serial.Cmp(MaxSerialNumber) > 0 {
+			t.Errorf("serial: got %v, want <= MaxSerialNumber", serial)
+		} else if serialBytes := serial.Bytes(); len(serialBytes) == 20 && serialBytes[0]&0x80 != 0 {
+			t.Errorf("serial: got len=20 with MSB set, want MSB unset")
+		}
 	}
 }
