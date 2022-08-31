@@ -194,6 +194,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -247,6 +248,7 @@ var (
 	validity       = flag.Duration("validity", time.Hour, "window of time that MITM certificates are valid")
 	allowCORS      = flag.Bool("cors", false, "allow CORS requests to configure the proxy")
 	harLogging     = flag.Bool("har", false, "enable HAR logging API")
+	harFile        = flag.String("harFile", "./martian.har", "har file path")
 	marblLogging   = flag.Bool("marbl", false, "enable MARBL logging API")
 	trafficShaping = flag.Bool("traffic-shaping", false, "enable traffic shaping API")
 	skipTLSVerify  = flag.Bool("skip-tls-verify", false, "skip TLS server verification; insecure")
@@ -389,6 +391,7 @@ func main() {
 
 		configure("/logs", har.NewExportHandler(hl), mux)
 		configure("/logs/reset", har.NewResetHandler(hl), mux)
+		configure("/logs/dump", har.NewDumpHandler(hl, *harFile), mux)
 	}
 
 	logger := martianlog.NewLogger()
@@ -441,6 +444,18 @@ func main() {
 	signal.Notify(sigc, os.Interrupt)
 
 	<-sigc
+
+	if *harLogging {
+		log.Println("martian: dumping har file")
+		u := url.URL{}
+		proxy, _ := u.Parse(fmt.Sprintf("http://%v", *addr))
+		transport := http.Transport{}
+		transport.Proxy = http.ProxyURL(proxy) // set proxy
+
+		client := &http.Client{}
+		client.Transport = &transport
+		client.Get("http://martian.proxy/logs/dump")
+	}
 
 	log.Println("martian: shutting down")
 	os.Exit(0)
