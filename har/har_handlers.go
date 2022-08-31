@@ -16,7 +16,6 @@ package har
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -61,23 +60,7 @@ func NewDumpHandler(l *Logger, path string) http.Handler {
 	}
 }
 
-type fileResponseWriter struct {
-	file  io.Writer
-	multi io.Writer
-}
-
-func (w *fileResponseWriter) Write(b []byte) (int, error) {
-	return w.multi.Write(b)
-}
-
-func newFileResponseWriter(file io.Writer) io.Writer {
-	multi := io.MultiWriter(file)
-	return &fileResponseWriter{
-		file:  file,
-		multi: multi,
-	}
-}
-
+// ServeHTTP writes the log in HAR format to a file.
 func (h *dumpHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != "GET" {
 		rw.Header().Add("Allow", "GET")
@@ -95,17 +78,15 @@ func (h *dumpHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	file, err := os.Create(h.filePath)
-	defer file.Close()
 	if err != nil {
 		log.Errorf("create file", err)
 		return
 	}
+	defer file.Close()
 
-	writer := newFileResponseWriter(file)
-	hl := h.logger.Export()
-	encoder := json.NewEncoder(writer)
+	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "\t")
-	encoder.Encode(hl)
+	encoder.Encode(h.logger.Export())
 }
 
 // ServeHTTP writes the log in HAR format to the response body.
