@@ -95,11 +95,11 @@ func (h *dumpHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	file, err := os.Create(h.filePath)
-	defer file.Close()
 	if err != nil {
 		log.Errorf("create file", err)
 		return
 	}
+	defer file.Close()
 
 	writer := newFileResponseWriter(file)
 	hl := h.logger.Export()
