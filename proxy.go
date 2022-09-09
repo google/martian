@@ -573,6 +573,9 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		if _, ok := err.(*trafficshape.ErrForceClose); ok {
 			closing = errClose
 		}
+		if err == io.ErrUnexpectedEOF {
+			closing = errClose
+		}
 	}
 	err = brw.Flush()
 	if err != nil {

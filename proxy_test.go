@@ -331,12 +331,14 @@ func TestIntegrationUnexpectedUpstreamFailure(t *testing.T) {
 		}
 
 		res := &http.Response{
-			Status:        "200 OK",
-			StatusCode:    200,
-			Proto:         "HTTP/1.1",
-			ProtoMajor:    1,
-			ProtoMinor:    1,
-			Body:          ioutil.NopCloser(bytes.NewBufferString("body content")),
+			Status:     "200 OK",
+			StatusCode: 200,
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Body:       ioutil.NopCloser(bytes.NewBufferString("body content")),
+			// Content length is set as 13 but response
+			// stops after sending 12 bytes
 			ContentLength: 13,
 			Request:       req,
 			Header:        make(http.Header, 0),
