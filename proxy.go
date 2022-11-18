@@ -417,10 +417,6 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		log.Errorf("martian: got error while flushing response back to client: %v", err)
 	}
 
-	cbw := bufio.NewWriter(cconn)
-	cbr := bufio.NewReader(cconn)
-	defer cbw.Flush()
-
 	copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
 		if _, err := io.Copy(w, r); err != nil && err != io.EOF {
 			log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
@@ -431,8 +427,8 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	}
 
 	donec := make(chan bool, 2)
-	go copySync(cbw, brw, donec)
-	go copySync(brw, cbr, donec)
+	go copySync(cconn, conn, donec)
+	go copySync(conn, cconn, donec)
 
 	log.Debugf("martian: established CONNECT tunnel, proxying traffic")
 	<-donec
