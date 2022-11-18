@@ -35,6 +35,7 @@ import (
 	"github.com/google/martian/v3/nosigpipe"
 	"github.com/google/martian/v3/proxyutil"
 	"github.com/google/martian/v3/trafficshape"
+	"golang.org/x/net/proxy"
 )
 
 var errClose = errors.New("closing connection")
@@ -649,6 +650,8 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	switch proxyURL.Scheme {
 	case "http", "https":
 		return p.connectHTTP(req, proxyURL)
+	case "socks5":
+		return p.connectSOCKS5(req, proxyURL)
 	default:
 		return nil, nil, fmt.Errorf("martian: unsupported proxy scheme: %s", proxyURL.Scheme)
 	}
@@ -701,4 +704,42 @@ func (p *Proxy) clientTLCConfig() *tls.Config {
 	}
 
 	return &tls.Config{}
+}
+
+type dialerFunc func(network, addr string) (net.Conn, error)
+
+func (f dialerFunc) Dial(network, addr string) (net.Conn, error) {
+	return f(network, addr)
+}
+
+func (p *Proxy) connectSOCKS5(req *http.Request, proxyURL *url.URL) (*http.Response, net.Conn, error) {
+	log.Debugf("martian: CONNECT with downstream SOCKS5 proxy: %s", proxyURL.Host)
+
+	u := proxyURL.User
+	var auth *proxy.Auth
+	if u != nil {
+		auth = new(proxy.Auth)
+		auth.User = u.Username()
+		if p, ok := u.Password(); ok {
+			auth.Password = p
+		}
+	}
+
+	addr := proxyURL.Hostname()
+	port := proxyURL.Port()
+	if port == "" {
+		port = "1080"
+	}
+
+	d, err := proxy.SOCKS5("tcp", net.JoinHostPort(addr, port), auth, dialerFunc(p.dial))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn, err := d.Dial("tcp", req.URL.Host)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return proxyutil.NewResponse(200, nil, req), conn, nil
 }
