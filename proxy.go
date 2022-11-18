@@ -267,6 +267,15 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	}
 }
 
+type closeWriter interface {
+	CloseWrite() error
+}
+
+var (
+	_ closeWriter = (*net.TCPConn)(nil)
+	_ closeWriter = (*tls.Conn)(nil)
+)
+
 func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) (*http.Request, error) {
 	var req *http.Request
 	reqc := make(chan *http.Request, 1)
@@ -286,8 +295,9 @@ func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) 
 		} else {
 			log.Errorf("martian: failed to read request: %v", err)
 		}
-
-		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
+		if cw, ok := conn.(closeWriter); ok {
+			cw.CloseWrite()
+		}
 
 		return nil, errClose
 	case req = <-reqc:
@@ -420,6 +430,11 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
 		if _, err := io.Copy(w, r); err != nil && err != io.EOF {
 			log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
+		}
+		if cw, ok := w.(closeWriter); ok {
+			cw.CloseWrite()
+		} else {
+			log.Errorf("martian: cannot close write side of CONNECT tunnel")
 		}
 
 		log.Debugf("martian: CONNECT tunnel finished copying")
