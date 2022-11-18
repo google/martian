@@ -184,52 +184,19 @@ func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
 // Serve accepts connections from the listener and handles the requests.
 func (p *Proxy) Serve(l net.Listener) error {
 	defer l.Close()
-
-	var delay time.Duration
-	for {
-		if p.Closing() {
-			return nil
-		}
-
-		conn, err := l.Accept()
-		nosigpipe.IgnoreSIGPIPE(conn)
-		if err != nil {
-			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-				if delay == 0 {
-					delay = 5 * time.Millisecond
-				} else {
-					delay *= 2
-				}
-				if max := time.Second; delay > max {
-					delay = max
-				}
-
-				log.Debugf("martian: temporary error on accept: %v", err)
-				time.Sleep(delay)
-				continue
-			}
-
-			if errors.Is(err, net.ErrClosed) {
-				log.Debugf("martian: listener closed, returning")
-				return err
-			}
-
-			log.Errorf("martian: failed to accept: %v", err)
-			return err
-		}
-		delay = 0
-		log.Debugf("martian: accepted connection from %s", conn.RemoteAddr())
-
-		if tconn, ok := conn.(*net.TCPConn); ok {
-			tconn.SetKeepAlive(true)
-			tconn.SetKeepAlivePeriod(3 * time.Minute)
-		}
-
-		go p.handleLoop(conn)
-	}
+	return http.Serve(l, p)
 }
 
-func (p *Proxy) handleLoop(conn net.Conn) {
+func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Debugf("martian: accepted connection from %s", r.RemoteAddr)
+	hij, ok := w.(http.Hijacker)
+	if !ok {
+		panic("martian: http.ResponseWriter does not implement http.Hijacker")
+	}
+	conn, brw, err := hij.Hijack()
+	if err != nil {
+		panic(err)
+	}
 	p.connsMu.Lock()
 	p.conns.Add(1)
 	p.connsMu.Unlock()
@@ -239,7 +206,12 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 		return
 	}
 
-	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+	nosigpipe.IgnoreSIGPIPE(conn)
+
+	if tconn, ok := conn.(*net.TCPConn); ok {
+		tconn.SetKeepAlive(true)
+		tconn.SetKeepAlivePeriod(3 * time.Minute)
+	}
 
 	s, err := newSession(conn, brw)
 	if err != nil {
@@ -257,10 +229,11 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 		deadline := time.Now().Add(p.timeout)
 		conn.SetDeadline(deadline)
 
-		if err := p.handle(ctx, conn, brw); isCloseable(err) {
+		if err := p.handle(ctx, r, conn, brw); isCloseable(err) {
 			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
 			return
 		}
+		r = nil
 	}
 }
 
@@ -361,12 +334,12 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 			}
 			brw.Writer.Reset(nconn)
 			brw.Reader.Reset(nconn)
-			return p.handle(ctx, nconn, brw)
+			return p.handle(ctx, nil, nconn, brw)
 		}
 
 		// Prepend the previously read data to be read again by http.ReadRequest.
 		brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
-		return p.handle(ctx, conn, brw)
+		return p.handle(ctx, nil, conn, brw)
 	}
 
 	log.Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
@@ -439,12 +412,15 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	return errClose
 }
 
-func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error {
+func (p *Proxy) handle(ctx *Context, req *http.Request, conn net.Conn, brw *bufio.ReadWriter) error {
 	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 
-	req, err := p.readRequest(ctx, conn, brw)
-	if err != nil {
-		return err
+	var err error
+	if req == nil {
+		req, err = p.readRequest(ctx, conn, brw)
+		if err != nil {
+			return err
+		}
 	}
 	defer req.Body.Close()
 
