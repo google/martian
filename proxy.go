@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -664,16 +665,44 @@ func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (*http.Respons
 	if err != nil {
 		return nil, nil, err
 	}
+	if proxyURL.Scheme == "https" {
+		tlsConfig := p.clientTLCConfig()
+		tlsConfig.ServerName = proxyURL.Hostname()
+		tlsConfig.NextProtos = []string{"http/1.1"}
+		conn = tls.Client(conn, tlsConfig)
+	}
+
 	pbw := bufio.NewWriter(conn)
 	pbr := bufio.NewReader(conn)
 
-	req.Write(pbw)
-	pbw.Flush()
+	connReq := &http.Request{
+		Method: "CONNECT",
+		URL:    req.URL,
+		Host:   req.Host,
+		Header: make(http.Header),
+	}
+	if proxyURL.User != nil {
+		connReq.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(proxyURL.User.String())))
+	}
+	connReq.Write(pbw)
 
-	res, err := http.ReadResponse(pbr, req)
-	if err != nil {
+	if err := pbw.Flush(); err != nil {
+		conn.Close()
 		return nil, nil, err
 	}
 
-	return res, conn, nil
+	res, err := http.ReadResponse(pbr, req)
+	if err != nil || res.StatusCode/100 != 2 {
+		return res, conn, err
+	}
+
+	return proxyutil.NewResponse(200, nil, req), conn, nil
+}
+
+func (p *Proxy) clientTLCConfig() *tls.Config {
+	if tr, ok := p.roundTripper.(*http.Transport); ok && tr.TLSClientConfig != nil {
+		return tr.TLSClientConfig.Clone()
+	}
+
+	return &tls.Config{}
 }
