@@ -53,6 +53,9 @@ func isCloseable(err error) bool {
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
+	// AllowHTTP disables automatic HTTP to HTTPS upgrades when the listener is TLS.
+	AllowHTTP bool
+
 	roundTripper http.RoundTripper
 	dial         func(string, string) (net.Conn, error)
 	timeout      time.Duration
@@ -476,7 +479,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	req.URL.Scheme = "http"
-	if session.IsSecure() {
+	if session.IsSecure() && !p.AllowHTTP {
 		log.Infof("martian: forcing HTTPS inside secure session")
 		req.URL.Scheme = "https"
 	}
