@@ -60,7 +60,7 @@ type Proxy struct {
 	dial         func(string, string) (net.Conn, error)
 	timeout      time.Duration
 	mitm         *mitm.Config
-	proxyURL     *url.URL
+	proxyURL     func(*http.Request) (*url.URL, error)
 	conns        sync.WaitGroup
 	connsMu      sync.Mutex // protects conns.Add/Wait from concurrent access
 	closing      chan bool
@@ -103,7 +103,7 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
-		tr.Proxy = http.ProxyURL(p.proxyURL)
+		tr.Proxy = p.proxyURL
 		tr.Dial = p.dial
 	}
 }
@@ -111,10 +111,15 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 // SetDownstreamProxy sets the proxy that receives requests from the upstream
 // proxy.
 func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
-	p.proxyURL = proxyURL
+	p.SetDownstreamProxyFunc(http.ProxyURL(proxyURL))
+}
+
+// SetDownstreamProxyFunc sets proxy function as in http.Transport.Proxy.
+func (p *Proxy) SetDownstreamProxyFunc(f func(*http.Request) (*url.URL, error)) {
+	p.proxyURL = f
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.Proxy = http.ProxyURL(p.proxyURL)
+		tr.Proxy = f
 	}
 }
 
@@ -623,10 +628,19 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 }
 
 func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
+	var proxyURL *url.URL
 	if p.proxyURL != nil {
-		log.Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
+		u, err := p.proxyURL(req)
+		if err != nil {
+			return nil, nil, err
+		}
+		proxyURL = u
+	}
 
-		conn, err := p.dial("tcp", p.proxyURL.Host)
+	if proxyURL != nil {
+		log.Debugf("martian: CONNECT with downstream proxy: %s", proxyURL.Host)
+
+		conn, err := p.dial("tcp", proxyURL.Host)
 		if err != nil {
 			return nil, nil, err
 		}
