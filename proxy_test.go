@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -66,14 +67,62 @@ func (l *timeoutListener) Accept() (net.Conn, error) {
 	return l.Listener.Accept()
 }
 
-func TestIntegrationTemporaryTimeout(t *testing.T) {
-	t.Parallel()
+var https = flag.Bool("https", false, "run proxy using TLS listener")
+
+type listener struct {
+	net.Listener
+	clientConfig *tls.Config
+}
+
+func (l listener) dial() (net.Conn, error) {
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		return nil, err
+	}
+	if l.clientConfig != nil {
+		conn = tls.Client(conn, l.clientConfig)
+	}
+	return conn, nil
+}
+
+func newListener(t *testing.T) listener {
+	t.Helper()
 
 	l, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
 
+	if !*https {
+		return listener{l, nil}
+	}
+
+	t.Log("using TLS listener")
+
+	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
+	if err != nil {
+		t.Fatalf("mitm.NewAuthority(): got %v, want no error", err)
+	}
+
+	mc, err := mitm.NewConfig(ca, priv)
+	if err != nil {
+		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
+	}
+	l = tls.NewListener(l, mc.TLS())
+
+	roots := x509.NewCertPool()
+	roots.AddCert(ca)
+
+	return listener{l, &tls.Config{
+		ServerName: "example.com",
+		RootCAs:    roots,
+	}}
+}
+
+func TestIntegrationTemporaryTimeout(t *testing.T) {
+	t.Parallel()
+
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -85,7 +134,7 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 	// Accept() three times.
 	go p.Serve(newTimeoutListener(l, 3))
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -117,11 +166,7 @@ func TestIntegrationTemporaryTimeout(t *testing.T) {
 func TestIntegrationHTTP(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -151,7 +196,7 @@ func TestIntegrationHTTP(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -185,12 +230,11 @@ func TestIntegrationHTTP(t *testing.T) {
 func TestIntegrationHTTP100Continue(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
+	if *https {
+		p.AllowHTTP = true
+	}
 	defer p.Close()
 
 	p.SetTimeout(2 * time.Second)
@@ -244,7 +288,7 @@ func TestIntegrationHTTP100Continue(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -297,12 +341,11 @@ func TestIntegrationHTTP100Continue(t *testing.T) {
 func TestIntegrationUnexpectedUpstreamFailure(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
+	if *https {
+		p.AllowHTTP = true
+	}
 	defer p.Close()
 
 	// setting a large proxy timeout
@@ -355,7 +398,7 @@ func TestIntegrationUnexpectedUpstreamFailure(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -417,12 +460,12 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	go downstream.Serve(dl)
 
 	// Start second proxy as upstream proxy, will write to downstream proxy.
-	ul, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
+	ul := newListener(t)
 
 	upstream := NewProxy()
+	if *https {
+		upstream.AllowHTTP = true
+	}
 	defer upstream.Close()
 
 	// Set upstream proxy's downstream proxy to the host:port of the first proxy.
@@ -434,7 +477,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	go upstream.Serve(ul)
 
 	// Open connection to upstream proxy.
-	conn, err := net.Dial("tcp", ul.Addr().String())
+	conn, err := ul.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -465,11 +508,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -488,7 +527,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 	go p.Serve(l)
 
 	// Open connection to upstream proxy.
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -522,11 +561,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -564,7 +599,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -618,11 +653,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 func TestIntegrationConnect(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -664,7 +695,7 @@ func TestIntegrationConnect(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -769,10 +800,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	go downstream.Serve(dl)
 
 	// Start second proxy as upstream proxy, will CONNECT to downstream proxy.
-	ul, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
+	ul := newListener(t)
 
 	upstream := NewProxy()
 	defer upstream.Close()
@@ -785,7 +813,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	go upstream.Serve(ul)
 
 	// Open connection to upstream proxy.
-	conn, err := net.Dial("tcp", ul.Addr().String())
+	conn, err := ul.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -850,11 +878,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 func TestIntegrationMITM(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -891,7 +915,7 @@ func TestIntegrationMITM(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -962,11 +986,7 @@ func TestIntegrationMITM(t *testing.T) {
 func TestIntegrationTransparentHTTP(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -985,7 +1005,7 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -1113,11 +1133,7 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 func TestIntegrationFailedRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -1129,7 +1145,7 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -1165,11 +1181,7 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 func TestIntegrationSkipRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -1188,7 +1200,7 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -1220,11 +1232,7 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 func TestHTTPThroughConnectWithMITM(t *testing.T) {
 	t.Parallel()
 
-	l, err := net.Listen("tcp", "[::]:0")
-	if err != nil {
-		t.Fatalf("net.Listen(): got %v, want no error", err)
-	}
-
+	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
@@ -1252,7 +1260,7 @@ func TestHTTPThroughConnectWithMITM(t *testing.T) {
 
 	go p.Serve(l)
 
-	conn, err := net.Dial("tcp", l.Addr().String())
+	conn, err := l.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
