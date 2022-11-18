@@ -807,7 +807,8 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 
 	// Set upstream proxy's downstream proxy to the host:port of the first proxy.
 	upstream.SetDownstreamProxy(&url.URL{
-		Host: dl.Addr().String(),
+		Scheme: "http",
+		Host:   dl.Addr().String(),
 	})
 
 	go upstream.Serve(ul)

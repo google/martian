@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -637,33 +638,42 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 		proxyURL = u
 	}
 
-	if proxyURL != nil {
-		log.Debugf("martian: CONNECT with downstream proxy: %s", proxyURL.Host)
+	if proxyURL == nil {
+		log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
 
-		conn, err := p.dial("tcp", proxyURL.Host)
-		if err != nil {
-			return nil, nil, err
-		}
-		pbw := bufio.NewWriter(conn)
-		pbr := bufio.NewReader(conn)
-
-		req.Write(pbw)
-		pbw.Flush()
-
-		res, err := http.ReadResponse(pbr, req)
+		conn, err := p.dial("tcp", req.URL.Host)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		return res, conn, nil
+		return proxyutil.NewResponse(200, nil, req), conn, nil
 	}
 
-	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
+	switch proxyURL.Scheme {
+	case "http", "https":
+		return p.connectHTTP(req, proxyURL)
+	default:
+		return nil, nil, fmt.Errorf("martian: unsupported proxy scheme: %s", proxyURL.Scheme)
+	}
+}
 
-	conn, err := p.dial("tcp", req.URL.Host)
+func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (*http.Response, net.Conn, error) {
+	log.Debugf("martian: CONNECT with downstream HTTP proxy: %s", proxyURL.Host)
+
+	conn, err := p.dial("tcp", proxyURL.Host)
+	if err != nil {
+		return nil, nil, err
+	}
+	pbw := bufio.NewWriter(conn)
+	pbr := bufio.NewReader(conn)
+
+	req.Write(pbw)
+	pbw.Flush()
+
+	res, err := http.ReadResponse(pbr, req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return proxyutil.NewResponse(200, nil, req), conn, nil
+	return res, conn, nil
 }
