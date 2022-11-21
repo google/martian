@@ -58,6 +58,8 @@ func isCloseable(err error) bool {
 type Proxy struct {
 	// AllowHTTP disables automatic HTTP to HTTPS upgrades when the listener is TLS.
 	AllowHTTP bool
+	// WithoutWarning disables the warning header added to requests and responses when modifier errors occur.
+	WithoutWarning bool
 
 	roundTripper http.RoundTripper
 	dial         func(string, string) (net.Conn, error)
@@ -315,7 +317,7 @@ func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) 
 func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *Session, brw *bufio.ReadWriter, conn net.Conn) error {
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying CONNECT request: %v", err)
-		proxyutil.Warning(req.Header, err)
+		p.warning(req.Header, err)
 	}
 	if session.Hijacked() {
 		log.Debugf("martian: connection hijacked by request modifier")
@@ -329,7 +331,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 
 		if err := p.resmod.ModifyResponse(res); err != nil {
 			log.Errorf("martian: error modifying CONNECT response: %v", err)
-			proxyutil.Warning(res.Header, err)
+			p.warning(res.Header, err)
 		}
 		if session.Hijacked() {
 			log.Infof("martian: connection hijacked by response modifier")
@@ -391,11 +393,11 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	if cerr != nil {
 		log.Errorf("martian: failed to CONNECT: %v", cerr)
 		res = proxyutil.NewResponse(502, nil, req)
-		proxyutil.Warning(res.Header, cerr)
+		p.warning(res.Header, cerr)
 
 		if err := p.resmod.ModifyResponse(res); err != nil {
 			log.Errorf("martian: error modifying CONNECT response: %v", err)
-			proxyutil.Warning(res.Header, err)
+			p.warning(res.Header, err)
 		}
 		if session.Hijacked() {
 			log.Infof("martian: connection hijacked by response modifier")
@@ -416,7 +418,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 
 	if err := p.resmod.ModifyResponse(res); err != nil {
 		log.Errorf("martian: error modifying CONNECT response: %v", err)
-		proxyutil.Warning(res.Header, err)
+		p.warning(res.Header, err)
 	}
 	if session.Hijacked() {
 		log.Infof("martian: connection hijacked by response modifier")
@@ -511,7 +513,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	// Not a CONNECT request
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying request: %v", err)
-		proxyutil.Warning(req.Header, err)
+		p.warning(req.Header, err)
 	}
 	if session.Hijacked() {
 		return nil
@@ -522,7 +524,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	if err != nil {
 		log.Errorf("martian: failed to round trip: %v", err)
 		res = proxyutil.NewResponse(502, nil, req)
-		proxyutil.Warning(res.Header, err)
+		p.warning(res.Header, err)
 	}
 	defer res.Body.Close()
 
@@ -532,7 +534,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	if err := p.resmod.ModifyResponse(res); err != nil {
 		log.Errorf("martian: error modifying response: %v", err)
-		proxyutil.Warning(res.Header, err)
+		p.warning(res.Header, err)
 	}
 	if session.Hijacked() {
 		log.Infof("martian: connection hijacked by response modifier")
@@ -624,6 +626,13 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 	}
 
 	return p.roundTripper.RoundTrip(req)
+}
+
+func (p *Proxy) warning(h http.Header, err error) {
+	if p.WithoutWarning {
+		return
+	}
+	proxyutil.Warning(h, err)
 }
 
 func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
