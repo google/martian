@@ -60,6 +60,8 @@ type Proxy struct {
 	AllowHTTP bool
 	// WithoutWarning disables the warning header added to requests and responses when modifier errors occur.
 	WithoutWarning bool
+	// ErrorResponse specifies a custom error HTTP response to send when a proxying error occurs.
+	ErrorResponse func(req *http.Request, err error) *http.Response
 
 	roundTripper http.RoundTripper
 	dial         func(string, string) (net.Conn, error)
@@ -392,7 +394,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	res, cconn, cerr := p.connect(req)
 	if cerr != nil {
 		log.Errorf("martian: failed to CONNECT: %v", cerr)
-		res = proxyutil.NewResponse(502, nil, req)
+		res = p.errorResponse(req, cerr)
 		p.warning(res.Header, cerr)
 
 		if err := p.resmod.ModifyResponse(res); err != nil {
@@ -523,7 +525,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	res, err := p.roundTrip(ctx, req)
 	if err != nil {
 		log.Errorf("martian: failed to round trip: %v", err)
-		res = proxyutil.NewResponse(502, nil, req)
+		res = p.errorResponse(req, err)
 		p.warning(res.Header, err)
 	}
 	defer res.Body.Close()
@@ -633,6 +635,13 @@ func (p *Proxy) warning(h http.Header, err error) {
 		return
 	}
 	proxyutil.Warning(h, err)
+}
+
+func (p *Proxy) errorResponse(req *http.Request, err error) *http.Response {
+	if p.ErrorResponse != nil {
+		return p.ErrorResponse(req, err)
+	}
+	return proxyutil.NewResponse(502, nil, req)
 }
 
 func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
