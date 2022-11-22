@@ -272,6 +272,10 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
 			return
 		}
+		if s.Hijacked() {
+			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
+			return
+		}
 	}
 }
 
