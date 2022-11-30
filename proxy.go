@@ -265,8 +265,10 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	}
 
 	for {
-		deadline := time.Now().Add(p.timeout)
-		conn.SetDeadline(deadline)
+		if p.timeout > 0 {
+			deadline := time.Now().Add(p.timeout)
+			conn.SetDeadline(deadline)
+		}
 
 		if err := p.handle(ctx, conn, brw); isCloseable(err) {
 			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
