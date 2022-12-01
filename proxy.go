@@ -595,7 +595,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		}
 	}
 
-	err = res.Write(brw)
+	// Add support for Server Sent Events - relay HTTP chunks and flush after each chunk.
+	// This is safe for events that are smaller than the buffer io.Copy uses (32KB).
+	// If the event is larger than the buffer, the event will be split into multiple chunks.
+	if res.Header.Get("Content-Type") == "text/event-stream" {
+		err = res.Write(flushAfterChunkWriter{brw.Writer})
+	} else {
+		err = res.Write(brw)
+	}
 	if err != nil {
 		log.Errorf("martian: got error while writing response back to client: %v", err)
 		if _, ok := err.(*trafficshape.ErrForceClose); ok {
