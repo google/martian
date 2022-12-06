@@ -290,20 +290,9 @@ var (
 	_ closeWriter = (*tls.Conn)(nil)
 )
 
-func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) (*http.Request, error) {
-	var req *http.Request
-	reqc := make(chan *http.Request, 1)
-	errc := make(chan error, 1)
-	go func() {
-		r, err := http.ReadRequest(brw.Reader)
-		if err != nil {
-			errc <- err
-			return
-		}
-		reqc <- r
-	}()
-	select {
-	case err := <-errc:
+func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) (req *http.Request, err error) {
+	req, err = http.ReadRequest(brw.Reader)
+	if err != nil {
 		if isCloseable(err) {
 			log.Debugf("martian: connection closed prematurely: %v", err)
 		} else {
@@ -312,14 +301,15 @@ func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) 
 		if cw, ok := conn.(closeWriter); ok {
 			cw.CloseWrite()
 		}
-
-		return nil, errClose
-	case req = <-reqc:
-	case <-p.closing:
-		return nil, errClose
+	} else {
+		select {
+		case <-p.closing:
+			err = errClose
+		default:
+		}
 	}
 
-	return req, nil
+	return
 }
 
 func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *Session, brw *bufio.ReadWriter, conn net.Conn) error {
