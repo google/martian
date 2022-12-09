@@ -91,11 +91,13 @@ func (g *Group) ModifyRequest(req *http.Request) error {
 	g.reqmu.RLock()
 	defer g.reqmu.RUnlock()
 
-	merr := martian.NewMultiError()
-
+	var merr *martian.MultiError
 	for _, reqmod := range g.reqmods {
 		if err := reqmod.ModifyRequest(req); err != nil {
 			if g.aggregateErrors {
+				if merr == nil {
+					merr = martian.NewMultiError()
+				}
 				merr.Add(err)
 				continue
 			}
@@ -104,7 +106,7 @@ func (g *Group) ModifyRequest(req *http.Request) error {
 		}
 	}
 
-	if merr.Empty() {
+	if merr == nil || merr.Empty() {
 		return nil
 	}
 
@@ -119,11 +121,13 @@ func (g *Group) ModifyResponse(res *http.Response) error {
 	g.resmu.RLock()
 	defer g.resmu.RUnlock()
 
-	merr := martian.NewMultiError()
-
+	var merr *martian.MultiError
 	for _, resmod := range g.resmods {
 		if err := resmod.ModifyResponse(res); err != nil {
 			if g.aggregateErrors {
+				if merr == nil {
+					merr = martian.NewMultiError()
+				}
 				merr.Add(err)
 				continue
 			}
@@ -132,7 +136,7 @@ func (g *Group) ModifyResponse(res *http.Response) error {
 		}
 	}
 
-	if merr.Empty() {
+	if merr == nil || merr.Empty() {
 		return nil
 	}
 
@@ -145,7 +149,7 @@ func (g *Group) VerifyRequests() error {
 	g.reqmu.Lock()
 	defer g.reqmu.Unlock()
 
-	merr := martian.NewMultiError()
+	var merr *martian.MultiError
 	for _, reqmod := range g.reqmods {
 		reqv, ok := reqmod.(verify.RequestVerifier)
 		if !ok {
@@ -153,11 +157,14 @@ func (g *Group) VerifyRequests() error {
 		}
 
 		if err := reqv.VerifyRequests(); err != nil {
+			if merr == nil {
+				merr = martian.NewMultiError()
+			}
 			merr.Add(err)
 		}
 	}
 
-	if merr.Empty() {
+	if merr == nil || merr.Empty() {
 		return nil
 	}
 
@@ -170,7 +177,7 @@ func (g *Group) VerifyResponses() error {
 	g.resmu.Lock()
 	defer g.resmu.Unlock()
 
-	merr := martian.NewMultiError()
+	var merr *martian.MultiError
 	for _, resmod := range g.resmods {
 		resv, ok := resmod.(verify.ResponseVerifier)
 		if !ok {
@@ -178,11 +185,14 @@ func (g *Group) VerifyResponses() error {
 		}
 
 		if err := resv.VerifyResponses(); err != nil {
+			if merr == nil {
+				merr = martian.NewMultiError()
+			}
 			merr.Add(err)
 		}
 	}
 
-	if merr.Empty() {
+	if merr == nil || merr.Empty() {
 		return nil
 	}
 
