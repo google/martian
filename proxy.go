@@ -58,14 +58,40 @@ func isCloseable(err error) bool {
 type Proxy struct {
 	// AllowHTTP disables automatic HTTP to HTTPS upgrades when the listener is TLS.
 	AllowHTTP bool
+
 	// WithoutWarning disables the warning header added to requests and responses when modifier errors occur.
 	WithoutWarning bool
+
 	// ErrorResponse specifies a custom error HTTP response to send when a proxying error occurs.
 	ErrorResponse func(req *http.Request, err error) *http.Response
 
+	// ReadTimeout is the maximum duration for reading the entire
+	// request, including the body. A zero or negative value means
+	// there will be no timeout.
+	//
+	// Because ReadTimeout does not let Handlers make per-request
+	// decisions on each request body's acceptable deadline or
+	// upload rate, most users will prefer to use
+	// ReadHeaderTimeout. It is valid to use them both.
+	ReadTimeout time.Duration
+
+	// ReadHeaderTimeout is the amount of time allowed to read
+	// request headers. The connection's read deadline is reset
+	// after reading the headers and the Handler can decide what
+	// is considered too slow for the body. If ReadHeaderTimeout
+	// is zero, the value of ReadTimeout is used. If both are
+	// zero, there is no timeout.
+	ReadHeaderTimeout time.Duration
+
+	// WriteTimeout is the maximum duration before timing out
+	// writes of the response. It is reset whenever a new
+	// request's header is read. Like ReadTimeout, it does not
+	// let Handlers make decisions on a per-request basis.
+	// A zero or negative value means there will be no timeout.
+	WriteTimeout time.Duration
+
 	roundTripper http.RoundTripper
 	dial         func(string, string) (net.Conn, error)
-	timeout      time.Duration
 	mitm         *mitm.Config
 	proxyURL     func(*http.Request) (*url.URL, error)
 	conns        sync.WaitGroup
@@ -84,10 +110,11 @@ func NewProxy() *Proxy {
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: time.Second,
 		},
-		timeout: 5 * time.Minute,
-		closing: make(chan bool),
-		reqmod:  noop,
-		resmod:  noop,
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 5 * time.Minute,
+		closing:      make(chan bool),
+		reqmod:       noop,
+		resmod:       noop,
 	}
 	proxy.SetDial((&net.Dialer{
 		Timeout:   30 * time.Second,
@@ -128,7 +155,8 @@ func (p *Proxy) SetDownstreamProxyFunc(f func(*http.Request) (*url.URL, error)) 
 
 // SetTimeout sets the request timeout of the proxy.
 func (p *Proxy) SetTimeout(timeout time.Duration) {
-	p.timeout = timeout
+	p.ReadTimeout = timeout
+	p.WriteTimeout = timeout
 }
 
 // SetMITM sets the config to use for MITMing of CONNECT requests.
@@ -265,11 +293,6 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 	}
 
 	for {
-		if p.timeout > 0 {
-			deadline := time.Now().Add(p.timeout)
-			conn.SetDeadline(deadline)
-		}
-
 		if err := p.handle(ctx, conn, brw); isCloseable(err) {
 			log.Debugf("martian: closing connection: %v", conn.RemoteAddr())
 			return
@@ -290,7 +313,30 @@ var (
 	_ closeWriter = (*tls.Conn)(nil)
 )
 
+func (p *Proxy) readHeaderTimeout() time.Duration {
+	if p.ReadHeaderTimeout > 0 {
+		return p.ReadHeaderTimeout
+	}
+	return p.ReadTimeout
+}
+
 func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) (req *http.Request, err error) {
+	var (
+		wholeReqDeadline time.Time // or zero if none
+		hdrDeadline      time.Time // or zero if none
+	)
+	t0 := time.Now()
+	if d := p.readHeaderTimeout(); d > 0 {
+		hdrDeadline = t0.Add(d)
+	}
+	if d := p.ReadTimeout; d > 0 {
+		wholeReqDeadline = t0.Add(d)
+	}
+
+	if deadlineErr := conn.SetReadDeadline(hdrDeadline); deadlineErr != nil {
+		log.Errorf("martian: can't set read header deadline: %v", deadlineErr)
+	}
+
 	req, err = http.ReadRequest(brw.Reader)
 	if err != nil {
 		if isCloseable(err) {
@@ -306,6 +352,13 @@ func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) 
 		case <-p.closing:
 			err = errClose
 		default:
+		}
+	}
+
+	// Adjust the read deadline if necessary.
+	if !hdrDeadline.Equal(wholeReqDeadline) {
+		if deadlineErr := conn.SetReadDeadline(wholeReqDeadline); deadlineErr != nil {
+			log.Errorf("martian: can't set read deadline: %v", deadlineErr)
 		}
 	}
 
@@ -582,6 +635,12 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 				}
 				break
 			}
+		}
+	}
+
+	if p.WriteTimeout > 0 {
+		if deadlineErr := conn.SetWriteDeadline(time.Now().Add(p.WriteTimeout)); deadlineErr != nil {
+			log.Errorf("martian: can't set write deadline: %v", deadlineErr)
 		}
 	}
 
