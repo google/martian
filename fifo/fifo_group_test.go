@@ -332,3 +332,111 @@ func TestResets(t *testing.T) {
 		t.Errorf("VerifyResponses(): got %v, want no error", err)
 	}
 }
+
+func TestModifyResponseInlineGroupsAggregateErrors(t *testing.T) {
+	fg1 := NewGroup()
+	fg1.SetAggregateErrors(true)
+	reserr1 := errors.New("1. response error")
+	tm1 := martiantest.NewModifier()
+	tm1.ResponseError(reserr1)
+	fg1.AddResponseModifier(tm1)
+
+	fg2 := NewGroup()
+	fg2.SetAggregateErrors(true)
+	reserr2 := errors.New("2. response error")
+	tm2 := martiantest.NewModifier()
+	tm2.ResponseError(reserr2)
+	fg2.AddResponseModifier(tm2)
+
+	fg3 := NewGroup()
+	fg3.SetAggregateErrors(true)
+	reserr3 := errors.New("3. response error")
+	tm3 := martiantest.NewModifier()
+	tm3.ResponseError(reserr3)
+	fg3.AddResponseModifier(tm3)
+
+	fg2.AddResponseModifier(fg3)
+	fg1.AddResponseModifier(fg2)
+	ig := fg1.ToImmutable()
+
+	if len(ig.resmods) != 3 {
+		t.Fatalf("inner groups should be inlined")
+	}
+
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+	_, remove, err := martian.TestContext(req, nil, nil)
+	if err != nil {
+		t.Fatalf("TestContext(): got %v, want no error", err)
+	}
+	defer remove()
+
+	res := proxyutil.NewResponse(200, nil, req)
+
+	merr := martian.NewMultiError()
+	merr.Add(reserr1)
+	merr.Add(reserr2)
+	merr.Add(reserr3)
+
+	if err := ig.ModifyResponse(res); err == nil {
+		t.Fatalf("ig.ModifyResponse(): got %v, want %v", err, merr)
+	}
+
+	if err := ig.ModifyResponse(res); err.Error() != merr.Error() {
+		t.Fatalf("ig.ModifyResponse(): got %v, want %v", err, merr)
+	}
+}
+
+func TestModifyRequestInlineGroupsAggregateErrors(t *testing.T) {
+	fg1 := NewGroup()
+	fg1.SetAggregateErrors(true)
+	reqerr1 := errors.New("1. request error")
+	tm1 := martiantest.NewModifier()
+	tm1.RequestError(reqerr1)
+	fg1.AddRequestModifier(tm1)
+
+	fg2 := NewGroup()
+	fg2.SetAggregateErrors(true)
+	reqerr2 := errors.New("2. request error")
+	tm2 := martiantest.NewModifier()
+	tm2.RequestError(reqerr2)
+	fg2.AddRequestModifier(tm2)
+
+	fg3 := NewGroup()
+	fg3.SetAggregateErrors(true)
+	reqerr3 := errors.New("3. request error")
+	tm3 := martiantest.NewModifier()
+	tm3.RequestError(reqerr3)
+	fg3.AddRequestModifier(tm3)
+
+	fg2.AddRequestModifier(fg3)
+	fg1.AddRequestModifier(fg2)
+	ig := fg1.ToImmutable()
+
+	if len(ig.reqmods) != 3 {
+		t.Fatalf("inner groups should be inlined")
+	}
+
+	req, err := http.NewRequest("GET", "http://example.com/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	merr := martian.NewMultiError()
+	merr.Add(reqerr1)
+	merr.Add(reqerr2)
+	merr.Add(reqerr3)
+
+	if err := ig.ModifyRequest(req); err == nil {
+		t.Fatalf("ig.ModifyRequest(): got %v, want not nil", err)
+	}
+	if err := ig.ModifyRequest(req); err.Error() != merr.Error() {
+		t.Fatalf("ig.ModifyRequest(): got %v, want %v", err, merr)
+	}
+
+	if err, want := ig.ModifyRequest(req), "1. request error\n2. request error\n3. request error"; err.Error() != want {
+		t.Fatalf("ig.ModifyRequest(): got %v, want %v", err, want)
+	}
+}

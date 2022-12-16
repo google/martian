@@ -30,16 +30,73 @@ import (
 	"github.com/google/martian/v3/verify"
 )
 
+type group struct {
+	reqmods         []martian.RequestModifier
+	resmods         []martian.ResponseModifier
+	aggregateErrors bool
+}
+
+// ModifyRequest modifies the request. By default, aggregateErrors is false; if an error is
+// returned by a RequestModifier the error is returned and no further modifiers are run. When
+// aggregateErrors is set to true, the errors returned by each modifier in the group are
+// aggregated.
+func (g *group) ModifyRequest(req *http.Request) error {
+	var merr *martian.MultiError
+	for _, reqmod := range g.reqmods {
+		if err := reqmod.ModifyRequest(req); err != nil {
+			if g.aggregateErrors {
+				if merr == nil {
+					merr = martian.NewMultiError()
+				}
+				merr.Add(err)
+				continue
+			}
+
+			return err
+		}
+	}
+
+	if merr == nil || merr.Empty() {
+		return nil
+	}
+
+	return merr
+}
+
+// ModifyResponse modifies the request. By default, aggregateErrors is false; if an error is
+// returned by a RequestModifier the error is returned and no further modifiers are run. When
+// aggregateErrors is set to true, the errors returned by each modifier in the group are
+// aggregated.
+func (g *group) ModifyResponse(res *http.Response) error {
+	var merr *martian.MultiError
+	for _, resmod := range g.resmods {
+		if err := resmod.ModifyResponse(res); err != nil {
+			if g.aggregateErrors {
+				if merr == nil {
+					merr = martian.NewMultiError()
+				}
+				merr.Add(err)
+				continue
+			}
+
+			return err
+		}
+	}
+
+	if merr == nil || merr.Empty() {
+		return nil
+	}
+
+	return merr
+}
+
 // Group is a martian.RequestResponseModifier that maintains lists of
 // request and response modifiers executed on a first-in, first-out basis.
+// The Group allows adding new modifiers on the run.
 type Group struct {
-	reqmu   sync.RWMutex
-	reqmods []martian.RequestModifier
-
-	resmu   sync.RWMutex
-	resmods []martian.ResponseModifier
-
-	aggregateErrors bool
+	group
+	reqmu sync.RWMutex // guards group.reqmods
+	resmu sync.RWMutex // guards group.resmods
 }
 
 type groupJSON struct {
@@ -90,27 +147,7 @@ func (g *Group) AddResponseModifier(resmod martian.ResponseModifier) {
 func (g *Group) ModifyRequest(req *http.Request) error {
 	g.reqmu.RLock()
 	defer g.reqmu.RUnlock()
-
-	var merr *martian.MultiError
-	for _, reqmod := range g.reqmods {
-		if err := reqmod.ModifyRequest(req); err != nil {
-			if g.aggregateErrors {
-				if merr == nil {
-					merr = martian.NewMultiError()
-				}
-				merr.Add(err)
-				continue
-			}
-
-			return err
-		}
-	}
-
-	if merr == nil || merr.Empty() {
-		return nil
-	}
-
-	return merr
+	return g.group.ModifyRequest(req)
 }
 
 // ModifyResponse modifies the request. By default, aggregateErrors is false; if an error is
@@ -120,27 +157,7 @@ func (g *Group) ModifyRequest(req *http.Request) error {
 func (g *Group) ModifyResponse(res *http.Response) error {
 	g.resmu.RLock()
 	defer g.resmu.RUnlock()
-
-	var merr *martian.MultiError
-	for _, resmod := range g.resmods {
-		if err := resmod.ModifyResponse(res); err != nil {
-			if g.aggregateErrors {
-				if merr == nil {
-					merr = martian.NewMultiError()
-				}
-				merr.Add(err)
-				continue
-			}
-
-			return err
-		}
-	}
-
-	if merr == nil || merr.Empty() {
-		return nil
-	}
-
-	return merr
+	return g.group.ModifyResponse(res)
 }
 
 // VerifyRequests returns a MultiError containing all the
@@ -265,4 +282,56 @@ func groupFromJSON(b []byte) (*parse.Result, error) {
 	}
 
 	return parse.NewResult(g, msg.Scope)
+}
+
+// ToImmutable creates ImmutableGroup from existing Group.
+// If a Group has a modifier that is another Group it will also become immutable.
+// Moreover, if the aggregateErrors settings match between the two groups the other group's modifiers are inlined.
+func (g *Group) ToImmutable() *ImmutableGroup {
+	g.reqmu.Lock()
+	defer g.reqmu.Unlock()
+	g.resmu.Lock()
+	defer g.resmu.Unlock()
+
+	var reqmods []martian.RequestModifier
+	for _, m := range g.reqmods {
+		if mm, ok := m.(*Group); ok {
+			if im := mm.ToImmutable(); g.aggregateErrors == im.aggregateErrors {
+				reqmods = append(reqmods, im.reqmods...)
+			} else {
+				reqmods = append(reqmods, im)
+			}
+		} else {
+			reqmods = append(reqmods, m)
+		}
+	}
+
+	var resmods []martian.ResponseModifier
+	for _, m := range g.resmods {
+		if mm, ok := m.(*Group); ok {
+			if im := mm.ToImmutable(); g.aggregateErrors == im.aggregateErrors {
+				resmods = append(resmods, im.resmods...)
+			} else {
+				resmods = append(resmods, im)
+			}
+		} else {
+			resmods = append(resmods, m)
+		}
+	}
+
+	return &ImmutableGroup{
+		group{
+			reqmods:         reqmods,
+			resmods:         resmods,
+			aggregateErrors: g.aggregateErrors,
+		},
+	}
+}
+
+// ImmutableGroup is a martian.RequestResponseModifier that maintains lists of
+// request and response modifiers executed on a first-in, first-out basis.
+// ImmutableGroup can be constructed only from a Group.
+// It cannot be modified.
+type ImmutableGroup struct {
+	group
 }
