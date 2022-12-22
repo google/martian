@@ -23,7 +23,7 @@ func NewTransport() *Transport {
 // Respond sets the transport to respond with response with statusCode.
 func (tr *Transport) Respond(statusCode int) {
 	tr.rtfunc = func(req *http.Request) (*http.Response, error) {
-		// Force CONNECT requests to 200 to test CONNECT with downstream proxy.
+		// Force CONNECT requests to 200 to test CONNECT with upstream proxy.
 		if req.Method == "CONNECT" {
 			statusCode = 200
 		}

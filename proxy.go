@@ -141,14 +141,13 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	}
 }
 
-// SetDownstreamProxy sets the proxy that receives requests from the upstream
-// proxy.
-func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
-	p.SetDownstreamProxyFunc(http.ProxyURL(proxyURL))
+// SetUpstreamProxy sets the proxy that receives requests from this proxy.
+func (p *Proxy) SetUpstreamProxy(proxyURL *url.URL) {
+	p.SetUpstreamProxyFunc(http.ProxyURL(proxyURL))
 }
 
-// SetDownstreamProxyFunc sets proxy function as in http.Transport.Proxy.
-func (p *Proxy) SetDownstreamProxyFunc(f func(*http.Request) (*url.URL, error)) {
+// SetUpstreamProxyFunc sets proxy function as in http.Transport.Proxy.
+func (p *Proxy) SetUpstreamProxyFunc(f func(*http.Request) (*url.URL, error)) {
 	p.proxyURL = f
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
@@ -751,7 +750,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 }
 
 func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (*http.Response, net.Conn, error) {
-	log.Debugf("martian: CONNECT with downstream HTTP proxy: %s", proxyURL.Host)
+	log.Debugf("martian: CONNECT with upstream HTTP proxy: %s", proxyURL.Host)
 
 	conn, err := p.dial("tcp", proxyURL.Host)
 	if err != nil {
@@ -806,7 +805,7 @@ func (f dialerFunc) Dial(network, addr string) (net.Conn, error) {
 }
 
 func (p *Proxy) connectSOCKS5(req *http.Request, proxyURL *url.URL) (*http.Response, net.Conn, error) {
-	log.Debugf("martian: CONNECT with downstream SOCKS5 proxy: %s", proxyURL.Host)
+	log.Debugf("martian: CONNECT with upstream SOCKS5 proxy: %s", proxyURL.Host)
 
 	u := proxyURL.User
 	var auth *proxy.Auth

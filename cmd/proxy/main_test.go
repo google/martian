@@ -257,11 +257,11 @@ func TestProxyMain(t *testing.T) {
 		}
 	})
 
-	t.Run("DownstreamProxy", func(t *testing.T) {
-		// Start downstream proxy
-		dsProxyPort := getFreePort(t)
-		dsAPIPort := getFreePort(t)
-		cmd := exec.Command(binPath, "-addr="+dsProxyPort, "-api-addr="+dsAPIPort)
+	t.Run("UpstreamProxy", func(t *testing.T) {
+		// Start upstream proxy
+		usProxyPort := getFreePort(t)
+		usAPIPort := getFreePort(t)
+		cmd := exec.Command(binPath, "-addr="+usProxyPort, "-api-addr="+usAPIPort)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {
@@ -270,12 +270,12 @@ func TestProxyMain(t *testing.T) {
 		defer cmd.Wait()
 		defer cmd.Process.Signal(os.Interrupt)
 
-		dsProxyURL := "http://localhost" + dsProxyPort
-		dsAPIURL := "http://localhost" + dsAPIPort
+		usProxyURL := "http://localhost" + usProxyPort
+		usAPIURL := "http://localhost" + usAPIPort
 		configureURL := "http://martian.proxy/configure"
 
 		// TODO: Make using API hostport directly work on Travis.
-		dsAPIClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(parseURL(t, dsAPIURL))}}
+		dsAPIClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(parseURL(t, usAPIURL))}}
 		waitForProxy(t, dsAPIClient, configureURL)
 
 		// Configure modifiers
@@ -308,7 +308,7 @@ func TestProxyMain(t *testing.T) {
 		// Start main proxy
 		proxyPort := getFreePort(t)
 		apiPort := getFreePort(t)
-		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-downstream-proxy-url="+dsProxyURL)
+		cmd = exec.Command(binPath, "-addr="+proxyPort, "-api-addr="+apiPort, "-upstream-proxy-url="+usProxyURL)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {

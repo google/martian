@@ -440,44 +440,44 @@ func TestIntegrationUnexpectedUpstreamFailure(t *testing.T) {
 	}
 }
 
-func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
+func TestIntegrationHTTPUpstreamProxy(t *testing.T) {
 	t.Parallel()
 
-	// Start first proxy to use as downstream.
-	dl, err := net.Listen("tcp", "[::]:0")
+	// Start first proxy to use as upstream.
+	ul, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
 
-	downstream := NewProxy()
-	defer downstream.Close()
-
-	dtr := martiantest.NewTransport()
-	dtr.Respond(299)
-	downstream.SetRoundTripper(dtr)
-	downstream.SetTimeout(600 * time.Millisecond)
-
-	go downstream.Serve(dl)
-
-	// Start second proxy as upstream proxy, will write to downstream proxy.
-	ul := newListener(t)
-
 	upstream := NewProxy()
-	if *https {
-		upstream.AllowHTTP = true
-	}
 	defer upstream.Close()
 
-	// Set upstream proxy's downstream proxy to the host:port of the first proxy.
-	upstream.SetDownstreamProxy(&url.URL{
-		Host: dl.Addr().String(),
-	})
+	utr := martiantest.NewTransport()
+	utr.Respond(299)
+	upstream.SetRoundTripper(utr)
 	upstream.SetTimeout(600 * time.Millisecond)
 
 	go upstream.Serve(ul)
 
-	// Open connection to upstream proxy.
-	conn, err := ul.dial()
+	// Start second proxy, will write to upstream proxy.
+	pl := newListener(t)
+
+	proxy := NewProxy()
+	if *https {
+		proxy.AllowHTTP = true
+	}
+	defer proxy.Close()
+
+	// Set proxy's upstream proxy to the host:port of the first proxy.
+	proxy.SetUpstreamProxy(&url.URL{
+		Host: ul.Addr().String(),
+	})
+	proxy.SetTimeout(600 * time.Millisecond)
+
+	go proxy.Serve(pl)
+
+	// Open connection to proxy.
+	conn, err := pl.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -494,7 +494,7 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 		t.Fatalf("req.WriteProxy(): got %v, want no error", err)
 	}
 
-	// Response from downstream proxy.
+	// Response from upstream proxy.
 	res, err := http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
@@ -505,15 +505,15 @@ func TestIntegrationHTTPDownstreamProxy(t *testing.T) {
 	}
 }
 
-func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
+func TestIntegrationHTTPUpstreamProxyError(t *testing.T) {
 	t.Parallel()
 
 	l := newListener(t)
 	p := NewProxy()
 	defer p.Close()
 
-	// Set proxy's downstream proxy to invalid host:port to force failure.
-	p.SetDownstreamProxy(&url.URL{
+	// Set proxy's upstream proxy to invalid host:port to force failure.
+	p.SetUpstreamProxy(&url.URL{
 		Host: "[::]:0",
 	})
 	p.SetTimeout(600 * time.Millisecond)
@@ -544,7 +544,7 @@ func TestIntegrationHTTPDownstreamProxyError(t *testing.T) {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
 
-	// Response from upstream proxy, assuming downstream proxy failed to CONNECT.
+	// Response from proxy, assuming upstream proxy failed to CONNECT.
 	res, err := http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
@@ -770,21 +770,21 @@ func TestIntegrationConnect(t *testing.T) {
 	}
 }
 
-func TestIntegrationConnectDownstreamProxy(t *testing.T) {
+func TestIntegrationConnectUpstreamProxy(t *testing.T) {
 	t.Parallel()
 
-	// Start first proxy to use as downstream.
-	dl, err := net.Listen("tcp", "[::]:0")
+	// Start first proxy to use as upstream.
+	ul, err := net.Listen("tcp", "[::]:0")
 	if err != nil {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
 
-	downstream := NewProxy()
-	defer downstream.Close()
+	upstream := NewProxy()
+	defer upstream.Close()
 
-	dtr := martiantest.NewTransport()
-	dtr.Respond(299)
-	downstream.SetRoundTripper(dtr)
+	utr := martiantest.NewTransport()
+	utr.Respond(299)
+	upstream.SetRoundTripper(utr)
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
 	if err != nil {
@@ -795,26 +795,26 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mitm.NewConfig(): got %v, want no error", err)
 	}
-	downstream.SetMITM(mc)
-
-	go downstream.Serve(dl)
-
-	// Start second proxy as upstream proxy, will CONNECT to downstream proxy.
-	ul := newListener(t)
-
-	upstream := NewProxy()
-	defer upstream.Close()
-
-	// Set upstream proxy's downstream proxy to the host:port of the first proxy.
-	upstream.SetDownstreamProxy(&url.URL{
-		Scheme: "http",
-		Host:   dl.Addr().String(),
-	})
+	upstream.SetMITM(mc)
 
 	go upstream.Serve(ul)
 
+	// Start second proxy, will CONNECT to upstream proxy.
+	pl := newListener(t)
+
+	proxy := NewProxy()
+	defer proxy.Close()
+
+	// Set proxy's upstream proxy to the host:port of the first proxy.
+	proxy.SetUpstreamProxy(&url.URL{
+		Scheme: "http",
+		Host:   ul.Addr().String(),
+	})
+
+	go proxy.Serve(pl)
+
 	// Open connection to upstream proxy.
-	conn, err := ul.dial()
+	conn, err := pl.dial()
 	if err != nil {
 		t.Fatalf("net.Dial(): got %v, want no error", err)
 	}
@@ -831,7 +831,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
 
-	// Response from downstream proxy starting MITM.
+	// Response from upstream proxy starting MITM.
 	res, err := http.ReadResponse(bufio.NewReader(conn), req)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
@@ -864,7 +864,7 @@ func TestIntegrationConnectDownstreamProxy(t *testing.T) {
 		t.Fatalf("req.Write(): got %v, want no error", err)
 	}
 
-	// Response from MITM in downstream proxy.
+	// Response from MITM in upstream proxy.
 	res, err = http.ReadResponse(bufio.NewReader(tlsconn), req)
 	if err != nil {
 		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
