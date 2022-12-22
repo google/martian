@@ -549,10 +549,16 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		req.TLS = &cs
 	}
 
-	req.URL.Scheme = "http"
-	if session.IsSecure() && !p.AllowHTTP {
-		log.Infof("martian: forcing HTTPS inside secure session")
-		req.URL.Scheme = "https"
+	if req.URL.Scheme == "" {
+		req.URL.Scheme = "http"
+		if session.IsSecure() {
+			req.URL.Scheme = "https"
+		}
+	} else if req.URL.Scheme == "http" {
+		if session.IsSecure() && !p.AllowHTTP {
+			log.Infof("martian: forcing HTTPS inside secure session")
+			req.URL.Scheme = "https"
+		}
 	}
 
 	req.RemoteAddr = conn.RemoteAddr().String()
