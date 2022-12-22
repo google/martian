@@ -90,6 +90,9 @@ type Proxy struct {
 	// A zero or negative value means there will be no timeout.
 	WriteTimeout time.Duration
 
+	// CloseAfterReply closes the connection after the response has been sent.
+	CloseAfterReply bool
+
 	roundTripper http.RoundTripper
 	dial         func(string, string) (net.Conn, error)
 	mitm         *mitm.Config
@@ -667,6 +670,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		if _, ok := err.(*trafficshape.ErrForceClose); ok {
 			closing = errClose
 		}
+	}
+
+	if p.CloseAfterReply {
+		closing = errClose
 	}
 	return closing
 }
