@@ -109,6 +109,9 @@ type Proxy struct {
 func NewProxy() *Proxy {
 	proxy := &Proxy{
 		roundTripper: &http.Transport{
+			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
+			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
+			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
 			Proxy:                 http.ProxyFromEnvironment,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: time.Second,
@@ -134,6 +137,7 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	p.roundTripper = rt
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
+		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 		tr.Proxy = p.proxyURL
 		tr.Dial = p.dial
 	}
