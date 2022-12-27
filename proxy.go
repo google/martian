@@ -113,11 +113,9 @@ func NewProxy() *Proxy {
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: time.Second,
 		},
-		ReadTimeout:  5 * time.Minute,
-		WriteTimeout: 5 * time.Minute,
-		closing:      make(chan bool),
-		reqmod:       noop,
-		resmod:       noop,
+		closing: make(chan bool),
+		reqmod:  noop,
+		resmod:  noop,
 	}
 	proxy.SetDial((&net.Dialer{
 		Timeout:   30 * time.Second,
@@ -153,12 +151,6 @@ func (p *Proxy) SetUpstreamProxyFunc(f func(*http.Request) (*url.URL, error)) {
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.Proxy = f
 	}
-}
-
-// SetTimeout sets the request timeout of the proxy.
-func (p *Proxy) SetTimeout(timeout time.Duration) {
-	p.ReadTimeout = timeout
-	p.WriteTimeout = timeout
 }
 
 // SetMITM sets the config to use for MITMing of CONNECT requests.
