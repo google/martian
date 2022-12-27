@@ -19,35 +19,35 @@
 //
 // Supported configuration endpoints:
 //
-//   POST http://martian.proxy/configure
+//	POST http://martian.proxy/configure
 //
 // sets the request and response modifier of the proxy; modifiers adhere to the
 // following top-level JSON structure:
 //
-//   {
-//     "package.Modifier": {
-//       "scope": ["request", "response"],
-//       "attribute 1": "value",
-//       "attribute 2": "value"
-//     }
-//   }
+//	{
+//	  "package.Modifier": {
+//	    "scope": ["request", "response"],
+//	    "attribute 1": "value",
+//	    "attribute 2": "value"
+//	  }
+//	}
 //
 // modifiers may be "stacked" to provide support for additional behaviors; for
 // example, to add a "Martian-Test" header with the value "true" for requests
 // with the domain "www.example.com" the JSON message would be:
 //
-//   {
-//     "url.Filter": {
-//       "scope": ["request"],
-//       "host": "www.example.com",
-//       "modifier": {
-//         "header.Modifier": {
-//           "name": "Martian-Test",
-//           "value": "true"
-//         }
-//       }
-//     }
-//   }
+//	{
+//	  "url.Filter": {
+//	    "scope": ["request"],
+//	    "host": "www.example.com",
+//	    "modifier": {
+//	      "header.Modifier": {
+//	        "name": "Martian-Test",
+//	        "value": "true"
+//	      }
+//	    }
+//	  }
+//	}
 //
 // url.Filter parses the JSON object in the value of the "url.Filter" attribute;
 // the "host" key tells the url.Filter to filter requests if the host explicitly
@@ -60,82 +60,82 @@
 // log requests and responses after adding the "Martian-Test" header to the
 // request, but only when the host matches www.example.com:
 //
-//   {
-//     "url.Filter": {
-//       "host": "www.example.com",
-//       "modifier": {
-//         "fifo.Group": {
-//           "modifiers": [
-//             {
-//               "header.Modifier": {
-//                 "scope": ["request"],
-//                 "name": "Martian-Test",
-//                 "value": "true"
-//               }
-//             },
-//             {
-//               "log.Logger": { }
-//             }
-//           ]
-//         }
-//       }
-//     }
-//   }
+//	{
+//	  "url.Filter": {
+//	    "host": "www.example.com",
+//	    "modifier": {
+//	      "fifo.Group": {
+//	        "modifiers": [
+//	          {
+//	            "header.Modifier": {
+//	              "scope": ["request"],
+//	              "name": "Martian-Test",
+//	              "value": "true"
+//	            }
+//	          },
+//	          {
+//	            "log.Logger": { }
+//	          }
+//	        ]
+//	      }
+//	    }
+//	  }
+//	}
 //
 // modifiers are designed to be composed together in ways that allow the user to
 // write a single JSON structure to accomplish a variety of functionality
 //
-//   GET http://martian.proxy/verify
+//	GET http://martian.proxy/verify
 //
 // retrieves the verifications errors as JSON with the following structure:
 //
-//   {
-//     "errors": [
-//       {
-//         "message": "request(url) verification failure"
-//       },
-//       {
-//         "message": "response(url) verification failure"
-//       }
-//     ]
-//   }
+//	{
+//	  "errors": [
+//	    {
+//	      "message": "request(url) verification failure"
+//	    },
+//	    {
+//	      "message": "response(url) verification failure"
+//	    }
+//	  ]
+//	}
 //
 // verifiers also adhere to the modifier interface and thus can be included in the
 // modifier configuration request; for example, to verify that all requests to
 // "www.example.com" are sent over HTTPS send the following JSON to the
 // configuration endpoint:
 //
-//   {
-//     "url.Filter": {
-//       "scope": ["request"],
-//       "host": "www.example.com",
-//       "modifier": {
-//         "url.Verifier": {
-//           "scope": ["request"],
-//           "scheme": "https"
-//         }
-//       }
-//     }
-//   }
+//	{
+//	  "url.Filter": {
+//	    "scope": ["request"],
+//	    "host": "www.example.com",
+//	    "modifier": {
+//	      "url.Verifier": {
+//	        "scope": ["request"],
+//	        "scheme": "https"
+//	      }
+//	    }
+//	  }
+//	}
 //
 // sending a request to "http://martian.proxy/verify" will then return errors from the url.Verifier
 //
-//   POST http://martian.proxy/verify/reset
+//	POST http://martian.proxy/verify/reset
 //
 // resets the verifiers to their initial state; note some verifiers may start in
 // a failure state (e.g., pingback.Verifier is failed if no requests have been
 // seen by the proxy)
 //
-//   GET http://martian.proxy/authority.cer
+//	GET http://martian.proxy/authority.cer
 //
 // prompts the user to install the CA certificate used by the proxy if MITM is enabled
 //
-//   GET http://martian.proxy/logs
+//	GET http://martian.proxy/logs
 //
 // retrieves the HAR logs for all requests and responses seen by the proxy if
 // the HAR flag is enabled
 //
-//   DELETE http://martian.proxy/logs/reset
+//	DELETE http://martian.proxy/logs/reset
 //
 // reset the in-memory HAR log; note that the log will grow unbounded unless it
 // is periodically reset
@@ -148,46 +148,47 @@
 // reading anymore requests from them.
 //
 // The flags are:
-//   -addr=":8080"
-//     host:port of the proxy
-//   -api-addr=":8181"
-//     host:port of the proxy API
-//   -tls-addr=":4443"
-//     host:port of the proxy over TLS
-//   -api="martian.proxy"
-//     hostname that can be used to reference the configuration API when
-//     configuring through the proxy
-//   -cert=""
-//     PEM encoded X.509 CA certificate; if set, it will be set as the
-//     issuer for dynamically-generated certificates during man-in-the-middle
-//   -key=""
-//     PEM encoded private key of cert (RSA or ECDSA); if set, the key will be used
-//     to sign dynamically-generated certificates during man-in-the-middle
-//   -generate-ca-cert=false
-//     generates a CA certificate and private key to use for man-in-the-middle;
-//     the certificate is only valid while the proxy is running and will be
-//     discarded on shutdown
-//   -organization="Martian Proxy"
-//     organization name set on the dynamically-generated certificates during
-//     man-in-the-middle
-//   -validity="1h"
-//     window of time around the time of request that the dynamically-generated
-//     certificate is valid for; the duration is set such that the total valid
-//     timeframe is double the value of validity (1h before & 1h after)
-//   -cors=false
-//     allow the proxy to be configured via CORS requests; such as when
-//     configuring the proxy via AJAX
-//   -har=false
-//     enable logging endpoints for retrieving full request/response logs in
-//     HAR format.
-//   -traffic-shaping=false
-//     enable traffic shaping endpoints for simulating latency and constrained
-//     bandwidth conditions (e.g. mobile, exotic network infrastructure, the
-//     90's)
-//   -skip-tls-verify=false
-//     skip TLS server verification; insecure and intended for testing only
-//   -v=0
-//     log level for console logs; defaults to error only.
+//
+//	-addr=":8080"
+//	  host:port of the proxy
+//	-api-addr=":8181"
+//	  host:port of the proxy API
+//	-tls-addr=":4443"
+//	  host:port of the proxy over TLS
+//	-api="martian.proxy"
+//	  hostname that can be used to reference the configuration API when
+//	  configuring through the proxy
+//	-cert=""
+//	  PEM encoded X.509 CA certificate; if set, it will be set as the
+//	  issuer for dynamically-generated certificates during man-in-the-middle
+//	-key=""
+//	  PEM encoded private key of cert (RSA or ECDSA); if set, the key will be used
+//	  to sign dynamically-generated certificates during man-in-the-middle
+//	-generate-ca-cert=false
+//	  generates a CA certificate and private key to use for man-in-the-middle;
+//	  the certificate is only valid while the proxy is running and will be
+//	  discarded on shutdown
+//	-organization="Martian Proxy"
+//	  organization name set on the dynamically-generated certificates during
+//	  man-in-the-middle
+//	-validity="1h"
+//	  window of time around the time of request that the dynamically-generated
+//	  certificate is valid for; the duration is set such that the total valid
+//	  timeframe is double the value of validity (1h before & 1h after)
+//	-cors=false
+//	  allow the proxy to be configured via CORS requests; such as when
+//	  configuring the proxy via AJAX
+//	-har=false
+//	  enable logging endpoints for retrieving full request/response logs in
+//	  HAR format.
+//	-traffic-shaping=false
+//	  enable traffic shaping endpoints for simulating latency and constrained
+//	  bandwidth conditions (e.g. mobile, exotic network infrastructure, the
+//	  90's)
+//	-skip-tls-verify=false
+//	  skip TLS server verification; insecure and intended for testing only
+//	-v=0
+//	  log level for console logs; defaults to error only.
 package main
 
 import (
