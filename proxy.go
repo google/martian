@@ -59,6 +59,10 @@ type Proxy struct {
 	// AllowHTTP disables automatic HTTP to HTTPS upgrades when the listener is TLS.
 	AllowHTTP bool
 
+	// ConnectPassthrough handles CONNECT requests as normal requests.
+	// The request is passed to RoundTripper and the response is passed back to the client.
+	ConnectPassthrough bool
+
 	// WithoutWarning disables the warning header added to requests and responses when modifier errors occur.
 	WithoutWarning bool
 
@@ -561,11 +565,13 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		req.URL.Host = req.Host
 	}
 
-	if req.Method == "CONNECT" {
+	// Note that the CONNECT request which are passed through (i.e. handled with a roundTripper)
+	// does not require extra flush in our logic, as this case is handled in net/http package.
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.19.5:src/net/http/transfer.go;l=365
+	if req.Method == "CONNECT" && !p.ConnectPassthrough {
 		return p.handleConnectRequest(ctx, req, session, brw, conn)
 	}
 
-	// Not a CONNECT request
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying request: %v", err)
 		p.warning(req.Header, err)

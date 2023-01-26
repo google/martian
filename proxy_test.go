@@ -1493,3 +1493,52 @@ func TestReadHeaderTimeout(t *testing.T) {
 		t.Fatalf("conn.Write(): got %v, want EOF", err)
 	}
 }
+
+func TestConnectPassthrough(t *testing.T) {
+	t.Parallel()
+
+	l := newListener(t)
+	p := NewProxy()
+	p.ConnectPassthrough = true
+	defer p.Close()
+
+	tr := martiantest.NewTransport()
+	p.SetRoundTripper(tr)
+	p.SetTimeout(200 * time.Millisecond)
+
+	tm := martiantest.NewModifier()
+	tm.RequestFunc(func(req *http.Request) {
+		ctx := NewContext(req)
+		ctx.SkipRoundTrip()
+	})
+	p.SetRequestModifier(tm)
+
+	go p.Serve(l)
+
+	conn, err := l.dial()
+	if err != nil {
+		t.Fatalf("net.Dial(): got %v, want no error", err)
+	}
+	defer conn.Close()
+
+	req, err := http.NewRequest("CONNECT", "http://example.com:80", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest(): got %v, want no error", err)
+	}
+
+	// CONNECT http://example.com:80 HTTP/1.1
+	if err := req.WriteProxy(conn); err != nil {
+		t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+	}
+
+	// Response from skipped round trip.
+	res, err := http.ReadResponse(bufio.NewReader(conn), req)
+	if err != nil {
+		t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+	}
+	defer res.Body.Close()
+
+	if got, want := res.StatusCode, 200; got != want {
+		t.Errorf("res.StatusCode: got %d, want %d", got, want)
+	}
+}
