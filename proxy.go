@@ -367,6 +367,20 @@ func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) 
 	return
 }
 
+func copySync(w io.Writer, r io.Reader, donec chan<- bool) {
+	if _, err := io.Copy(w, r); err != nil && err != io.EOF {
+		log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
+	}
+	if cw, ok := w.(closeWriter); ok {
+		cw.CloseWrite()
+	} else {
+		log.Errorf("martian: cannot close write side of CONNECT tunnel")
+	}
+
+	log.Debugf("martian: CONNECT tunnel finished copying")
+	donec <- true
+}
+
 func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *Session, brw *bufio.ReadWriter, conn net.Conn) error {
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying CONNECT request: %v", err)
@@ -484,20 +498,6 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	}
 	if err := brw.Flush(); err != nil {
 		log.Errorf("martian: got error while flushing response back to client: %v", err)
-	}
-
-	copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
-		if _, err := io.Copy(w, r); err != nil && err != io.EOF {
-			log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
-		}
-		if cw, ok := w.(closeWriter); ok {
-			cw.CloseWrite()
-		} else {
-			log.Errorf("martian: cannot close write side of CONNECT tunnel")
-		}
-
-		log.Debugf("martian: CONNECT tunnel finished copying")
-		donec <- true
 	}
 
 	donec := make(chan bool, 2)
