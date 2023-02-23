@@ -367,8 +367,19 @@ func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) 
 	return
 }
 
+var copyBufPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 32*1024)
+		return &b
+	},
+}
+
 func copySync(w io.Writer, r io.Reader, donec chan<- bool) {
-	if _, err := io.Copy(w, r); err != nil && err != io.EOF {
+	bufp := copyBufPool.Get().(*[]byte)
+	buf := *bufp
+	defer copyBufPool.Put(bufp)
+
+	if _, err := io.CopyBuffer(w, r, buf); err != nil && err != io.EOF {
 		log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
 	}
 	if cw, ok := w.(closeWriter); ok {
