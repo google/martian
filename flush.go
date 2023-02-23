@@ -1,3 +1,5 @@
+// Copyright 2023 Sauce Labs Inc. All rights reserved.
+//
 // Copyright 2015 Google Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +16,22 @@
 
 package martian
 
-import "bufio"
+import (
+	"bufio"
+	"mime"
+	"net/http"
+)
+
+func shouldFlush(res *http.Response) bool {
+	return isTextEventStream(res) || res.ContentLength == -1
+}
+
+func isTextEventStream(res *http.Response) bool {
+	// The MIME type is defined in https://www.w3.org/TR/eventsource/#text-event-stream
+	resCT := res.Header.Get("Content-Type")
+	baseCT, _, _ := mime.ParseMediaType(resCT)
+	return baseCT == "text/event-stream"
+}
 
 // flushAfterChunkWriter works with net/http/internal.chunkedWriter and forces a flush after each chunk is written.
 // There is also net/http/internal.FlushAfterChunkWriter that does the same thing nicer, but it is not available.
