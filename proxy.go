@@ -559,6 +559,18 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		req.TLS = &cs
 	}
 
+	req.RemoteAddr = conn.RemoteAddr().String()
+	if req.URL.Host == "" {
+		req.URL.Host = req.Host
+	}
+
+	// Note that the CONNECT request which are passed through (i.e. handled with a roundTripper)
+	// does not require extra flush in our logic, as this case is handled in net/http package.
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.19.5:src/net/http/transfer.go;l=365
+	if req.Method == "CONNECT" && !p.ConnectPassthrough {
+		return p.handleConnectRequest(ctx, req, session, brw, conn)
+	}
+
 	if req.URL.Scheme == "" {
 		req.URL.Scheme = "http"
 		if session.IsSecure() {
@@ -571,22 +583,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		}
 	}
 
-	req.RemoteAddr = conn.RemoteAddr().String()
-	if req.URL.Host == "" {
-		req.URL.Host = req.Host
-	}
-
 	if _, ok := req.Header["User-Agent"]; !ok {
 		// If the outbound request doesn't have a User-Agent header set,
 		// don't send the default Go HTTP client User-Agent.
 		req.Header.Set("User-Agent", "")
-	}
-
-	// Note that the CONNECT request which are passed through (i.e. handled with a roundTripper)
-	// does not require extra flush in our logic, as this case is handled in net/http package.
-	// https://cs.opensource.google/go/go/+/refs/tags/go1.19.5:src/net/http/transfer.go;l=365
-	if req.Method == "CONNECT" && !p.ConnectPassthrough {
-		return p.handleConnectRequest(ctx, req, session, brw, conn)
 	}
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
