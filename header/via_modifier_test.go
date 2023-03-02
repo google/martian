@@ -31,11 +31,7 @@ func TestViaModifier(t *testing.T) {
 	}
 	res := proxyutil.NewResponse(200, nil, req)
 
-	ctx, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	ctx := martian.TestContext(req, nil, nil)
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

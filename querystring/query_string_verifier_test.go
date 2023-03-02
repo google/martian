@@ -34,11 +34,7 @@ func TestVerifyRequestPasses(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -57,11 +53,8 @@ func TestVerifyEmptyValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
+
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -79,11 +72,8 @@ func TestFailureWithMissingKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
+
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -114,11 +104,8 @@ func TestFailureWithMultiFail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
+
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}
@@ -180,11 +167,8 @@ func TestVerifierFromJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
+
 	if err := reqv.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
 	}

@@ -47,11 +47,7 @@ func Test404WhenExplictlyMappedFileDoesNotExist(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
@@ -93,11 +89,7 @@ func TestFileExistsInBothExplictlyMappedPathAndInferredPath(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
@@ -149,11 +141,7 @@ func TestStaticModifierExplicitPathMapping(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
@@ -201,11 +189,7 @@ func TestStaticModifierOnRequest(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
@@ -254,11 +238,7 @@ func TestRequestOverHTTPS(t *testing.T) {
 
 	req.URL.Scheme = "https"
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
@@ -339,11 +319,7 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(http.StatusOK, nil, req)
 
@@ -378,11 +354,7 @@ func TestModifierFromJSON(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	_ = martian.TestContext(req, nil, nil)
 
 	res = proxyutil.NewResponse(http.StatusOK, nil, req)
 
@@ -431,11 +403,7 @@ func TestStaticModifierSingleRangeRequest(t *testing.T) {
 	}
 	req.Header.Set("Range", "bytes=1-4")
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := mod.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

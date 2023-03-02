@@ -41,11 +41,7 @@ func TestVerifyResponses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%d. http.NewRequest(): got %v, want no error", i, err)
 		}
-		_, remove, err := martian.TestContext(req, nil, nil)
-		if err != nil {
-			t.Fatalf("TestContext(): got %v, want no error", err)
-		}
-		defer remove()
+		martian.TestContext(req, nil, nil)
 
 		res := proxyutil.NewResponse(tc.got, nil, req)
 
@@ -102,11 +98,7 @@ func TestVerifierFromJSON(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(200, nil, req)
 	if err := resv.ModifyResponse(res); err != nil {

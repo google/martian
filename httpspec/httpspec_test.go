@@ -36,11 +36,7 @@ func TestNewStack(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	// Hop-by-hop header to be removed.
 	req.Header.Set("Hop-By-Hop", "true")

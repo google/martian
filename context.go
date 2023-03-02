@@ -61,22 +61,18 @@ func NewContext(req *http.Request) *Context {
 	return v.(*Context)
 }
 
-// TestContext builds a new session and associated context and returns the
-// context and a function to remove the associated context. If it fails to
-// generate either a new session or a new context it will return an error.
+// TestContext builds a new session and associated context and returns the context.
 // Intended for tests only.
-func TestContext(req *http.Request, conn net.Conn, bw *bufio.ReadWriter) (ctx *Context, remove func(), err error) {
-	nop := func() {}
-
-	ctx = NewContext(req)
+func TestContext(req *http.Request, conn net.Conn, bw *bufio.ReadWriter) *Context {
+	ctx := NewContext(req)
 	if ctx != nil {
-		return ctx, nop, nil
+		return ctx
 	}
 
 	ctx = withSession(newSession(conn, bw))
 	*req = *req.Clone(ctx.addToContext(req.Context()))
 
-	return ctx, nop, nil
+	return ctx
 }
 
 // IsSecure returns whether the current session is from a secure connection,

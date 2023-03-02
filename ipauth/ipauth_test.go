@@ -34,11 +34,7 @@ func TestModifyRequest(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	ctx := martian.TestContext(req, nil, nil)
 
 	if err := m.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -96,11 +92,7 @@ func TestModifyResponse(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	ctx := martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(200, nil, req)
 	if err := m.ModifyResponse(res); err != nil {

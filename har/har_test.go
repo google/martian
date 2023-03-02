@@ -42,11 +42,7 @@ func TestModifyRequest(t *testing.T) {
 	}
 	req.AddCookie(cookie)
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	logger := NewLogger()
 	if err := logger.ModifyRequest(req); err != nil {
@@ -136,11 +132,7 @@ func TestModifyResponse(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(301, strings.NewReader("response body"), req)
 	res.ContentLength = 13
@@ -240,11 +232,7 @@ func TestModifyRequestBodyURLEncoded(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -291,11 +279,7 @@ func TestModifyRequestBodyArbitraryContentType(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -342,11 +326,7 @@ func TestModifyRequestBodyMultipart(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", mpw.FormDataContentType())
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -406,11 +386,7 @@ func TestModifyRequestErrorsOnDuplicateRequest(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -429,11 +405,7 @@ func TestHARExportsTime(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -468,11 +440,7 @@ func TestReset(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -501,11 +469,7 @@ func TestExportSortsEntries(t *testing.T) {
 			t.Fatalf("NewRequest(): got %v, want no error", err)
 		}
 
-		_, remove, err := martian.TestContext(req, nil, nil)
-		if err != nil {
-			t.Fatalf("martian.TestContext(): got %v, want no error", err)
-		}
-		defer remove()
+		martian.TestContext(req, nil, nil)
 
 		if err := logger.ModifyRequest(req); err != nil {
 			t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -532,11 +496,7 @@ func TestExportIgnoresOrphanedResponse(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -564,11 +524,7 @@ func TestExportAndResetResetsCompleteRequests(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -595,11 +551,7 @@ func TestExportAndResetLeavesPendingRequests(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -621,11 +573,7 @@ func TestExportAndResetExportsCompleteRequests(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -650,11 +598,7 @@ func TestExportAndResetExportsCompleteRequestsWithPendingLeft(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -665,11 +609,7 @@ func TestExportAndResetExportsCompleteRequestsWithPendingLeft(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	_ = martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -680,11 +620,7 @@ func TestExportAndResetExportsCompleteRequestsWithPendingLeft(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	_ = martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -712,11 +648,7 @@ func TestSkippingLogging(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	ctx := martian.TestContext(req, nil, nil)
 
 	ctx.SkipLogging()
 
@@ -743,11 +675,7 @@ func TestOptionResponseBodyLogging(t *testing.T) {
 		t.Fatalf("NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	bdr := strings.NewReader("{\"response\": \"body\"}")
 	res := proxyutil.NewResponse(200, bdr, req)
@@ -837,11 +765,7 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -873,11 +797,7 @@ func TestOptionRequestPostDataLogging(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, remove, err = martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	_ = martian.TestContext(req, nil, nil)
 
 	if err := logger.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

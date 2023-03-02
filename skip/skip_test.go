@@ -29,11 +29,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("martian.TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	ctx := martian.TestContext(req, nil, nil)
 
 	if ctx.SkippingRoundTrip() {
 		t.Fatal("ctx.SkippingRoundTrip(): got true, want false")

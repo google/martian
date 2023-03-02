@@ -80,11 +80,7 @@ func TestVerifyRequests(t *testing.T) {
 			t.Fatalf("%d. http.NewRequest(..., %s, ...): got %v, want no error", i, tc.got, err)
 		}
 
-		_, remove, err := martian.TestContext(req, nil, nil)
-		if err != nil {
-			t.Fatalf("TestContext(): got %v, want no error", err)
-		}
-		defer remove()
+		martian.TestContext(req, nil, nil)
 
 		if err := v.ModifyRequest(req); err != nil {
 			t.Fatalf("%d. ModifyRequest(): got %v, want no error", i, err)
@@ -115,11 +111,7 @@ func TestVerifyRequests(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := v.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)
@@ -158,11 +150,7 @@ func TestVerifierFromJSON(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := reqv.ModifyRequest(req); err != nil {
 		t.Fatalf("ModifyRequest(): got %v, want no error", err)

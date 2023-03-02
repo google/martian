@@ -29,12 +29,7 @@ func TestContexts(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
-
+	ctx := TestContext(req, nil, nil)
 	ctx.Set("key", "value")
 	got, ok := ctx.Get("key")
 	if !ok {
@@ -69,12 +64,7 @@ func TestContexts(t *testing.T) {
 		t.Errorf("s.Get(%q): got %q, want %q", "key", got, want)
 	}
 
-	ctx2, remove, err := TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
-
+	ctx2 := TestContext(req, nil, nil)
 	if ctx != ctx2 {
 		t.Error("TestContext(): got new context, want existing context")
 	}
@@ -88,11 +78,7 @@ func TestContextHijack(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := TestContext(req, rc, bufio.NewReadWriter(bufio.NewReader(rc), bufio.NewWriter(rc)))
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	ctx := TestContext(req, rc, bufio.NewReadWriter(bufio.NewReader(rc), bufio.NewWriter(rc)))
 
 	session := ctx.Session()
 	if session.Hijacked() {

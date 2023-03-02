@@ -33,11 +33,7 @@ func TestMarkAPIRequestsWithHeader(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	ctx, remove, err := martian.TestContext(areq, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	ctx := martian.TestContext(areq, nil, nil)
 
 	ctx.APIRequest()
 
@@ -46,11 +42,7 @@ func TestMarkAPIRequestsWithHeader(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, removereq, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer removereq()
+	martian.TestContext(req, nil, nil)
 
 	var b bytes.Buffer
 
@@ -99,11 +91,7 @@ func TestSendTimestampWithLogRequest(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	var b bytes.Buffer
 	s := NewStream(&b)
@@ -151,11 +139,7 @@ func TestSendTimestampWithLogResponse(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	res := proxyutil.NewResponse(200, nil, req)
 	var b bytes.Buffer
@@ -212,11 +196,7 @@ func TestBodyLoggingWithOneRead(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	var b bytes.Buffer
 	s := NewStream(&b)
@@ -273,11 +253,7 @@ func TestBodyLogging_ManyReads(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	var b bytes.Buffer
 	s := NewStream(&b)
@@ -327,11 +303,7 @@ func TestReturnOriginalRequestPathAndQuery(t *testing.T) {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		t.Fatalf("TestContext(): got %v, want no error", err)
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	var b bytes.Buffer
 	s := NewStream(&b)
@@ -396,10 +368,10 @@ func readAllDataFrames(reader *Reader, id string, t *testing.T) []byte {
 			i++
 		}
 	}
-	
+
 	if !term {
 		t.Fatal("didn't see terminal DataFrame")
 	}
-	
+
 	return res
 }

@@ -48,12 +48,7 @@ func ExampleLogger() {
 	req.TransferEncoding = []string{"chunked"}
 	req.Header.Set("Content-Encoding", "gzip")
 
-	_, remove, err := martian.TestContext(req, nil, nil)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer remove()
+	martian.TestContext(req, nil, nil)
 
 	if err := l.ModifyRequest(req); err != nil {
 		fmt.Println(err)
