@@ -155,6 +155,10 @@ func (s *Session) Set(key string, val any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.vals == nil {
+		s.vals = make(map[string]any)
+	}
+
 	s.vals[key] = val
 }
 
@@ -184,6 +188,10 @@ func (ctx *Context) Get(key string) (any, bool) {
 func (ctx *Context) Set(key string, val any) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
+
+	if ctx.vals == nil {
+		ctx.vals = make(map[string]any)
+	}
 
 	ctx.vals[key] = val
 }
@@ -259,7 +267,6 @@ func newSession(conn net.Conn, brw *bufio.ReadWriter) *Session {
 	return &Session{
 		conn: conn,
 		brw:  brw,
-		vals: make(map[string]any),
 	}
 }
 
@@ -275,6 +282,5 @@ func withSession(s *Session) *Context {
 	return &Context{
 		session: s,
 		id:      nextID.Add(1),
-		vals:    make(map[string]any),
 	}
 }
