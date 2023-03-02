@@ -158,7 +158,7 @@ func TestProxyMain(t *testing.T) {
 		}
 		mc, err := mitm.NewConfig(servCert, servPriv)
 		if err != nil {
-			t.Fatalf("mitm.NewConfig(%p, %q): got error %v, want no error", servCert, servPriv, err)
+			t.Fatalf("mitm.NewConfig(%p, %p): got error %v, want no error", servCert, servPriv, err)
 		}
 		sc := mc.TLS()
 
