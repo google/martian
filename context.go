@@ -16,12 +16,13 @@ package martian
 
 import (
 	"bufio"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // Context provides information and storage for a single request/response pair.
@@ -29,7 +30,7 @@ import (
 // a single connection.
 type Context struct {
 	session *Session
-	id      string
+	id      uint64
 
 	mu            sync.RWMutex
 	vals          map[string]any
@@ -41,7 +42,6 @@ type Context struct {
 // Session provides information and storage about a connection.
 type Session struct {
 	mu       sync.RWMutex
-	id       string
 	secure   bool
 	hijacked bool
 	conn     net.Conn
@@ -75,27 +75,10 @@ func TestContext(req *http.Request, conn net.Conn, bw *bufio.ReadWriter) (ctx *C
 		return ctx, func() { unlink(req) }, nil
 	}
 
-	s, err := newSession(conn, bw)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ctx, err = withSession(s)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	ctx = withSession(newSession(conn, bw))
 	ctxs[req] = ctx
 
 	return ctx, func() { unlink(req) }, nil
-}
-
-// ID returns the session ID.
-func (s *Session) ID() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.id
 }
 
 // IsSecure returns whether the current session is from a secure connection,
@@ -182,7 +165,7 @@ func (ctx *Context) Session() *Session {
 
 // ID returns the context ID.
 func (ctx *Context) ID() string {
-	return ctx.id
+	return strconv.FormatUint(ctx.id, 16)
 }
 
 // Get takes key and returns the associated value from the context.
@@ -255,16 +238,6 @@ func (ctx *Context) IsAPIRequest() bool {
 	return ctx.apiRequest
 }
 
-// newID creates a new 16 character random hex ID; note these are not UUIDs.
-func newID() (string, error) {
-	src := make([]byte, 8)
-	if _, err := rand.Read(src); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(src), nil
-}
-
 // link associates the context with request.
 func link(req *http.Request, ctx *Context) {
 	ctxmu.Lock()
@@ -282,31 +255,26 @@ func unlink(req *http.Request) {
 }
 
 // newSession builds a new session.
-func newSession(conn net.Conn, brw *bufio.ReadWriter) (*Session, error) {
-	sid, err := newID()
-	if err != nil {
-		return nil, err
-	}
-
+func newSession(conn net.Conn, brw *bufio.ReadWriter) *Session {
 	return &Session{
-		id:   sid,
 		conn: conn,
 		brw:  brw,
 		vals: make(map[string]any),
-	}, nil
+	}
 }
 
-// withSession builds a new context from an existing session. Session must be
-// non-nil.
-func withSession(s *Session) (*Context, error) {
-	cid, err := newID()
-	if err != nil {
-		return nil, err
-	}
+var nextID atomic.Uint64
 
+func init() {
+	nextID.Store(uint64(time.Now().UnixMilli()))
+}
+
+// withSession builds a new context from an existing session.
+// Session must be non-nil.
+func withSession(s *Session) *Context {
 	return &Context{
 		session: s,
-		id:      cid,
+		id:      nextID.Add(1),
 		vals:    make(map[string]any),
-	}, nil
+	}
 }

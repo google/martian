@@ -280,19 +280,11 @@ func (p *Proxy) handleLoop(conn net.Conn) {
 		return
 	}
 
-	brw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-
-	s, err := newSession(conn, brw)
-	if err != nil {
-		log.Errorf("martian: failed to create session: %v", err)
-		return
-	}
-
-	ctx, err := withSession(s)
-	if err != nil {
-		log.Errorf("martian: failed to create context: %v", err)
-		return
-	}
+	var (
+		brw = bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+		s   = newSession(conn, brw)
+		ctx = withSession(s)
+	)
 
 	for {
 		if err := p.handle(ctx, conn, brw); isCloseable(err) {
@@ -533,11 +525,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	defer req.Body.Close()
 
 	session := ctx.Session()
-	ctx, err = withSession(session)
-	if err != nil {
-		log.Errorf("martian: failed to build new context: %v", err)
-		return err
-	}
+	ctx = withSession(session)
 
 	link(req, ctx)
 	defer unlink(req)
