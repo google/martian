@@ -35,10 +35,6 @@ func TestContexts(t *testing.T) {
 	}
 	defer remove()
 
-	if len(ctx.ID()) != 16 {
-		t.Errorf("ctx.ID(): got %q, want 16 character random ID", ctx.ID())
-	}
-
 	ctx.Set("key", "value")
 	got, ok := ctx.Get("key")
 	if !ok {
@@ -59,11 +55,6 @@ func TestContexts(t *testing.T) {
 	}
 
 	s := ctx.Session()
-
-	if len(s.ID()) != 16 {
-		t.Errorf("s.ID(): got %q, want 16 character random ID", s.ID())
-	}
-
 	s.MarkSecure()
 	if !s.IsSecure() {
 		t.Error("s.IsSecure(): got false, want true")

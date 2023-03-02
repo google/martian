@@ -347,6 +347,8 @@ func (p *Proxy) readRequest(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) 
 			err = errClose
 		default:
 		}
+
+		req = req.WithContext(ctx.addToContext(req.Context()))
 	}
 
 	// Adjust the read deadline if necessary.
@@ -518,17 +520,14 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error {
 	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 
+	session := ctx.Session()
+	ctx = withSession(session)
+
 	req, err := p.readRequest(ctx, conn, brw)
 	if err != nil {
 		return err
 	}
 	defer req.Body.Close()
-
-	session := ctx.Session()
-	ctx = withSession(session)
-
-	link(req, ctx)
-	defer unlink(req)
 
 	if tsconn, ok := conn.(*trafficshape.Conn); ok {
 		wrconn := tsconn.GetWrappedConn()

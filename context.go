@@ -16,6 +16,7 @@ package martian
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -49,17 +50,15 @@ type Session struct {
 	vals     map[string]any
 }
 
-var (
-	ctxmu sync.RWMutex
-	ctxs  = make(map[*http.Request]*Context)
-)
+const marianKey string = "martian.Context"
 
 // NewContext returns a context for the in-flight HTTP request.
 func NewContext(req *http.Request) *Context {
-	ctxmu.RLock()
-	defer ctxmu.RUnlock()
-
-	return ctxs[req]
+	v := req.Context().Value(marianKey)
+	if v == nil {
+		return nil
+	}
+	return v.(*Context)
 }
 
 // TestContext builds a new session and associated context and returns the
@@ -67,18 +66,17 @@ func NewContext(req *http.Request) *Context {
 // generate either a new session or a new context it will return an error.
 // Intended for tests only.
 func TestContext(req *http.Request, conn net.Conn, bw *bufio.ReadWriter) (ctx *Context, remove func(), err error) {
-	ctxmu.Lock()
-	defer ctxmu.Unlock()
+	nop := func() {}
 
-	ctx, ok := ctxs[req]
-	if ok {
-		return ctx, func() { unlink(req) }, nil
+	ctx = NewContext(req)
+	if ctx != nil {
+		return ctx, nop, nil
 	}
 
 	ctx = withSession(newSession(conn, bw))
-	ctxs[req] = ctx
+	*req = *req.Clone(ctx.addToContext(req.Context()))
 
-	return ctx, func() { unlink(req) }, nil
+	return ctx, nop, nil
 }
 
 // IsSecure returns whether the current session is from a secure connection,
@@ -160,6 +158,14 @@ func (s *Session) Set(key string, val any) {
 	}
 
 	s.vals[key] = val
+}
+
+// addToContext returns context.Context with the current context to the passed context.
+func (ctx *Context) addToContext(rctx context.Context) context.Context {
+	if rctx == nil {
+		rctx = context.Background()
+	}
+	return context.WithValue(rctx, marianKey, ctx)
 }
 
 // Session returns the session for the context.
@@ -244,22 +250,6 @@ func (ctx *Context) IsAPIRequest() bool {
 	defer ctx.mu.RUnlock()
 
 	return ctx.apiRequest
-}
-
-// link associates the context with request.
-func link(req *http.Request, ctx *Context) {
-	ctxmu.Lock()
-	defer ctxmu.Unlock()
-
-	ctxs[req] = ctx
-}
-
-// unlink removes the context for request.
-func unlink(req *http.Request) {
-	ctxmu.Lock()
-	defer ctxmu.Unlock()
-
-	delete(ctxs, req)
 }
 
 // newSession builds a new session.
