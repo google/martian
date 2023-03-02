@@ -39,11 +39,11 @@ type Result struct {
 	resmod martian.ResponseModifier
 }
 
-// NewResult returns a new parse.Result for a given interface{} that implements a modifier
+// NewResult returns a new parse.Result for a given interface that implements a modifier
 // and a slice of scopes to generate the result for.
 //
 // Returns nil, error if a given modifier does not support a given scope
-func NewResult(mod interface{}, scope []ModifierType) (*Result, error) {
+func NewResult(mod any, scope []ModifierType) (*Result, error) {
 	reqmod, reqOk := mod.(martian.RequestModifier)
 	resmod, resOk := mod.(martian.ResponseModifier)
 	result := &Result{}

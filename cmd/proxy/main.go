@@ -299,7 +299,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	var x509c *x509.Certificate
-	var priv interface{}
+	var priv any
 
 	if *generateCA {
 		var err error

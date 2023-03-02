@@ -40,9 +40,9 @@ var (
 )
 
 type Logger interface {
-	Infof(format string, args ...interface{})
-	Debugf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
+	Infof(format string, args ...any)
+	Debugf(format string, args ...any)
+	Errorf(format string, args ...any)
 }
 
 // SetLogger changes the default logger. This must be called very first,
@@ -61,23 +61,23 @@ func SetLevel(l int) {
 }
 
 // Infof logs an info message.
-func Infof(format string, args ...interface{}) {
+func Infof(format string, args ...any) {
 	currLogger.Infof(format, args...)
 }
 
 // Debugf logs a debug message.
-func Debugf(format string, args ...interface{}) {
+func Debugf(format string, args ...any) {
 	currLogger.Debugf(format, args...)
 }
 
 // Errorf logs an error message.
-func Errorf(format string, args ...interface{}) {
+func Errorf(format string, args ...any) {
 	currLogger.Errorf(format, args...)
 }
 
 type logger struct{}
 
-func (l *logger) Infof(format string, args ...interface{}) {
+func (l *logger) Infof(format string, args ...any) {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -93,7 +93,7 @@ func (l *logger) Infof(format string, args ...interface{}) {
 	log.Println(msg)
 }
 
-func (l *logger) Debugf(format string, args ...interface{}) {
+func (l *logger) Debugf(format string, args ...any) {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -109,7 +109,7 @@ func (l *logger) Debugf(format string, args ...interface{}) {
 	log.Println(msg)
 }
 
-func (l *logger) Errorf(format string, args ...interface{}) {
+func (l *logger) Errorf(format string, args ...any) {
 	lock.Lock()
 	defer lock.Unlock()
 

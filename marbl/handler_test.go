@@ -110,7 +110,7 @@ func TestUnreadsDontBlock(t *testing.T) {
 }
 
 func doOrTimeout(d time.Duration, f func()) bool {
-	done := make(chan interface{})
+	done := make(chan any)
 	go func() {
 		f()
 		done <- 1

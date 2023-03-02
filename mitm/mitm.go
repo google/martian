@@ -45,7 +45,7 @@ var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 // capable of MITM.
 type Config struct {
 	ca                     *x509.Certificate
-	capriv                 interface{}
+	capriv                 any
 	priv                   *rsa.PrivateKey
 	keyID                  []byte
 	validity               time.Duration
@@ -118,7 +118,7 @@ func NewAuthority(name, organization string, validity time.Duration) (*x509.Cert
 
 // NewConfig creates a MITM config using the CA certificate and
 // private key to generate on-the-fly certificates.
-func NewConfig(ca *x509.Certificate, privateKey interface{}) (*Config, error) {
+func NewConfig(ca *x509.Certificate, privateKey any) (*Config, error) {
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
 

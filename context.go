@@ -32,7 +32,7 @@ type Context struct {
 	id      string
 
 	mu            sync.RWMutex
-	vals          map[string]interface{}
+	vals          map[string]any
 	skipRoundTrip bool
 	skipLogging   bool
 	apiRequest    bool
@@ -46,7 +46,7 @@ type Session struct {
 	hijacked bool
 	conn     net.Conn
 	brw      *bufio.ReadWriter
-	vals     map[string]interface{}
+	vals     map[string]any
 }
 
 var (
@@ -157,7 +157,7 @@ func (s *Session) setConn(conn net.Conn, brw *bufio.ReadWriter) {
 }
 
 // Get takes key and returns the associated value from the session.
-func (s *Session) Get(key string) (interface{}, bool) {
+func (s *Session) Get(key string) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -168,7 +168,7 @@ func (s *Session) Get(key string) (interface{}, bool) {
 
 // Set takes a key and associates it with val in the session. The value is
 // persisted for the entire session across multiple requests and responses.
-func (s *Session) Set(key string, val interface{}) {
+func (s *Session) Set(key string, val any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -186,7 +186,7 @@ func (ctx *Context) ID() string {
 }
 
 // Get takes key and returns the associated value from the context.
-func (ctx *Context) Get(key string) (interface{}, bool) {
+func (ctx *Context) Get(key string) (any, bool) {
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()
 
@@ -198,7 +198,7 @@ func (ctx *Context) Get(key string) (interface{}, bool) {
 // Set takes a key and associates it with val in the context. The value is
 // persisted for the duration of the request and is removed on the following
 // request.
-func (ctx *Context) Set(key string, val interface{}) {
+func (ctx *Context) Set(key string, val any) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
 
@@ -292,7 +292,7 @@ func newSession(conn net.Conn, brw *bufio.ReadWriter) (*Session, error) {
 		id:   sid,
 		conn: conn,
 		brw:  brw,
-		vals: make(map[string]interface{}),
+		vals: make(map[string]any),
 	}, nil
 }
 
@@ -307,6 +307,6 @@ func withSession(s *Session) (*Context, error) {
 	return &Context{
 		session: s,
 		id:      cid,
-		vals:    make(map[string]interface{}),
+		vals:    make(map[string]any),
 	}, nil
 }

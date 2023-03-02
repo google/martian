@@ -250,7 +250,7 @@ call to `parse.Register` in `init()`.
 Signature of parse.Register:
 
 ```go
-Register(name string, parseFunc func(b []byte) (interface{}, error))
+Register(name string, parseFunc func(b []byte) (any, error))
 ```
 
 Register takes in the key as a string in the form `package.Type`. For
@@ -276,7 +276,7 @@ func init() {
   parse.Register("header.Modifier", modifierFromJSON)
 }
 
-func modifierFromJSON(b []byte) (interface{}, error) {
+func modifierFromJSON(b []byte) (any, error) {
   ...
 }
 ```
