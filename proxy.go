@@ -406,7 +406,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 			p.warning(res.Header, err)
 		}
 		if session.Hijacked() {
-			log.Infof("martian: connection hijacked by response modifier")
+			log.Debugf("martian: connection hijacked by response modifier")
 			return nil
 		}
 
@@ -472,7 +472,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 			p.warning(res.Header, err)
 		}
 		if session.Hijacked() {
-			log.Infof("martian: connection hijacked by response modifier")
+			log.Debugf("martian: connection hijacked by response modifier")
 			return nil
 		}
 
@@ -493,7 +493,7 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		p.warning(res.Header, err)
 	}
 	if session.Hijacked() {
-		log.Infof("martian: connection hijacked by response modifier")
+		log.Debugf("martian: connection hijacked by response modifier")
 		return nil
 	}
 
@@ -581,6 +581,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		p.warning(req.Header, err)
 	}
 	if session.Hijacked() {
+		log.Debugf("martian: connection hijacked by request modifier")
 		return nil
 	}
 
@@ -602,7 +603,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		p.warning(res.Header, err)
 	}
 	if session.Hijacked() {
-		log.Infof("martian: connection hijacked by response modifier")
+		log.Debugf("martian: connection hijacked by response modifier")
 		return nil
 	}
 
