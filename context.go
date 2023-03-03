@@ -47,6 +47,7 @@ type Session struct {
 	hijacked bool
 	conn     net.Conn
 	brw      *bufio.ReadWriter
+	rw       http.ResponseWriter
 	vals     map[string]any
 }
 
@@ -103,16 +104,42 @@ func (s *Session) MarkInsecure() {
 // Hijack takes control of the connection from the proxy. No further action
 // will be taken by the proxy and the connection will be closed following the
 // return of the hijacker.
-func (s *Session) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (s *Session) Hijack() (conn net.Conn, brw *bufio.ReadWriter, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.hijacked {
 		return nil, nil, fmt.Errorf("martian: session has already been hijacked")
 	}
-	s.hijacked = true
+	defer func() {
+		s.hijacked = err == nil
+	}()
 
-	return s.conn, s.brw, nil
+	if s.conn != nil {
+		return s.conn, s.brw, nil
+	}
+	if s.rw != nil {
+		return http.NewResponseController(s.rw).Hijack()
+	}
+
+	panic("martian: session has no connection or response writer")
+}
+
+// HijackResponseWriter takes control of the response writer from the proxy.
+func (s *Session) HijackResponseWriter() (http.ResponseWriter, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.hijacked {
+		return nil, fmt.Errorf("martian: session has already been hijacked")
+	}
+
+	if s.rw != nil {
+		s.hijacked = true
+		return s.rw, nil
+	}
+
+	return nil, fmt.Errorf("martian: session has no response writer")
 }
 
 // Hijacked returns whether the connection has been hijacked.
@@ -248,11 +275,18 @@ func (ctx *Context) IsAPIRequest() bool {
 	return ctx.apiRequest
 }
 
-// newSession builds a new session.
+// newSession builds a new session from a [net.Conn].
 func newSession(conn net.Conn, brw *bufio.ReadWriter) *Session {
 	return &Session{
 		conn: conn,
 		brw:  brw,
+	}
+}
+
+// newSessionWithResponseWriter builds a new session from a [http.ResponseWriter].
+func newSessionWithResponseWriter(rw http.ResponseWriter) *Session {
+	return &Session{
+		rw: rw,
 	}
 }
 
