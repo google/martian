@@ -18,3 +18,4 @@ script:
   - go vet ./...
   - go test -v ./... --race
   - go test -v -run Integration -tls .
+  - go test -v -run Integration -handler .

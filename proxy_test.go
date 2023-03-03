@@ -119,6 +119,22 @@ func newListener(t *testing.T) listener {
 	}}
 }
 
+var withHandler = flag.Bool("handler", false, "run proxy using http.Handler")
+
+func serve(p *Proxy, l net.Listener) {
+	if *withHandler {
+		s := http.Server{
+			Handler:           p.Handler(),
+			ReadTimeout:       p.ReadTimeout,
+			ReadHeaderTimeout: p.ReadHeaderTimeout,
+			WriteTimeout:      p.WriteTimeout,
+		}
+		s.Serve(l)
+	}
+
+	p.Serve(l)
+}
+
 func TestIntegrationTemporaryTimeout(t *testing.T) {
 	t.Parallel()
 
@@ -194,7 +210,7 @@ func TestIntegrationHTTP(t *testing.T) {
 	p.SetRequestModifier(tm)
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -228,6 +244,9 @@ func TestIntegrationHTTP(t *testing.T) {
 }
 
 func TestIntegrationHTTP100Continue(t *testing.T) {
+	if *withHandler {
+		t.Skip("skipping in handler mode")
+	}
 	t.Parallel()
 
 	l := newListener(t)
@@ -286,7 +305,7 @@ func TestIntegrationHTTP100Continue(t *testing.T) {
 	p.SetRequestModifier(tm)
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -396,7 +415,7 @@ func TestIntegrationUnexpectedUpstreamFailure(t *testing.T) {
 	p.SetRequestModifier(tm)
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -524,7 +543,7 @@ func TestIntegrationHTTPUpstreamProxyError(t *testing.T) {
 
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	// Open connection to upstream proxy.
 	conn, err := l.dial()
@@ -597,7 +616,7 @@ func TestIntegrationTLSHandshakeErrorCallback(t *testing.T) {
 		req.URL.Host = tl.Addr().String()
 	})
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -693,7 +712,7 @@ func TestIntegrationConnect(t *testing.T) {
 	p.SetRequestModifier(tm)
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -898,7 +917,7 @@ func TestIntegrationConnectPassthrough(t *testing.T) {
 	p.SetRoundTripper(tr)
 	p.SetTimeout(200 * time.Millisecond)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -944,6 +963,9 @@ func TestIntegrationConnectPassthrough(t *testing.T) {
 }
 
 func TestIntegrationMITM(t *testing.T) {
+	if *withHandler {
+		t.Skip("skipping in handler mode")
+	}
 	t.Parallel()
 
 	l := newListener(t)
@@ -981,7 +1003,7 @@ func TestIntegrationMITM(t *testing.T) {
 	p.SetRequestModifier(tm)
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -1071,7 +1093,7 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 	p.SetRequestModifier(tm)
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -1108,6 +1130,9 @@ func TestIntegrationTransparentHTTP(t *testing.T) {
 }
 
 func TestIntegrationTransparentMITM(t *testing.T) {
+	if *withHandler {
+		t.Skip("skipping in handler mode")
+	}
 	t.Parallel()
 
 	ca, priv, err := mitm.NewAuthority("martian.proxy", "Martian Authority", 2*time.Hour)
@@ -1148,7 +1173,7 @@ func TestIntegrationTransparentMITM(t *testing.T) {
 	p.SetRequestModifier(tm)
 	p.SetResponseModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
@@ -1211,7 +1236,7 @@ func TestIntegrationFailedRoundTrip(t *testing.T) {
 	p.SetRoundTripper(tr)
 	p.SetTimeout(200 * time.Millisecond)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -1266,7 +1291,7 @@ func TestIntegrationSkipRoundTrip(t *testing.T) {
 	})
 	p.SetRequestModifier(tm)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -1326,7 +1351,7 @@ func TestHTTPThroughConnectWithMITM(t *testing.T) {
 	}
 	p.SetMITM(mc)
 
-	go p.Serve(l)
+	go serve(p, l)
 
 	conn, err := l.dial()
 	if err != nil {
@@ -1517,7 +1542,7 @@ func TestRacyClose(t *testing.T) {
 		defer l.Close() // to make p.Serve exit
 
 		p := NewProxy()
-		go p.Serve(l)
+		go serve(p, l)
 		defer p.Close()
 
 		conn, err := net.Dial("tcp", l.Addr().String())
