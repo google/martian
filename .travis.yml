@@ -15,5 +15,5 @@ install:
   - go get -u github.com/golang/snappy
 
 script:
-  - golint ./...
+  - go vet ./...
   - go test -v ./... --race
