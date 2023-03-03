@@ -68,7 +68,8 @@ func TestListenerRead(t *testing.T) {
 		// Dial the local listener.
 		c, err := net.Dial("tcp", tsl.Addr().String())
 		if err != nil {
-			t.Fatalf("net.Dial(): got %v, want no error", err)
+			t.Errorf("net.Dial(): got %v, want no error", err)
+			return
 		}
 		defer c.Close()
 
@@ -149,7 +150,8 @@ func TestListenerWrite(t *testing.T) {
 		// Dial the local listener.
 		c, err := net.Dial("tcp", tsl.Addr().String())
 		if err != nil {
-			t.Fatalf("net.Dial(): got %v, want no error", err)
+			t.Errorf("net.Dial(): got %v, want no error", err)
+			return
 		}
 		defer c.Close()
 
@@ -159,7 +161,8 @@ func TestListenerWrite(t *testing.T) {
 
 		got, err := ioutil.ReadAll(c)
 		if err != nil {
-			t.Fatalf("c.Read(): got %v, want no error", err)
+			t.Errorf("c.Read(): got %v, want no error", err)
+			return
 		}
 		if !bytes.Equal(got, want) {
 			t.Errorf("c.Read(): got %q, want %q", got, want)
@@ -234,7 +237,8 @@ func TestListenerWriteTo(t *testing.T) {
 		// Dial the local listener.
 		c, err := net.Dial("tcp", tsl.Addr().String())
 		if err != nil {
-			t.Fatalf("net.Dial(): got %v, want no error", err)
+			t.Errorf("net.Dial(): got %v, want no error", err)
+			return
 		}
 		defer c.Close()
 
@@ -325,7 +329,8 @@ func TestListenerReadFrom(t *testing.T) {
 		// Dial the local listener.
 		c, err := net.Dial("tcp", tsl.Addr().String())
 		if err != nil {
-			t.Fatalf("net.Dial(): got %v, want no error", err)
+			t.Errorf("net.Dial(): got %v, want no error", err)
+			return
 		}
 		defer c.Close()
 
@@ -335,7 +340,8 @@ func TestListenerReadFrom(t *testing.T) {
 
 		got, err := ioutil.ReadAll(c)
 		if err != nil {
-			t.Fatalf("c.Read(): got %v, want no error", err)
+			t.Errorf("c.Read(): got %v, want no error", err)
+			return
 		}
 		if !bytes.Equal(got, want) {
 			t.Errorf("c.Read(): got %q, want %q", got, want)
@@ -466,7 +472,8 @@ func TestActionsAndThrottles(t *testing.T) {
 		h := NewHandler(tsl)
 		req, err := http.NewRequest("POST", "test", bytes.NewBufferString(tc.jsonString))
 		if err != nil {
-			t.Fatalf("%d. http.NewRequest(): got %v, want no error", i, err)
+			t.Errorf("%d. http.NewRequest(): got %v, want no error", i, err)
+			return
 		}
 
 		rw := httptest.NewRecorder()
@@ -480,7 +487,8 @@ func TestActionsAndThrottles(t *testing.T) {
 		conn, err := net.Dial("tcp", l.Addr().String())
 		defer conn.Close()
 		if err != nil {
-			t.Fatalf("net.Dial(): got %v, want no error", err)
+			t.Errorf("net.Dial(): got %v, want no error", err)
+			return
 		}
 
 		tsconn := tsl.GetTrafficShapedConn(conn)

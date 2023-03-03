@@ -103,16 +103,19 @@ func TestConstantThrottleAndClose(t *testing.T) {
 	go func() {
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+			t.Errorf("http.NewRequest(): got %v, want no error", err)
+			return
 		}
 
 		if err := req.WriteProxy(conn); err != nil {
-			t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+			t.Errorf("req.WriteProxy(): got %v, want no error", err)
+			return
 		}
 
 		res, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
-			t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+			t.Errorf("http.ReadResponse(): got %v, want no error", err)
+			return
 		}
 		body, _ := ioutil.ReadAll(res.Body)
 		bodystr := string(body)
@@ -229,16 +232,19 @@ func TestSleepAndClose(t *testing.T) {
 	go func() {
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+			t.Errorf("http.NewRequest(): got %v, want no error", err)
+			return
 		}
 
 		if err := req.WriteProxy(conn); err != nil {
-			t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+			t.Errorf("req.WriteProxy(): got %v, want no error", err)
+			return
 		}
 
 		res, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
-			t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+			t.Errorf("http.ReadResponse(): got %v, want no error", err)
+			return
 		}
 		body, _ := ioutil.ReadAll(res.Body)
 		bodystr := string(body)
@@ -348,16 +354,19 @@ func TestConstantThrottleAndCloseByteRange(t *testing.T) {
 	go func() {
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+			t.Errorf("http.NewRequest(): got %v, want no error", err)
+			return
 		}
 
 		if err := req.WriteProxy(conn); err != nil {
-			t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+			t.Errorf("req.WriteProxy(): got %v, want no error", err)
+			return
 		}
 
 		res, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
-			t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+			t.Errorf("http.ReadResponse(): got %v, want no error", err)
+			return
 		}
 
 		body, _ := ioutil.ReadAll(res.Body)
@@ -468,20 +477,24 @@ func TestMaxBandwidth(t *testing.T) {
 			conn, err := net.Dial("tcp", l.Addr().String())
 			defer conn.Close()
 			if err != nil {
-				t.Fatalf("net.Dial(): got %v, want no error", err)
+				t.Errorf("net.Dial(): got %v, want no error", err)
+				return
 			}
 			req, err := http.NewRequest("GET", "http://example/example", nil)
 			if err != nil {
-				t.Fatalf("http.NewRequest(): got %v, want no error", err)
+				t.Errorf("http.NewRequest(): got %v, want no error", err)
+				return
 			}
 
 			if err := req.WriteProxy(conn); err != nil {
-				t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+				t.Errorf("req.WriteProxy(): got %v, want no error", err)
+				return
 			}
 
 			res, err := http.ReadResponse(bufio.NewReader(conn), req)
 			if err != nil {
-				t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+				t.Errorf("http.ReadResponse(): got %v, want no error", err)
+				return
 			}
 
 			body, _ := ioutil.ReadAll(res.Body)
@@ -605,21 +618,25 @@ func TestConcurrentResponseActions(t *testing.T) {
 		conn, err := net.Dial("tcp", l.Addr().String())
 		defer conn.Close()
 		if err != nil {
-			t.Fatalf("net.Dial(): got %v, want no error", err)
+			t.Errorf("net.Dial(): got %v, want no error", err)
+			return
 		}
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		req.Header.Set("ContentRange", "bytes 250-1000/1000")
 		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+			t.Errorf("http.NewRequest(): got %v, want no error", err)
+			return
 		}
 
 		if err := req.WriteProxy(conn); err != nil {
-			t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+			t.Errorf("req.WriteProxy(): got %v, want no error", err)
+			return
 		}
 
 		res, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
-			t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+			t.Errorf("http.ReadResponse(): got %v, want no error", err)
+			return
 		}
 
 		body, _ := ioutil.ReadAll(res.Body)
@@ -631,20 +648,24 @@ func TestConcurrentResponseActions(t *testing.T) {
 		conn, err := net.Dial("tcp", l.Addr().String())
 		defer conn.Close()
 		if err != nil {
-			t.Fatalf("net.Dial(): got %v, want no error", err)
+			t.Errorf("net.Dial(): got %v, want no error", err)
+			return
 		}
 		req, err := http.NewRequest("GET", "http://example/example", nil)
 		if err != nil {
-			t.Fatalf("http.NewRequest(): got %v, want no error", err)
+			t.Errorf("http.NewRequest(): got %v, want no error", err)
+			return
 		}
 
 		if err := req.WriteProxy(conn); err != nil {
-			t.Fatalf("req.WriteProxy(): got %v, want no error", err)
+			t.Errorf("req.WriteProxy(): got %v, want no error", err)
+			return
 		}
 
 		res, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
-			t.Fatalf("http.ReadResponse(): got %v, want no error", err)
+			t.Errorf("http.ReadResponse(): got %v, want no error", err)
+			return
 		}
 
 		body, _ := ioutil.ReadAll(res.Body)

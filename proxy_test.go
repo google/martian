@@ -1347,13 +1347,15 @@ func TestServerClosesConnection(t *testing.T) {
 		t.Logf("Waiting for server side connection")
 		conn, err := dstl.Accept()
 		if err != nil {
-			t.Fatalf("Got error while accepting connection on destination listener: %v", err)
+			t.Errorf("Got error while accepting connection on destination listener: %v", err)
+			return
 		}
 		t.Logf("Accepted server side connection")
 
 		buf := make([]byte, 16384)
 		if _, err := conn.Read(buf); err != nil {
-			t.Fatalf("Error reading: %v", err)
+			t.Errorf("Error reading: %v", err)
+			return
 		}
 
 		_, err = conn.Write([]byte("HTTP/1.1 301 MOVED PERMANENTLY\r\n" +
@@ -1364,7 +1366,8 @@ func TestServerClosesConnection(t *testing.T) {
 			"Content-type: text/html\r\n" +
 			"Connection: close\r\n\r\n"))
 		if err != nil {
-			t.Fatalf("Got error while writting to connection on destination listener: %v", err)
+			t.Errorf("Got error while writting to connection on destination listener: %v", err)
+			return
 		}
 		conn.Close()
 	}()
