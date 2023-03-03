@@ -17,4 +17,4 @@ install:
 script:
   - go vet ./...
   - go test -v ./... --race
-  - go test -v -run Integration -https .
+  - go test -v -run Integration -tls .

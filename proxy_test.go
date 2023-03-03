@@ -67,7 +67,7 @@ func (l *timeoutListener) Accept() (net.Conn, error) {
 	return l.Listener.Accept()
 }
 
-var https = flag.Bool("https", false, "run proxy using TLS listener")
+var withTLS = flag.Bool("tls", false, "run proxy using TLS listener")
 
 type listener struct {
 	net.Listener
@@ -93,7 +93,7 @@ func newListener(t *testing.T) listener {
 		t.Fatalf("net.Listen(): got %v, want no error", err)
 	}
 
-	if !*https {
+	if !*withTLS {
 		return listener{l, nil}
 	}
 
@@ -232,7 +232,7 @@ func TestIntegrationHTTP100Continue(t *testing.T) {
 
 	l := newListener(t)
 	p := NewProxy()
-	if *https {
+	if *withTLS {
 		p.AllowHTTP = true
 	}
 	defer p.Close()
@@ -343,7 +343,7 @@ func TestIntegrationUnexpectedUpstreamFailure(t *testing.T) {
 
 	l := newListener(t)
 	p := NewProxy()
-	if *https {
+	if *withTLS {
 		p.AllowHTTP = true
 	}
 	defer p.Close()
@@ -463,7 +463,7 @@ func TestIntegrationHTTPUpstreamProxy(t *testing.T) {
 	pl := newListener(t)
 
 	proxy := NewProxy()
-	if *https {
+	if *withTLS {
 		proxy.AllowHTTP = true
 	}
 	defer proxy.Close()
