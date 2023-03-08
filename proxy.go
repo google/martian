@@ -499,24 +499,6 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		log.Errorf("martian: failed to CONNECT: %v", cerr)
 		res = p.errorResponse(req, cerr)
 		p.warning(res.Header, cerr)
-
-		if err := p.resmod.ModifyResponse(res); err != nil {
-			log.Errorf("martian: error modifying CONNECT response: %v", err)
-			p.warning(res.Header, err)
-		}
-		if session.Hijacked() {
-			log.Debugf("martian: connection hijacked by response modifier")
-			return nil
-		}
-
-		if err := res.Write(brw); err != nil {
-			log.Errorf("martian: got error while writing response back to client: %v", err)
-		}
-		err := brw.Flush()
-		if err != nil {
-			log.Errorf("martian: got error while flushing response back to client: %v", err)
-		}
-		return err
 	}
 	defer res.Body.Close()
 
@@ -527,6 +509,20 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	if session.Hijacked() {
 		log.Debugf("martian: connection hijacked by response modifier")
 		return nil
+	}
+
+	if res.StatusCode != 200 {
+		if cerr == nil {
+			log.Errorf("martian: CONNECT rejected with status code: %d", res.StatusCode)
+		}
+		if err := res.Write(brw); err != nil {
+			log.Errorf("martian: got error while writing response back to client: %v", err)
+		}
+		err := brw.Flush()
+		if err != nil {
+			log.Errorf("martian: got error while flushing response back to client: %v", err)
+		}
+		return err
 	}
 
 	res.ContentLength = -1
