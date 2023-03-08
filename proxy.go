@@ -388,6 +388,17 @@ func copySync(dir string, w io.Writer, r io.Reader, donec chan<- bool) {
 	donec <- true
 }
 
+func drainBuffer(w io.Writer, r *bufio.Reader) error {
+	if n := r.Buffered(); n > 0 {
+		rbuf, err := r.Peek(n)
+		if err != nil {
+			return err
+		}
+		w.Write(rbuf)
+	}
+	return nil
+}
+
 func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *Session, brw *bufio.ReadWriter, conn net.Conn) error {
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying CONNECT request: %v", err)
@@ -531,6 +542,10 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	}
 	if err := brw.Flush(); err != nil {
 		log.Errorf("martian: got error while flushing response back to client: %v", err)
+	}
+
+	if err := drainBuffer(cw, brw.Reader); err != nil {
+		return err
 	}
 
 	donec := make(chan bool, 2)
