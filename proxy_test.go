@@ -885,15 +885,18 @@ func TestIntegrationConnectPassthrough(t *testing.T) {
 	defer p.Close()
 
 	tr := martiantest.NewTransport()
+	tr.Func(func(req *http.Request) (*http.Response, error) {
+		pr, pw := io.Pipe()
+		go func() {
+			if _, err := io.Copy(pw, req.Body); err != nil {
+				t.Errorf("io.Copy(): got %v, want no error", err)
+			}
+			pw.Close()
+		}()
+		return proxyutil.NewResponse(200, pr, req), nil
+	})
 	p.SetRoundTripper(tr)
 	p.SetTimeout(200 * time.Millisecond)
-
-	tm := martiantest.NewModifier()
-	tm.RequestFunc(func(req *http.Request) {
-		ctx := NewContext(req)
-		ctx.SkipRoundTrip()
-	})
-	p.SetRequestModifier(tm)
 
 	go p.Serve(l)
 
@@ -903,12 +906,12 @@ func TestIntegrationConnectPassthrough(t *testing.T) {
 	}
 	defer conn.Close()
 
-	req, err := http.NewRequest("CONNECT", "http://example.com:80", nil)
+	req, err := http.NewRequest("CONNECT", "//example.com:80", nil)
 	if err != nil {
 		t.Fatalf("http.NewRequest(): got %v, want no error", err)
 	}
 
-	// CONNECT http://example.com:80 HTTP/1.1
+	// CONNECT example.com:80 HTTP/1.1
 	if err := req.WriteProxy(conn); err != nil {
 		t.Fatalf("req.WriteProxy(): got %v, want no error", err)
 	}
@@ -922,6 +925,21 @@ func TestIntegrationConnectPassthrough(t *testing.T) {
 
 	if got, want := res.StatusCode, 200; got != want {
 		t.Errorf("res.StatusCode: got %d, want %d", got, want)
+	}
+
+	if _, err := conn.Write([]byte("12345")); err != nil {
+		t.Fatalf("conn.Write(): got %v, want no error", err)
+	}
+	buf := make([]byte, 5)
+	if _, err := conn.Read(buf); err != nil {
+		t.Fatalf("conn.Read(): got %v, want no error", err)
+	}
+	if string(buf) != "12345" {
+		t.Errorf("conn.Read(): got %q, want %q", buf, "12345")
+	}
+
+	if err := conn.Close(); err != nil {
+		t.Fatalf("conn.Close(): got %v, want no error", err)
 	}
 }
 

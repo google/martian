@@ -59,8 +59,8 @@ type Proxy struct {
 	// AllowHTTP disables automatic HTTP to HTTPS upgrades when the listener is TLS.
 	AllowHTTP bool
 
-	// ConnectPassthrough handles CONNECT requests as normal requests.
-	// The request is passed to RoundTripper and the response is passed back to the client.
+	// ConnectPassthrough passes CONNECT requests to the RoundTripper,
+	// and uses the response body as the connection to the client.
 	ConnectPassthrough bool
 
 	// WithoutWarning disables the warning header added to requests and responses when modifier errors occur.
@@ -463,7 +463,38 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 	}
 
 	log.Debugf("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
-	res, cconn, cerr := p.connect(req)
+	var (
+		res  *http.Response
+		cr   io.Reader
+		cw   io.WriteCloser
+		cerr error
+	)
+	if p.ConnectPassthrough {
+		pr, pw := io.Pipe()
+		req.Body = pr
+		defer req.Body.Close()
+
+		// perform the HTTP roundtrip
+		res, cerr = p.roundTrip(ctx, req)
+		if res != nil {
+			cr = res.Body
+			cw = pw
+
+			if res.StatusCode/100 == 2 {
+				res = proxyutil.NewResponse(200, nil, req)
+			}
+		}
+	} else {
+		var cconn net.Conn
+		res, cconn, cerr = p.connect(req)
+
+		if cconn != nil {
+			defer cconn.Close()
+			cr = cconn
+			cw = cconn
+		}
+	}
+
 	if cerr != nil {
 		log.Errorf("martian: failed to CONNECT: %v", cerr)
 		res = p.errorResponse(req, cerr)
@@ -488,7 +519,6 @@ func (p *Proxy) handleConnectRequest(ctx *Context, req *http.Request, session *S
 		return err
 	}
 	defer res.Body.Close()
-	defer cconn.Close()
 
 	if err := p.resmod.ModifyResponse(res); err != nil {
 		log.Errorf("martian: error modifying CONNECT response: %v", err)
@@ -553,10 +583,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		req.URL.Host = req.Host
 	}
 
-	// Note that the CONNECT request which are passed through (i.e. handled with a roundTripper)
-	// does not require extra flush in our logic, as this case is handled in net/http package.
-	// https://cs.opensource.google/go/go/+/refs/tags/go1.19.5:src/net/http/transfer.go;l=365
-	if req.Method == "CONNECT" && !p.ConnectPassthrough {
+	if req.Method == "CONNECT" {
 		return p.handleConnectRequest(ctx, req, session, brw, conn)
 	}
 
