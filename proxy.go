@@ -595,12 +595,6 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		}
 	}
 
-	if _, ok := req.Header["User-Agent"]; !ok {
-		// If the outbound request doesn't have a User-Agent header set,
-		// don't send the default Go HTTP client User-Agent.
-		req.Header.Set("User-Agent", "")
-	}
-
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("martian: error modifying request: %v", err)
 		p.warning(req.Header, err)
