@@ -378,6 +378,8 @@ func copySync(dir string, w io.Writer, r io.Reader, donec chan<- bool) {
 	}
 	if cw, ok := w.(closeWriter); ok {
 		cw.CloseWrite()
+	} else if pw, ok := w.(*io.PipeWriter); ok {
+		pw.Close()
 	} else {
 		log.Errorf("martian: cannot close write side of %s CONNECT tunnel (%T)", dir, w)
 	}
