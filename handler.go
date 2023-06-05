@@ -287,6 +287,13 @@ func (p proxyHandler) handleRequest(ctx *Context, rw http.ResponseWriter, req *h
 	return nil
 }
 
+func newWriteFlusher(rw http.ResponseWriter) writeFlusher {
+	return writeFlusher{
+		rw: rw,
+		rc: http.NewResponseController(rw),
+	}
+}
+
 type writeFlusher struct {
 	rw io.Writer
 	rc *http.ResponseController
@@ -318,16 +325,15 @@ func writeResponse(rw http.ResponseWriter, res *http.Response) {
 	announcedTrailers := addTrailerHeader(rw, res.Trailer)
 	rw.WriteHeader(res.StatusCode)
 
-	// This prevents net/http from calculating the length for short
-	// bodies and adding a Content-Length.
-	rc := http.NewResponseController(rw)
-	if err := rc.Flush(); err != nil {
-		log.Errorf("martian: got error while flushing response back to client: %v", err)
+	// This flush is needed for http/1 server to flush the status code and headers.
+	// It prevents the server from buffering the response and trying to calculate the response size.
+	if f, ok := rw.(http.Flusher); ok {
+		f.Flush()
 	}
 
 	var err error
 	if shouldFlush(res) {
-		err = copyBody(writeFlusher{rw, rc}, res.Body)
+		err = copyBody(newWriteFlusher(rw), res.Body)
 	} else {
 		err = copyBody(rw, res.Body)
 	}
