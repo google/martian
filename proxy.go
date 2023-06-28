@@ -17,8 +17,8 @@ package martian
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -30,12 +30,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/martian/v3/dialvia"
 	"github.com/google/martian/v3/log"
 	"github.com/google/martian/v3/mitm"
 	"github.com/google/martian/v3/nosigpipe"
 	"github.com/google/martian/v3/proxyutil"
 	"github.com/google/martian/v3/trafficshape"
-	"golang.org/x/net/proxy"
 )
 
 var errClose = errors.New("closing connection")
@@ -98,7 +98,7 @@ type Proxy struct {
 	CloseAfterReply bool
 
 	roundTripper http.RoundTripper
-	dial         func(string, string) (net.Conn, error)
+	dial         func(context.Context, string, string) (net.Conn, error)
 	mitm         *mitm.Config
 	proxyURL     func(*http.Request) (*url.URL, error)
 	conns        sync.WaitGroup
@@ -124,10 +124,10 @@ func NewProxy() *Proxy {
 		reqmod:  noop,
 		resmod:  noop,
 	}
-	proxy.SetDial((&net.Dialer{
+	proxy.SetDialContext((&net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
-	}).Dial)
+	}).DialContext)
 	return proxy
 }
 
@@ -143,7 +143,7 @@ func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 		tr.Proxy = p.proxyURL
-		tr.Dial = p.dial
+		tr.DialContext = p.dial
 	}
 }
 
@@ -166,16 +166,16 @@ func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
 }
 
-// SetDial sets the dial func used to establish a connection.
-func (p *Proxy) SetDial(dial func(string, string) (net.Conn, error)) {
-	p.dial = func(a, b string) (net.Conn, error) {
-		c, e := dial(a, b)
+// SetDialContext sets the dial func used to establish a connection.
+func (p *Proxy) SetDialContext(dial func(context.Context, string, string) (net.Conn, error)) {
+	p.dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		c, e := dial(ctx, network, addr)
 		nosigpipe.IgnoreSIGPIPE(c)
 		return c, e
 	}
 
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.Dial = p.dial
+		tr.DialContext = p.dial
 	}
 }
 
@@ -772,7 +772,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	if proxyURL == nil {
 		log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
 
-		conn, err := p.dial("tcp", req.URL.Host)
+		conn, err := p.dial(req.Context(), "tcp", req.URL.Host)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -790,45 +790,23 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	}
 }
 
-func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (*http.Response, net.Conn, error) {
+func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (res *http.Response, conn net.Conn, err error) {
 	log.Debugf("martian: CONNECT with upstream HTTP proxy: %s", proxyURL.Host)
 
-	conn, err := p.dial("tcp", proxyURL.Host)
-	if err != nil {
-		return nil, nil, err
-	}
 	if proxyURL.Scheme == "https" {
-		tlsConfig := p.clientTLCConfig()
-		tlsConfig.ServerName = proxyURL.Hostname()
-		tlsConfig.NextProtos = []string{"http/1.1"}
-		conn = tls.Client(conn, tlsConfig)
+		d := dialvia.HTTPSProxy(p.dial, proxyURL, p.clientTLCConfig())
+		res, conn, err = d.DialContext(req.Context(), "tcp", req.URL.Host)
+	} else {
+		d := dialvia.HTTPProxy(p.dial, proxyURL)
+		res, conn, err = d.DialContext(req.Context(), "tcp", req.URL.Host)
 	}
 
-	pbw := bufio.NewWriter(conn)
-	pbr := bufio.NewReader(conn)
-
-	connReq := &http.Request{
-		Method: "CONNECT",
-		URL:    req.URL,
-		Host:   req.Host,
-		Header: make(http.Header),
-	}
-	if proxyURL.User != nil {
-		connReq.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(proxyURL.User.String())))
-	}
-	connReq.Write(pbw)
-
-	if err := pbw.Flush(); err != nil {
-		conn.Close()
-		return nil, nil, err
+	if res != nil && res.StatusCode/100 == 2 {
+		res.Body.Close()
+		return proxyutil.NewResponse(200, nil, req), conn, nil
 	}
 
-	res, err := http.ReadResponse(pbr, req)
-	if err != nil || res.StatusCode/100 != 2 {
-		return res, conn, err
-	}
-
-	return proxyutil.NewResponse(200, nil, req), conn, nil
+	return res, conn, err
 }
 
 func (p *Proxy) clientTLCConfig() *tls.Config {
@@ -839,37 +817,12 @@ func (p *Proxy) clientTLCConfig() *tls.Config {
 	return &tls.Config{}
 }
 
-type dialerFunc func(network, addr string) (net.Conn, error)
-
-func (f dialerFunc) Dial(network, addr string) (net.Conn, error) {
-	return f(network, addr)
-}
-
 func (p *Proxy) connectSOCKS5(req *http.Request, proxyURL *url.URL) (*http.Response, net.Conn, error) {
 	log.Debugf("martian: CONNECT with upstream SOCKS5 proxy: %s", proxyURL.Host)
 
-	u := proxyURL.User
-	var auth *proxy.Auth
-	if u != nil {
-		auth = new(proxy.Auth)
-		auth.User = u.Username()
-		if p, ok := u.Password(); ok {
-			auth.Password = p
-		}
-	}
+	d := dialvia.SOCKS5Proxy(p.dial, proxyURL)
 
-	addr := proxyURL.Hostname()
-	port := proxyURL.Port()
-	if port == "" {
-		port = "1080"
-	}
-
-	d, err := proxy.SOCKS5("tcp", net.JoinHostPort(addr, port), auth, dialerFunc(p.dial))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	conn, err := d.Dial("tcp", req.URL.Host)
+	conn, err := d.DialContext(req.Context(), "tcp", req.URL.Host)
 	if err != nil {
 		return nil, nil, err
 	}
