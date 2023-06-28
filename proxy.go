@@ -794,7 +794,7 @@ func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (res *http.Res
 	log.Debugf("martian: CONNECT with upstream HTTP proxy: %s", proxyURL.Host)
 
 	if proxyURL.Scheme == "https" {
-		d := dialvia.HTTPSProxy(p.dial, proxyURL, p.clientTLCConfig())
+		d := dialvia.HTTPSProxy(p.dial, proxyURL, p.clientTLSConfig())
 		res, conn, err = d.DialContext(req.Context(), "tcp", req.URL.Host)
 	} else {
 		d := dialvia.HTTPProxy(p.dial, proxyURL)
@@ -809,7 +809,7 @@ func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (res *http.Res
 	return res, conn, err
 }
 
-func (p *Proxy) clientTLCConfig() *tls.Config {
+func (p *Proxy) clientTLSConfig() *tls.Config {
 	if tr, ok := p.roundTripper.(*http.Transport); ok && tr.TLSClientConfig != nil {
 		return tr.TLSClientConfig.Clone()
 	}
