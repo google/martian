@@ -103,6 +103,31 @@ func TestHTTPProxyDialerDialContext(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+
+	t.Run("context canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			serveOne(l, func(conn net.Conn) error {
+				cancel()
+				<-done
+				return nil
+			})
+		}()
+
+		conn, err := d.DialContext(ctx, "tcp", "foobar.com:80")
+		if err == nil {
+			t.Fatal("err is nil")
+		}
+		t.Log(err)
+		if conn != nil {
+			t.Fatal("conn is not nil")
+		}
+
+		done <- struct{}{}
+	})
 }
 
 func serveOne(l net.Listener, h func(conn net.Conn) error) error {

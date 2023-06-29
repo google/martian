@@ -101,17 +101,17 @@ func (d *HTTPProxyDialer) DialContextR(ctx context.Context, network, addr string
 	pbw := bufio.NewWriterSize(conn, 1024)
 	pbr := bufio.NewReaderSize(conn, 1024)
 
-	connReq := &http.Request{
+	req := http.Request{
 		Method: http.MethodConnect,
 		URL:    &url.URL{Host: addr},
 		Host:   addr,
 	}
 	if d.proxyURL.User != nil {
-		connReq.Header = make(http.Header, 1)
-		connReq.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(d.proxyURL.User.String())))
+		req.Header = make(http.Header, 1)
+		req.Header.Add("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(d.proxyURL.User.String())))
 	}
 
-	if err := connReq.Write(pbw); err != nil {
+	if err := req.Write(pbw); err != nil {
 		conn.Close()
 		return nil, nil, err
 	}
@@ -120,6 +120,26 @@ func (d *HTTPProxyDialer) DialContextR(ctx context.Context, network, addr string
 		return nil, nil, err
 	}
 
-	res, err := http.ReadResponse(pbr, connReq)
-	return res, conn, err
+	resCh := make(chan *http.Response, 1)
+	errCh := make(chan error, 1)
+
+	go func() {
+		res, err := http.ReadResponse(pbr, &req)
+		if err != nil {
+			errCh <- err
+		} else {
+			resCh <- res
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		conn.Close()
+		return nil, nil, ctx.Err()
+	case err := <-errCh:
+		conn.Close()
+		return nil, nil, err
+	case res := <-resCh:
+		return res, conn, nil
+	}
 }
