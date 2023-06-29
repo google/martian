@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 )
 
@@ -58,6 +59,30 @@ func HTTPSProxy(dial ContextDialerFunc, proxyURL *url.URL, tlsConfig *tls.Config
 		proxyURL:  proxyURL,
 		tlsConfig: tlsConfig,
 	}
+}
+
+func (d *HTTPProxyDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	res, conn, err := d.DialContextR(ctx, network, addr)
+	if err != nil {
+		if conn != nil {
+			conn.Close()
+		}
+		return nil, err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode/100 != 2 {
+		b, err := httputil.DumpResponse(res, true)
+		if err != nil {
+			b = []byte(fmt.Sprintf("error dumping response: %s", err))
+		}
+
+		conn.Close()
+		return nil, fmt.Errorf("proxy connection failed status=%d\n\n%s", res.StatusCode, string(b))
+	}
+
+	return conn, nil
 }
 
 func (d *HTTPProxyDialer) DialContextR(ctx context.Context, network, addr string) (*http.Response, net.Conn, error) {
