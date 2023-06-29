@@ -1,3 +1,5 @@
+// Copyright 2023 Sauce Labs, Inc. All rights reserved.
+
 package dialvia
 
 import (
