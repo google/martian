@@ -60,7 +60,7 @@ func HTTPSProxy(dial ContextDialerFunc, proxyURL *url.URL, tlsConfig *tls.Config
 	}
 }
 
-func (d *HTTPProxyDialer) DialContext(ctx context.Context, network, addr string) (*http.Response, net.Conn, error) {
+func (d *HTTPProxyDialer) DialContextR(ctx context.Context, network, addr string) (*http.Response, net.Conn, error) {
 	if network != "tcp" && network != "tcp4" && network != "tcp6" {
 		return nil, nil, fmt.Errorf("unsupported network: %s", network)
 	}

@@ -795,10 +795,10 @@ func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (res *http.Res
 
 	if proxyURL.Scheme == "https" {
 		d := dialvia.HTTPSProxy(p.dial, proxyURL, p.clientTLSConfig())
-		res, conn, err = d.DialContext(req.Context(), "tcp", req.URL.Host)
+		res, conn, err = d.DialContextR(req.Context(), "tcp", req.URL.Host)
 	} else {
 		d := dialvia.HTTPProxy(p.dial, proxyURL)
-		res, conn, err = d.DialContext(req.Context(), "tcp", req.URL.Host)
+		res, conn, err = d.DialContextR(req.Context(), "tcp", req.URL.Host)
 	}
 
 	if res != nil && res.StatusCode/100 == 2 {
