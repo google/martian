@@ -801,9 +801,15 @@ func (p *Proxy) connectHTTP(req *http.Request, proxyURL *url.URL) (res *http.Res
 		res, conn, err = d.DialContextR(req.Context(), "tcp", req.URL.Host)
 	}
 
-	if res != nil && res.StatusCode/100 == 2 {
-		res.Body.Close()
-		return proxyutil.NewResponse(200, nil, req), conn, nil
+	if res != nil {
+		if res.StatusCode/100 == 2 {
+			res.Body.Close()
+			return proxyutil.NewResponse(200, nil, req), conn, nil
+		}
+
+		// If the proxy returns a non-2xx response, return it to the client.
+		// But first, replace the Request with the original request.
+		res.Request = req
 	}
 
 	return res, conn, err
