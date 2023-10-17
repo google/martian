@@ -1252,7 +1252,7 @@ func TestServerClosesConnection(t *testing.T) {
 			"Content-type: text/html\r\n" +
 			"Connection: close\r\n\r\n"))
 		if err != nil {
-			t.Fatalf("Got error while writting to connection on destination listener: %v", err)
+			t.Fatalf("Got error while writing to connection on destination listener: %v", err)
 		}
 		conn.Close()
 	}()
